@@ -32,8 +32,7 @@ CLAUDE CEREBRO/
 │   ├── DM_CARS/            ← CONSECIONARIA.MD (Martin)
 │   ├── PRESTAMISTA/        ← APP.PRESTAMISTA (Martin)
 │   ├── GOJULITO/           ← gojulito (Edu)
-│   ├── JOSE_YBARRA/        ← Finanzas-jy (Edu)
-│   └── JAMROCK/            ← Jamrock (Edu)
+│   └── JOSE_YBARRA/        ← Finanzas-jy (Edu)
 │
 ├── MODULOS/                ← biblioteca de módulos reutilizables
 │   └── README.md           ← catálogo con estado por proyecto
