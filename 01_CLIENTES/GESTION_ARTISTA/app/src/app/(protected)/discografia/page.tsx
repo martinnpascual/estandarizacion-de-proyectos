@@ -1077,19 +1077,14 @@ function SongRow({
             </span>
           </>
         ) : hasAudio ? (
-          /* Not playing, has audio: show number, replace with Play on hover */
-          <>
-            <button
-              onClick={onPlay}
-              title="Reproducir"
-              className="hidden group-hover:flex items-center justify-center w-7 h-7 rounded-full bg-primary text-primary-foreground hover:bg-primary/80 transition-colors"
-            >
-              <Play className="h-3 w-3 ml-0.5" />
-            </button>
-            <span className="text-xs text-muted-foreground group-hover:hidden">
-              {index}
-            </span>
-          </>
+          /* Not playing, has audio: always-visible play button */
+          <button
+            onClick={onPlay}
+            title="Reproducir"
+            className="flex items-center justify-center w-7 h-7 rounded-full text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-colors"
+          >
+            <Play className="h-3 w-3 ml-0.5" />
+          </button>
         ) : (
           /* No audio: just the number */
           <span className="text-xs text-muted-foreground">{index}</span>

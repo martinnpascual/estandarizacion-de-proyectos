@@ -44,6 +44,8 @@ import { translateDraftStatus } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import type { Draft, DraftStatus, Song } from "@/types/database";
 
+const DRAFT_YEARS = [2026, 2025, 2024, 2023, 2022, 2021, 2020];
+
 const STATUSES: { value: "todos" | DraftStatus; label: string }[] = [
   { value: "todos", label: "Todos" },
   { value: "borrador", label: "Borrador" },
@@ -115,6 +117,7 @@ export default function MaquetasPage() {
   const [sortBy, setSortBy] = useState<"default" | "az" | "pipeline" | "newest" | "oldest">("default");
   const [missingAudioFilter, setMissingAudioFilter] = useState(false);
   const [producerFilter, setProducerFilter] = useState<string | null>(null);
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const loadDrafts = useCallback(async () => {
@@ -320,8 +323,16 @@ export default function MaquetasPage() {
 
   const uniqueProducers = Array.from(new Set(drafts.filter(d => d.producer).map(d => d.producer!))).sort((a, b) => a.localeCompare(b, "es"));
 
+  const isSearching = searchQuery.trim().length > 0;
+
   const displayedDrafts = (() => {
     let result = [...drafts];
+    // Year filter — only when not searching
+    if (!isSearching) {
+      result = result.filter(d =>
+        d.month_created ? d.month_created.startsWith(String(selectedYear)) : false
+      );
+    }
     if (missingAudioFilter) {
       result = result.filter(d => !d.drive_file_id && !d.drive_file_url);
     }
@@ -341,7 +352,7 @@ export default function MaquetasPage() {
   })();
 
   // Group by month_created for the "Recientes" view
-  const showMonthGroups = sortBy === "default" && !searchQuery.trim() && statusFilter === "todos" && !missingAudioFilter;
+  const showMonthGroups = sortBy === "default" && !isSearching && statusFilter === "todos" && !missingAudioFilter;
   const draftsByMonth: { month: string; label: string; drafts: Draft[] }[] = [];
   if (showMonthGroups) {
     const seen = new Map<string, Draft[]>();
@@ -546,6 +557,41 @@ export default function MaquetasPage() {
           </div>
           <ChevronRight className="h-4 w-4 text-green-400 flex-shrink-0" />
         </button>
+      )}
+
+      {/* Tabs de años */}
+      {!isSearching && (
+        <div className="flex items-center gap-3">
+          <div className="flex gap-2 overflow-x-auto pb-1 flex-1">
+            {DRAFT_YEARS.map((year) => {
+              const count = drafts.filter(d => d.month_created?.startsWith(String(year))).length;
+              return (
+                <button
+                  key={year}
+                  onClick={() => setSelectedYear(year)}
+                  className={cn(
+                    "px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors",
+                    selectedYear === year
+                      ? "bg-blue-500/20 text-blue-400"
+                      : "bg-secondary text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {year}
+                  {count > 0 && (
+                    <span className={cn("ml-1.5 text-xs tabular-nums", selectedYear === year ? "opacity-80" : "opacity-50")}>
+                      ({count})
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          {!loading && (
+            <span className="flex-shrink-0 text-xs text-muted-foreground bg-secondary px-2.5 py-1 rounded-full tabular-nums">
+              {displayedDrafts.length} maqueta{displayedDrafts.length !== 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
       )}
 
       {/* Filtros */}
