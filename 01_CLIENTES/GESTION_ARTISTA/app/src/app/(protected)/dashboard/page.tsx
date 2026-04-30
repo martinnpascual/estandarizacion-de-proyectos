@@ -1,0 +1,1172 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import {
+  Disc3, FileAudio, Users, Calendar, TrendingUp, TrendingDown, Clock,
+  CheckCircle, AlertCircle, FolderOpen, ChevronRight, Music,
+  Zap, Rocket, Share2, FolderPlus, AlertTriangle, CalendarDays,
+} from "lucide-react";
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, AreaChart, Area,
+} from "recharts";
+import { AnimatedCounter } from "@/components/ui/MotionWrapper";
+import {
+  getDashboardStats, getLatestDrafts, getActiveCollabs,
+  getSongsChartData, getRecentActivity, getActiveProjects,
+  type DashboardStats, type SongsByYear, type SongsByGenre,
+  type ActivityItem,
+} from "@/lib/actions/dashboard";
+import { getUpcomingEvents, getUpcomingReleases } from "@/lib/actions/calendar";
+import { useUser } from "@/hooks/useUser";
+import { cn } from "@/lib/utils";
+import type { CalendarEvent, CalendarEventType, Draft, Collaboration, Project, ProjectStatus } from "@/types/database";
+
+// ── tipos ──────────────────────────────────────────────────────────────
+const EVENT_TYPE_DOTS: Record<CalendarEventType, string> = {
+  lanzamiento: "bg-green-500",
+  sesion_grabacion: "bg-blue-500",
+  evento_musical: "bg-purple-500",
+  reunion: "bg-yellow-500",
+  otro: "bg-muted-foreground",
+};
+
+const DRAFT_STATUS_LABEL: Record<string, string> = {
+  borrador: "Borrador",
+  en_mezcla: "En mezcla",
+  masterizada: "Masterizada",
+  lista_para_publicar: "Lista para publicar",
+};
+
+const DRAFT_STATUS_COLOR: Record<string, string> = {
+  borrador: "text-muted-foreground",
+  en_mezcla: "text-blue-400",
+  masterizada: "text-purple-400",
+  lista_para_publicar: "text-green-400",
+};
+
+const COLLAB_STATUS_COLOR: Record<string, string> = {
+  propuesta_enviada: "text-yellow-400",
+  en_grabacion: "text-blue-400",
+  recibido: "text-purple-400",
+  mezclando: "text-orange-400",
+  listo: "text-green-400",
+};
+
+const COLLAB_STATUS_LABEL: Record<string, string> = {
+  propuesta_enviada: "Propuesta enviada",
+  en_grabacion: "En grabación",
+  recibido: "Recibido",
+  mezclando: "Mezclando",
+  listo: "Listo",
+};
+
+const GENRE_CHART_COLORS: Record<string, string> = {
+  "Trap":      "#f97316",
+  "Reggaeton": "#22c55e",
+  "Hip Hop":   "#eab308",
+  "R&B":       "#ec4899",
+  "Pop":       "#06b6d4",
+  "Drill":     "#ef4444",
+  "Dancehall": "#a855f7",
+  "Afrobeats": "#f59e0b",
+  "Otro":      "#71717a",
+};
+const GENRE_COLORS_FALLBACK = [
+  "#7c3aed", "#2563eb", "#0891b2", "#059669", "#d97706",
+  "#dc2626", "#db2777", "#4f46e5", "#65a30d", "#0d9488",
+];
+function getGenreColor(genre: string, i: number) {
+  return GENRE_CHART_COLORS[genre] ?? GENRE_COLORS_FALLBACK[i % GENRE_COLORS_FALLBACK.length];
+}
+
+const TOOLTIP_STYLE = {
+  background: "hsl(var(--card))",
+  border: "1px solid hsl(var(--border) / 0.6)",
+  borderRadius: 12,
+  fontSize: 11,
+  boxShadow: "0 8px 32px hsl(0 0% 0% / 0.3)",
+  padding: "8px 12px",
+};
+
+const PROJECT_STATUS_COLOR: Record<ProjectStatus, string> = {
+  idea:          "text-zinc-400",
+  en_produccion: "text-blue-400",
+  en_mezcla:     "text-purple-400",
+  master:        "text-yellow-400",
+  listo:         "text-orange-400",
+  publicado:     "text-green-400",
+};
+
+const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
+  idea:          "Idea",
+  en_produccion: "En producción",
+  en_mezcla:     "En mezcla",
+  master:        "Master",
+  listo:         "Listo",
+  publicado:     "Publicado",
+};
+
+const PROJECT_TYPE_LABEL: Record<string, string> = {
+  album:   "Álbum",
+  ep:      "EP",
+  mixtape: "Mixtape",
+  single:  "Single",
+};
+
+// ── deadline urgency helper (dashboard use) ───────────────────────────
+function deadlineChip(deadline: string | null): { label: string; cls: string; urgent: boolean } | null {
+  if (!deadline) return null;
+  const now = new Date(); now.setHours(0,0,0,0);
+  const d = new Date(deadline); d.setHours(0,0,0,0);
+  const diff = Math.round((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  if (diff < 0) return { label: `Vencido`, cls: "text-red-400", urgent: true };
+  if (diff === 0) return { label: "Hoy", cls: "text-red-400", urgent: true };
+  if (diff === 1) return { label: "Mañana", cls: "text-orange-400", urgent: true };
+  if (diff <= 7) return { label: `${diff}d`, cls: "text-yellow-400", urgent: false };
+  return null; // don't clutter the widget with far-off deadlines
+}
+
+// ── componente principal ───────────────────────────────────────────────
+export default function DashboardPage() {
+  const { user, profile } = useUser();
+  const searchParams = useSearchParams();
+  const googleConnected = searchParams.get("google_connected") === "true";
+  const googleError = searchParams.get("google_error");
+
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [collabs, setCollabs] = useState<Collaboration[]>([]);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [byYear, setByYear] = useState<SongsByYear[]>([]);
+  const [byGenre, setByGenre] = useState<SongsByGenre[]>([]);
+  const [activity, setActivity] = useState<ActivityItem[]>([]);
+  const [releases, setReleases] = useState<CalendarEvent[]>([]);
+  const [activeProjects, setActiveProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [googleLinked, setGoogleLinked] = useState<boolean | null>(null);
+  const [activityFilter, setActivityFilter] = useState<ActivityItem["type"] | "all">("all");
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const [statsRes, draftsRes, collabsRes, eventsRes, chartRes, activityRes, releasesRes, projectsRes] = await Promise.all([
+          getDashboardStats(),
+          getLatestDrafts(4),
+          getActiveCollabs(4),
+          getUpcomingEvents(5),
+          getSongsChartData(),
+          getRecentActivity(30),
+          getUpcomingReleases(5),
+          getActiveProjects(4),
+        ]);
+        setStats(statsRes.data);
+        setDrafts(draftsRes.data ?? []);
+        setCollabs(collabsRes.data ?? []);
+        setEvents(eventsRes.data ?? []);
+        setByYear(chartRes.byYear ?? []);
+        setByGenre(chartRes.byGenre ?? []);
+        setActivity(activityRes.data ?? []);
+        setReleases(releasesRes.data ?? []);
+        setActiveProjects(projectsRes.data ?? []);
+      } catch (e) {
+        console.error("Dashboard load error:", e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+
+    // Verificar si Google está conectado consultando el perfil
+    fetch("/api/drive/files?q=__check__")
+      .then((r) => r.json())
+      .then((j) => setGoogleLinked(!j.needs_auth))
+      .catch(() => setGoogleLinked(false));
+  }, []);
+
+  // Use profile's full_name if available, fall back to email prefix
+  const firstName = profile?.full_name
+    ? profile.full_name.split(" ")[0].toUpperCase()
+    : (user?.email?.split("@")[0] ?? "BERTIAKA").toUpperCase();
+
+  const greeting = (() => {
+    const h = new Date().getHours();
+    if (h < 12) return "Buenos días";
+    if (h < 18) return "Buenas tardes";
+    return "Buenas noches";
+  })();
+
+  const todayLabel = new Date().toLocaleDateString("es-AR", {
+    weekday: "long", day: "numeric", month: "long",
+  });
+
+  // ── Esta semana — computed from already-loaded state ─────────────────
+  type WeekItem = {
+    id: string; date: string; title: string; subtitle?: string;
+    href: string; kind: "event" | "collab" | "project";
+  };
+
+  const todayMidnight = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
+
+  const thisWeekItems: WeekItem[] = (() => {
+    if (loading) return [];
+    const in7 = new Date(todayMidnight); in7.setDate(in7.getDate() + 7);
+    const items: WeekItem[] = [];
+    events.forEach(ev => {
+      const raw = ev.start_date.split("T")[0];
+      const d = new Date(raw + "T12:00:00"); d.setHours(0, 0, 0, 0);
+      if (d >= todayMidnight && d <= in7)
+        items.push({ id: ev.id, date: raw, title: ev.title, href: `/calendario?event=${ev.id}`, kind: "event" });
+    });
+    collabs.forEach(c => {
+      if (!c.deadline) return;
+      const d = new Date(c.deadline + "T00:00:00"); d.setHours(0, 0, 0, 0);
+      if (d >= todayMidnight && d <= in7)
+        items.push({ id: c.id, date: c.deadline, title: c.song_title, subtitle: `Deadline · ${c.artist_name}`, href: `/collabs?collab=${c.id}`, kind: "collab" });
+    });
+    activeProjects.forEach(p => {
+      if (!p.target_date) return;
+      const d = new Date(p.target_date + "T00:00:00"); d.setHours(0, 0, 0, 0);
+      if (d >= todayMidnight && d <= in7)
+        items.push({ id: p.id, date: p.target_date, title: p.name, subtitle: `Target · ${PROJECT_TYPE_LABEL[p.type] ?? p.type}`, href: `/proyectos?project=${p.id}`, kind: "project" });
+    });
+    return items.sort((a, b) => a.date.localeCompare(b.date));
+  })();
+
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(todayMidnight);
+    d.setDate(d.getDate() + i);
+    const dateStr = d.toISOString().split("T")[0];
+    return {
+      dateStr,
+      label: d.toLocaleDateString("es-AR", { weekday: "short" }),
+      dayNum: d.getDate(),
+      isToday: i === 0,
+      count: thisWeekItems.filter(item => item.date === dateStr).length,
+    };
+  });
+
+  const groupedWeekItems = (() => {
+    const groups: { date: string; label: string; diff: number; items: WeekItem[] }[] = [];
+    thisWeekItems.forEach(item => {
+      const d = new Date(item.date + "T12:00:00"); d.setHours(0, 0, 0, 0);
+      const diff = Math.round((d.getTime() - todayMidnight.getTime()) / 86400000);
+      const label = diff === 0 ? "Hoy" : diff === 1 ? "Mañana"
+        : d.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "short" });
+      let group = groups.find(g => g.date === item.date);
+      if (!group) { group = { date: item.date, label, diff, items: [] }; groups.push(group); }
+      group.items.push(item);
+    });
+    return groups;
+  })();
+
+  // ── streak calculation (moved out of JSX) ─────────────────────────────────
+  const streak = (() => {
+    if (loading || !activity.length) return 0;
+    const todayMs = (() => { const d = new Date(); d.setHours(0,0,0,0); return d.getTime(); })();
+    let s = 0;
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(todayMs); d.setDate(d.getDate() - i);
+      const ds = d.toISOString().split("T")[0];
+      if (activity.some(a => a.ts.startsWith(ds))) { s++; } else if (i > 0) break;
+    }
+    return s;
+  })();
+
+  const weekTotal = loading ? 0 : activity.filter(a => {
+    const d = new Date(a.ts); d.setHours(0,0,0,0);
+    const today = new Date(); today.setHours(0,0,0,0);
+    return (today.getTime() - d.getTime()) < 7 * 86_400_000;
+  }).length;
+
+  return (
+    <div className="space-y-5">
+
+      {/* ── HERO BANNER ─────────────────────────────────────────────────────── */}
+      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card">
+        {/* Ambient gradients */}
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute -top-20 -right-20 w-72 h-72 bg-primary/8 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-10 -left-10 w-48 h-48 bg-blue-500/5 rounded-full blur-2xl pointer-events-none" />
+
+        <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-6">
+          {/* Left: avatar + name */}
+          <div className="flex items-center gap-4">
+            {/* Artist photo */}
+            <div className="relative flex-shrink-0">
+              <div className="absolute inset-0 rounded-2xl bg-primary/30 blur-lg scale-110" />
+              <div className="relative w-16 h-16 rounded-2xl overflow-hidden border-2 border-primary/30 shadow-[0_0_24px_hsl(var(--primary)/0.3)]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/artist.jpg"
+                  alt="BERTIAKA"
+                  className="w-full h-full object-cover"
+                  style={{ objectPosition: "50% 12%" }}
+                />
+              </div>
+              {/* Online dot */}
+              <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-green-500 border-2 border-card shadow-[0_0_6px_hsl(142_70%_45%/0.6)]" />
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-primary/60 mb-0.5">{greeting}</p>
+              <h1 className="text-4xl sm:text-5xl font-black tracking-tight leading-none gradient-text">
+                {firstName}
+              </h1>
+              <p className="text-muted-foreground/70 text-sm mt-1.5 font-medium capitalize">{todayLabel}</p>
+            </div>
+          </div>
+
+          {/* Right side: streak + activity */}
+          <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
+            {streak >= 2 && (
+              <div className="flex flex-col items-center px-4 py-3 rounded-xl bg-orange-500/10 border border-orange-500/20">
+                <span className="text-xl">{streak >= 14 ? "🔥🔥" : streak >= 7 ? "🔥" : "⚡"}</span>
+                <span className="text-xs font-bold text-orange-400 tabular-nums">{streak}d</span>
+                <span className="text-[10px] text-orange-400/60 uppercase tracking-wide">racha</span>
+              </div>
+            )}
+            {weekTotal > 0 && (
+              <div className="flex flex-col items-center px-4 py-3 rounded-xl bg-primary/8 border border-primary/15">
+                <Zap className="h-4 w-4 text-primary mb-0.5" />
+                <span className="text-xs font-bold text-primary tabular-nums">{weekTotal}</span>
+                <span className="text-[10px] text-primary/50 uppercase tracking-wide">esta semana</span>
+              </div>
+            )}
+            {!loading && stats && (
+              <div className="flex flex-col items-center px-4 py-3 rounded-xl bg-secondary/60 border border-border/60">
+                <Disc3 className="h-4 w-4 text-muted-foreground mb-0.5" />
+                <span className="text-xs font-bold tabular-nums">{stats.totalSongs}</span>
+                <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wide">canciones</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Alerts Google */}
+      {googleConnected && (
+        <div className="flex items-center gap-2 px-4 py-3 bg-green-500/10 border border-green-500/20 rounded-xl text-sm text-green-400">
+          <CheckCircle className="h-4 w-4 flex-shrink-0" />
+          Google Drive y Calendar conectados correctamente.
+        </div>
+      )}
+      {googleError && (
+        <div className="flex items-center gap-2 px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-xl text-sm text-red-400">
+          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+          Error al conectar con Google: {googleError}.
+        </div>
+      )}
+
+      {/* Google connection banner */}
+      {googleLinked === false && !googleConnected && !googleError && (
+        <div className="flex items-center justify-between px-4 py-3 bg-card border border-border rounded-xl">
+          <div className="flex items-center gap-2">
+            <FolderOpen className="h-4 w-4 text-muted-foreground" />
+            <div>
+              <p className="text-sm font-medium">Conectar Google Drive & Calendar</p>
+              <p className="text-xs text-muted-foreground">Para vincular archivos de audio y sincronizar eventos</p>
+            </div>
+          </div>
+          <a href="/api/auth/google" className="px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:bg-primary/80 transition-colors flex-shrink-0">
+            Conectar
+          </a>
+        </div>
+      )}
+
+      {/* Urgency alerts */}
+      {!loading && (() => {
+        const today = new Date(); today.setHours(0,0,0,0);
+        const overdueCollabs = collabs.filter(c => {
+          if (!c.deadline) return false;
+          const d = new Date(c.deadline); d.setHours(0,0,0,0);
+          return d < today;
+        });
+        const overdueProjects = activeProjects.filter(p => {
+          if (!p.target_date) return false;
+          const d = new Date(p.target_date + "T00:00:00");
+          return d < today;
+        });
+        const total = overdueCollabs.length + overdueProjects.length;
+        if (total === 0) return null;
+        return (
+          <a href="/notificaciones?filter=overdue" className="flex items-center justify-between px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-xl hover:bg-red-500/15 transition-colors">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-red-400 flex-shrink-0" />
+              <p className="text-sm font-medium text-red-400">
+                {total} elemento{total !== 1 ? "s" : ""} vencido{total !== 1 ? "s" : ""} — atención requerida
+              </p>
+            </div>
+            <ChevronRight className="h-4 w-4 text-red-400 flex-shrink-0" />
+          </a>
+        );
+      })()}
+
+      {/* Maquetas listas alert */}
+      {!loading && (stats?.readyToPublish ?? 0) > 0 && (
+        <a href="/maquetas?status=lista_para_publicar" className="flex items-center justify-between px-4 py-3 bg-green-500/10 border border-green-500/30 rounded-xl hover:bg-green-500/15 transition-colors">
+          <div className="flex items-center gap-2">
+            <CheckCircle className="h-4 w-4 text-green-400 flex-shrink-0" />
+            <p className="text-sm font-medium text-green-400">
+              {stats!.readyToPublish} maqueta{stats!.readyToPublish !== 1 ? "s" : ""} lista{stats!.readyToPublish !== 1 ? "s" : ""} para publicar
+            </p>
+          </div>
+          <ChevronRight className="h-4 w-4 text-green-400 flex-shrink-0" />
+        </a>
+      )}
+
+      {/* Proyectos listos alert */}
+      {!loading && (stats?.listoProjects ?? 0) > 0 && (
+        <a href="/proyectos?status=listo" className="flex items-center justify-between px-4 py-3 bg-purple-500/10 border border-purple-500/30 rounded-xl hover:bg-purple-500/15 transition-colors">
+          <div className="flex items-center gap-2">
+            <FolderOpen className="h-4 w-4 text-purple-400 flex-shrink-0" />
+            <p className="text-sm font-medium text-purple-400">
+              {stats!.listoProjects} proyecto{stats!.listoProjects !== 1 ? "s" : ""} listo{stats!.listoProjects !== 1 ? "s" : ""} — pendiente{stats!.listoProjects !== 1 ? "s" : ""} de publicar
+            </p>
+          </div>
+          <ChevronRight className="h-4 w-4 text-purple-400 flex-shrink-0" />
+        </a>
+      )}
+
+      {/* Collabs listos alert */}
+      {!loading && (stats?.listoCollabs ?? 0) > 0 && (
+        <a href="/collabs?status=listo" className="flex items-center justify-between px-4 py-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl hover:bg-yellow-500/15 transition-colors">
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-yellow-400 flex-shrink-0" />
+            <p className="text-sm font-medium text-yellow-400">
+              {stats!.listoCollabs} collab{stats!.listoCollabs !== 1 ? "s" : ""} lista{stats!.listoCollabs !== 1 ? "s" : ""} — parte grabada recibida
+            </p>
+          </div>
+          <ChevronRight className="h-4 w-4 text-yellow-400 flex-shrink-0" />
+        </a>
+      )}
+
+      {/* Stats cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <StatCard icon={Disc3}     label="Canciones"       value={loading ? "…" : String(stats?.totalSongs ?? 0)}    iconBg="bg-primary/15"     iconColor="text-primary"      accent="bg-primary"      href="/discografia" />
+        <StatCard icon={FileAudio} label="Maquetas activas" value={loading ? "…" : String(stats?.activeDrafts ?? 0)}  iconBg="bg-blue-500/15"    iconColor="text-blue-400"     accent="bg-blue-500"     href="/maquetas" />
+        <StatCard icon={Users}     label="Collabs activas"  value={loading ? "…" : String(stats?.pendingCollabs ?? 0)} iconBg="bg-yellow-500/15"  iconColor="text-yellow-400"   accent="bg-yellow-500"   href="/collabs" />
+        <StatCard icon={Calendar}  label="Eventos mes"      value={loading ? "…" : String(stats?.eventsThisMonth ?? 0)} iconBg="bg-green-500/15"  iconColor="text-green-400"    accent="bg-green-500"    href="/calendario" />
+        <StatCard icon={FolderOpen} label="Proyectos act."  value={loading ? "…" : String(stats?.activeProjects ?? 0)} iconBg="bg-purple-500/15"  iconColor="text-purple-400"   accent="bg-purple-500"   href="/proyectos" />
+        <StatCard icon={Music}     label="Listas publicar"  value={loading ? "…" : String(stats?.readyToPublish ?? 0)} iconBg="bg-emerald-500/15" iconColor="text-emerald-400"  accent="bg-emerald-500"  href="/maquetas" />
+      </div>
+
+      {/* Quick actions */}
+      <div className="hidden md:grid grid-cols-5 gap-2">
+        {[
+          { label: "Nueva canción",  icon: Disc3,     href: "/discografia?new=1", grad: "from-violet-600 to-purple-700",  shadow: "shadow-purple-900/40"  },
+          { label: "Nueva maqueta",  icon: FileAudio, href: "/maquetas?new=1",    grad: "from-blue-500 to-cyan-600",      shadow: "shadow-blue-900/40"    },
+          { label: "Nuevo evento",   icon: Calendar,  href: "/calendario?new=1",  grad: "from-green-500 to-emerald-600",  shadow: "shadow-green-900/40"   },
+          { label: "Nueva collab",   icon: Share2,    href: "/collabs?new=1",     grad: "from-amber-500 to-orange-600",   shadow: "shadow-orange-900/40"  },
+          { label: "Nuevo proyecto", icon: FolderPlus,href: "/proyectos?new=1",   grad: "from-pink-500 to-rose-600",      shadow: "shadow-pink-900/40"    },
+        ].map(({ label, icon: Icon, href, grad, shadow }) => (
+          <a key={href} href={href}
+            className="flex flex-col items-center gap-2.5 py-4 px-2 rounded-xl border border-border/60 bg-card hover:bg-secondary/30 transition-all group text-center hover:border-border hover:shadow-lg">
+            <div className={cn(
+              "w-11 h-11 rounded-xl flex items-center justify-center bg-gradient-to-br shadow-lg transition-all group-hover:scale-110 group-hover:shadow-xl",
+              grad, shadow
+            )}>
+              <Icon className="h-5 w-5 text-white drop-shadow" />
+            </div>
+            <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors leading-tight">{label}</span>
+          </a>
+        ))}
+      </div>
+
+      {/* Esta semana — mini agenda */}
+      <div className="bg-card/80 backdrop-blur-sm rounded-2xl border border-border/60 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-muted-foreground" />
+            <h2 className="font-semibold text-sm">Esta semana</h2>
+          </div>
+          <a href="/calendario" className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-0.5">
+            Agenda completa <ChevronRight className="h-3 w-3" />
+          </a>
+        </div>
+
+        {/* 7-day strip */}
+        <div className="grid grid-cols-7 gap-1 mb-4">
+          {weekDays.map((day) => (
+            <div key={day.dateStr} className={cn(
+              "flex flex-col items-center gap-0.5 py-2 px-0.5 rounded-lg",
+              day.isToday ? "bg-primary/10 ring-1 ring-primary/30" : "bg-secondary/50"
+            )}>
+              <span className={cn("text-[9px] uppercase tracking-wide font-medium",
+                day.isToday ? "text-primary" : "text-muted-foreground/70")}>
+                {day.label}
+              </span>
+              <span className={cn("text-sm font-bold leading-tight",
+                day.isToday ? "text-primary" : day.count > 0 ? "text-foreground" : "text-muted-foreground/50")}>
+                {day.dayNum}
+              </span>
+              <div className="h-2 flex items-center justify-center gap-0.5">
+                {day.count > 0 && Array.from({ length: Math.min(day.count, 3) }, (_, i) => (
+                  <span key={i} className={cn("w-1 h-1 rounded-full",
+                    day.isToday ? "bg-primary" : "bg-muted-foreground/50")} />
+                ))}
+                {day.count === 0 && <span className="w-1 h-1" />}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Items grouped by day */}
+        {loading ? (
+          <WidgetSkeleton />
+        ) : groupedWeekItems.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-3">
+            Sin eventos ni deadlines esta semana 🎵
+          </p>
+        ) : (
+          <div className="-mx-5">
+            {groupedWeekItems.map(group => (
+              <div key={group.date}>
+                <div className="px-5 pt-2.5 pb-1">
+                  <span className={cn(
+                    "text-[10px] font-bold uppercase tracking-widest",
+                    group.diff === 0 ? "text-primary" :
+                    group.diff === 1 ? "text-orange-400" :
+                    "text-muted-foreground/60"
+                  )}>
+                    {group.label}
+                  </span>
+                </div>
+                {group.items.map(item => (
+                  <a key={item.id} href={item.href}
+                    className="flex items-center gap-3 px-5 py-2 hover:bg-secondary/40 transition-colors group">
+                    {item.kind === "event" && (
+                      <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0 mt-0.5" />
+                    )}
+                    {item.kind === "collab" && (
+                      <AlertTriangle className="h-3.5 w-3.5 text-yellow-400 flex-shrink-0" />
+                    )}
+                    {item.kind === "project" && (
+                      <FolderOpen className="h-3.5 w-3.5 text-purple-400 flex-shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
+                        {item.title}
+                      </p>
+                      {item.subtitle && (
+                        <p className="text-xs text-muted-foreground truncate">{item.subtitle}</p>
+                      )}
+                    </div>
+                  </a>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Próximos lanzamientos */}
+      {(loading || releases.length > 0) && (
+        <Widget title="Próximos lanzamientos" icon={Rocket} href="/calendario" accentColor="bg-green-500">
+          {loading ? (
+            <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="flex-shrink-0 w-44 h-24 rounded-xl bg-secondary/60 animate-pulse" />
+              ))}
+            </div>
+          ) : (
+            <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin">
+              {releases.map((r) => (
+                <ReleaseCard key={r.id} release={r} />
+              ))}
+            </div>
+          )}
+        </Widget>
+      )}
+
+      {/* Main grid */}
+      <div className="grid md:grid-cols-2 gap-6">
+
+        {/* Últimas maquetas */}
+        <Widget title="Últimas maquetas" icon={Clock} href="/maquetas" accentColor="bg-blue-500">
+          {loading ? <WidgetSkeleton /> : drafts.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">Sin maquetas aún</p>
+          ) : (
+            <div className="divide-y divide-border -mx-5">
+              {drafts.map((d) => (
+                <a key={d.id} href={`/maquetas?draft=${d.id}`}
+                  className="flex items-center gap-3 py-2.5 px-5 hover:bg-secondary/40 transition-colors group">
+                  <Music className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">{d.title}</p>
+                    {d.producer && <p className="text-xs text-muted-foreground truncate">{d.producer}</p>}
+                  </div>
+                  <span className={cn("text-xs flex-shrink-0", DRAFT_STATUS_COLOR[d.status])}>
+                    {DRAFT_STATUS_LABEL[d.status]}
+                  </span>
+                </a>
+              ))}
+            </div>
+          )}
+        </Widget>
+
+        {/* Próximos eventos */}
+        <Widget title="Próximos eventos" icon={Calendar} href="/calendario" accentColor="bg-green-500">
+          {loading ? <WidgetSkeleton /> : events.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">Sin eventos próximos</p>
+          ) : (
+            <div className="space-y-1 -mx-5">
+              {events.map((ev) => (
+                <a key={ev.id} href={`/calendario?event=${ev.id}`}
+                  className="flex items-start gap-3 px-5 py-2.5 rounded-lg hover:bg-secondary/40 transition-colors group">
+                  <span className={cn("w-2 h-2 rounded-full mt-1.5 flex-shrink-0", EVENT_TYPE_DOTS[ev.event_type])} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">{ev.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(ev.start_date.includes("T") ? ev.start_date : ev.start_date + "T12:00:00")
+                        .toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}
+                    </p>
+                  </div>
+                </a>
+              ))}
+            </div>
+          )}
+        </Widget>
+
+        {/* Collabs activas */}
+        <Widget title="Featuring activos" icon={Users} href="/collabs" accentColor="bg-yellow-500">
+          {loading ? <WidgetSkeleton /> : collabs.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">Sin collabs activas</p>
+          ) : (
+            <div className="divide-y divide-border -mx-5">
+              {collabs.map((c) => {
+                const chip = deadlineChip(c.deadline);
+                return (
+                  <a key={c.id} href={`/collabs?collab=${c.id}`}
+                    className="flex items-center gap-3 py-2.5 px-5 hover:bg-secondary/40 transition-colors group">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">{c.song_title}</p>
+                      <p className="text-xs text-muted-foreground truncate">con {c.artist_name}</p>
+                    </div>
+                    {chip ? (
+                      <span className={cn("flex items-center gap-0.5 text-xs font-medium flex-shrink-0", chip.cls)}>
+                        {chip.urgent && <AlertTriangle className="h-3 w-3" />}
+                        {chip.label}
+                      </span>
+                    ) : (
+                      <span className={cn("text-xs flex-shrink-0", COLLAB_STATUS_COLOR[c.status])}>
+                        {COLLAB_STATUS_LABEL[c.status]}
+                      </span>
+                    )}
+                  </a>
+                );
+              })}
+            </div>
+          )}
+        </Widget>
+
+        {/* Proyectos activos */}
+        <Widget title="Proyectos activos" icon={FolderOpen} href="/proyectos" accentColor="bg-purple-500">
+          {loading ? <WidgetSkeleton /> : activeProjects.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">Sin proyectos activos</p>
+          ) : (
+            <div className="divide-y divide-border -mx-5">
+              {activeProjects.map((p) => {
+                const targetDate = p.target_date
+                  ? (() => {
+                      const today = new Date(); today.setHours(0,0,0,0);
+                      const d = new Date(p.target_date + "T00:00:00");
+                      const diff = Math.round((d.getTime() - today.getTime()) / 86_400_000);
+                      if (diff < 0)  return { label: "Vencido", cls: "text-red-400" };
+                      if (diff <= 30) return { label: `${diff}d`, cls: "text-yellow-400" };
+                      return { label: d.toLocaleDateString("es-AR", { month: "short", year: "numeric" }), cls: "text-muted-foreground" };
+                    })()
+                  : null;
+                return (
+                  <a key={p.id} href={`/proyectos?project=${p.id}`}
+                    className="flex items-center gap-3 py-2.5 px-5 hover:bg-secondary/40 transition-colors group">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">{p.name}</p>
+                      <p className="text-xs text-muted-foreground">{PROJECT_TYPE_LABEL[p.type] ?? p.type}</p>
+                    </div>
+                    {targetDate && (
+                      <span className={cn("text-xs flex-shrink-0", targetDate.cls)}>{targetDate.label}</span>
+                    )}
+                    <span className={cn("text-xs flex-shrink-0", PROJECT_STATUS_COLOR[p.status])}>
+                      {PROJECT_STATUS_LABEL[p.status]}
+                    </span>
+                  </a>
+                );
+              })}
+            </div>
+          )}
+        </Widget>
+
+        {/* Discografía summary */}
+        <Widget title="Estadísticas" icon={TrendingUp} href="/estadisticas" accentColor="bg-primary">
+          {loading ? <WidgetSkeleton /> : byYear.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">Sin canciones aún</p>
+          ) : (
+            <div className="space-y-4">
+              {byYear.length > 0 && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Canciones por año</p>
+                  <ResponsiveContainer width="100%" height={80}>
+                    <AreaChart data={byYear} margin={{ top: 4, right: 0, left: -25, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="songsByYearGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.35} />
+                          <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <XAxis dataKey="year" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                      <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} allowDecimals={false} />
+                      <Tooltip
+                        contentStyle={TOOLTIP_STYLE}
+                        formatter={(v) => [v as number, "canciones"]}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="count"
+                        stroke="hsl(var(--primary))"
+                        strokeWidth={2}
+                        fill="url(#songsByYearGrad)"
+                        dot={{ fill: "hsl(var(--primary))", r: 3, strokeWidth: 0 }}
+                        activeDot={{ r: 5, strokeWidth: 0 }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+              {byGenre.length > 0 && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Por género</p>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-shrink-0">
+                      <ResponsiveContainer width={80} height={80}>
+                        <PieChart>
+                          <Pie
+                            data={byGenre.slice(0, 8)}
+                            dataKey="count"
+                            nameKey="genre"
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={36}
+                            innerRadius={20}
+                            paddingAngle={2}
+                            strokeWidth={0}
+                          >
+                            {byGenre.slice(0, 8).map((entry, i) => (
+                              <Cell key={i} fill={getGenreColor(entry.genre, i)} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            contentStyle={TOOLTIP_STYLE}
+                            formatter={(v: unknown, name: unknown) => [v as number, name as string]}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="flex flex-col gap-1 flex-1 min-w-0">
+                      {byGenre.slice(0, 5).map((g, i) => (
+                        <div key={g.genre} className="flex items-center gap-1.5 text-xs">
+                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: getGenreColor(g.genre, i) }} />
+                          <span className="truncate text-muted-foreground">{g.genre}</span>
+                          <span className="ml-auto font-medium tabular-nums">{g.count}</span>
+                        </div>
+                      ))}
+                      {byGenre.length > 5 && (
+                        <p className="text-[10px] text-muted-foreground/60 mt-0.5">+{byGenre.length - 5} más</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </Widget>
+      </div>
+
+      {/* Actividad reciente */}
+      <Widget title="Actividad reciente" icon={Zap} href="/buscar" accentColor="bg-primary">
+        {loading ? <WidgetSkeleton /> : activity.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-6">Sin actividad reciente</p>
+        ) : (
+          <>
+            <ActivitySparkline activity={activity} />
+            {/* This week vs last week comparison */}
+            {(() => {
+              const now = new Date(); now.setHours(0,0,0,0);
+              const thisWeek = activity.filter(a => {
+                const d = new Date(a.ts); d.setHours(0,0,0,0);
+                return (now.getTime() - d.getTime()) < 7 * 86_400_000;
+              }).length;
+              const lastWeek = activity.filter(a => {
+                const d = new Date(a.ts); d.setHours(0,0,0,0);
+                const diff = now.getTime() - d.getTime();
+                return diff >= 7 * 86_400_000 && diff < 14 * 86_400_000;
+              }).length;
+              if (thisWeek === 0 && lastWeek === 0) return null;
+              const diff = thisWeek - lastWeek;
+              const pct = lastWeek > 0 ? Math.round((diff / lastWeek) * 100) : null;
+              return (
+                <div className="flex items-center gap-3 mt-3 mb-1">
+                  <span className="text-xs text-muted-foreground">
+                    Esta semana: <span className="font-semibold text-foreground">{thisWeek}</span> item{thisWeek !== 1 ? "s" : ""}
+                  </span>
+                  {lastWeek > 0 && (
+                    <span className={cn(
+                      "flex items-center gap-0.5 text-[11px] font-medium px-1.5 py-0.5 rounded-full",
+                      diff > 0 ? "text-green-400 bg-green-400/10" :
+                      diff < 0 ? "text-red-400 bg-red-400/10" :
+                      "text-muted-foreground bg-secondary"
+                    )}>
+                      {diff > 0 ? <TrendingUp className="h-3 w-3" /> : diff < 0 ? <TrendingDown className="h-3 w-3" /> : null}
+                      {pct !== null ? `${diff > 0 ? "+" : ""}${pct}%` : "="}
+                      <span className="opacity-60 ml-0.5">vs sem. anterior</span>
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
+            {/* Type filter pills */}
+            <div className="flex gap-1.5 mt-4 mb-1 overflow-x-auto pb-1">
+              {([
+                { key: "all", label: "Todos" },
+                { key: "song",    label: "Canciones" },
+                { key: "draft",   label: "Maquetas" },
+                { key: "collab",  label: "Featuring" },
+                { key: "project", label: "Proyectos" },
+              ] as { key: typeof activityFilter; label: string }[]).map(({ key, label }) => {
+                const count = key === "all" ? activity.length : activity.filter(a => a.type === key).length;
+                if (key !== "all" && count === 0) return null;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setActivityFilter(key)}
+                    className={cn(
+                      "flex items-center gap-1 text-[11px] px-2 py-1 rounded-full whitespace-nowrap transition-colors",
+                      activityFilter === key
+                        ? "bg-primary/15 text-primary font-medium"
+                        : "bg-secondary text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {label}
+                    {key !== "all" && <span className="tabular-nums opacity-70">{count}</span>}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="divide-y divide-border -mx-5">
+              {(activityFilter === "all" ? activity : activity.filter(a => a.type === activityFilter))
+                .slice(0, 10)
+                .map((item) => (
+                  <ActivityRow key={item.id} item={item} />
+                ))}
+            </div>
+          </>
+        )}
+      </Widget>
+    </div>
+  );
+}
+
+// ── sub-componentes ────────────────────────────────────────────────────
+function StatCard({ icon: Icon, label, value, iconBg, iconColor, accent, href }: {
+  icon: React.ElementType;
+  label: string;
+  value: string;
+  iconBg: string;
+  iconColor: string;
+  accent: string;
+  href?: string;
+}) {
+  const numValue = parseInt(value, 10);
+  const isNumeric = !isNaN(numValue) && value !== "…";
+
+  const inner = (
+    <div className="relative overflow-hidden">
+      {/* Accent line at bottom */}
+      <div className={cn("absolute bottom-0 left-0 right-0 h-0.5 opacity-50 rounded-full", accent)} />
+
+      {/* Icon + label row */}
+      <div className="flex items-center gap-2.5 mb-3">
+        <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0", iconBg)}>
+          <Icon className={cn("h-3.5 w-3.5", iconColor)} />
+        </div>
+        <span className="text-xs text-muted-foreground font-medium leading-tight">{label}</span>
+      </div>
+
+      {/* Value */}
+      {isNumeric ? (
+        <AnimatedCounter value={numValue} className="text-2xl font-black tracking-tight" />
+      ) : (
+        <p className="text-2xl font-black tracking-tight">{value}</p>
+      )}
+    </div>
+  );
+
+  if (href) {
+    return (
+      <a href={href}
+        className="bg-card/80 backdrop-blur-sm rounded-2xl border border-border/60 p-4 pb-5 block hover:border-primary/25 hover:shadow-lg transition-all duration-200 group hover:-translate-y-0.5">
+        {inner}
+      </a>
+    );
+  }
+  return (
+    <div className="bg-card/80 backdrop-blur-sm rounded-2xl border border-border/60 p-4 pb-5">{inner}</div>
+  );
+}
+
+function Widget({ title, icon: Icon, href, accentColor = "bg-primary", children }: {
+  title: string;
+  icon: React.ElementType;
+  href: string;
+  accentColor?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="bg-card/80 backdrop-blur-sm rounded-2xl border border-border/60 overflow-hidden">
+      {/* Top accent stripe */}
+      <div className={cn("h-0.5 w-full opacity-70", accentColor)} />
+      <div className="p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Icon className="h-4 w-4 text-muted-foreground" />
+            <h2 className="font-semibold text-sm tracking-tight">{title}</h2>
+          </div>
+          <a href={href}
+            className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-0.5 font-medium">
+            Ver todo <ChevronRight className="h-3 w-3" />
+          </a>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function WidgetSkeleton() {
+  return (
+    <div className="space-y-3 py-2">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="flex items-center gap-3 animate-pulse">
+          <div className="w-4 h-4 rounded bg-secondary flex-shrink-0" />
+          <div className="flex-1 space-y-1.5">
+            <div className="h-3 bg-secondary rounded w-3/4" />
+            <div className="h-2 bg-secondary rounded w-1/2" />
+          </div>
+          <div className="h-3 bg-secondary rounded w-16" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Activity sparkline (7 days) ────────────────────────────────────────
+function ActivitySparkline({ activity }: { activity: ActivityItem[] }) {
+  const days = 7;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Build array of last 7 days
+  const buckets: { label: string; total: number; song: number; draft: number; collab: number; project: number }[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    buckets.push({
+      label: d.toLocaleDateString("es-AR", { weekday: "short" }),
+      total: 0, song: 0, draft: 0, collab: 0, project: 0,
+    });
+  }
+
+  for (const item of activity) {
+    const itemDate = new Date(item.ts);
+    itemDate.setHours(0, 0, 0, 0);
+    const diffDays = Math.round((today.getTime() - itemDate.getTime()) / 86_400_000);
+    if (diffDays >= 0 && diffDays < days) {
+      const b = buckets[days - 1 - diffDays];
+      b.total += 1;
+      if (item.type === "song") b.song += 1;
+      else if (item.type === "draft") b.draft += 1;
+      else if (item.type === "collab") b.collab += 1;
+      else if (item.type === "project") b.project += 1;
+    }
+  }
+
+  const max = Math.max(...buckets.map(b => b.total), 1);
+  const totalWeek = buckets.reduce((s, b) => s + b.total, 0);
+
+  return (
+    <div className="mb-2">
+      <div className="flex items-end justify-between gap-1 h-12">
+        {buckets.map((b, i) => {
+          const heightPct = b.total > 0 ? Math.max(15, Math.round((b.total / max) * 100)) : 4;
+          const isToday = i === days - 1;
+          return (
+            <div key={i} className="flex flex-col items-center gap-1 flex-1">
+              <div className="w-full flex flex-col justify-end" style={{ height: "100%" }}>
+                <div
+                  className={cn("w-full rounded-sm transition-all duration-500",
+                    isToday ? "bg-primary" : b.total > 0 ? "bg-primary/40" : "bg-secondary")}
+                  style={{ height: `${heightPct}%` }}
+                  title={`${b.label}: ${b.total} elemento${b.total !== 1 ? "s" : ""}`}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex justify-between mt-1">
+        {buckets.map((b, i) => (
+          <span key={i} className={cn("text-[9px] text-center flex-1",
+            i === days - 1 ? "text-primary font-semibold" : "text-muted-foreground/60")}>
+            {b.label}
+          </span>
+        ))}
+      </div>
+      {totalWeek > 0 && (
+        <p className="text-xs text-muted-foreground mt-1.5">
+          <span className="font-medium text-foreground">{totalWeek}</span> elemento{totalWeek !== 1 ? "s" : ""} esta semana
+          {buckets[days - 1].total > 0 && (
+            <span className="ml-2 text-primary">· {buckets[days - 1].total} hoy</span>
+          )}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ── Activity row ───────────────────────────────────────────────────────
+
+const ACTIVITY_META: Record<ActivityItem["type"], { color: string; bg: string; icon: React.ElementType }> = {
+  song:    { color: "text-primary",      bg: "bg-primary/10",    icon: Disc3 },
+  draft:   { color: "text-blue-400",     bg: "bg-blue-400/10",   icon: FileAudio },
+  collab:  { color: "text-yellow-400",   bg: "bg-yellow-400/10", icon: Users },
+  project: { color: "text-purple-400",   bg: "bg-purple-400/10", icon: FolderOpen },
+};
+
+
+function timeAgo(isoDate: string): string {
+  const diff = Date.now() - new Date(isoDate).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1)  return "Hace un momento";
+  if (minutes < 60) return `Hace ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24)   return `Hace ${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7)     return `Hace ${days}d`;
+  return new Date(isoDate).toLocaleDateString("es-AR", { day: "numeric", month: "short" });
+}
+
+// ── Release countdown card ─────────────────────────────────────────────
+
+function daysUntil(dateStr: string): number {
+  const target = new Date(dateStr.includes("T") ? dateStr : dateStr + "T00:00:00");
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  return Math.ceil((target.getTime() - now.getTime()) / 86400000);
+}
+
+function ReleaseCard({ release }: { release: CalendarEvent }) {
+  const days = daysUntil(release.start_date);
+  const isToday = days === 0;
+  const isTomorrow = days === 1;
+
+  const urgencyRing =
+    days <= 3 ? "border-red-500/60 bg-red-500/5" :
+    days <= 14 ? "border-yellow-500/60 bg-yellow-500/5" :
+    "border-primary/40 bg-primary/5";
+
+  const badgeColor =
+    days <= 3 ? "bg-red-500 text-white" :
+    days <= 14 ? "bg-yellow-500 text-black" :
+    "bg-primary text-primary-foreground";
+
+  const countdownLabel =
+    isToday ? "¡Hoy!" :
+    isTomorrow ? "Mañana" :
+    `${days}d`;
+
+  const formattedDate = new Date(
+    release.start_date.includes("T") ? release.start_date : release.start_date + "T12:00:00"
+  ).toLocaleDateString("es-AR", { day: "numeric", month: "short", year: "numeric" });
+
+  // SVG ring: 36px circle, stroke-dasharray trick for progress (0‒90 days max)
+  const MAX_DAYS = 90;
+  const clamped = Math.min(days, MAX_DAYS);
+  const progress = isToday ? 1 : 1 - clamped / MAX_DAYS; // full ring = today
+  const circumference = 2 * Math.PI * 14; // r=14
+  const dash = circumference * progress;
+
+  return (
+    <a href={`/calendario?event=${release.id}`} className={cn(
+      "flex-shrink-0 w-44 rounded-xl border p-3 flex flex-col gap-2 transition-all hover:scale-[1.02] cursor-pointer",
+      urgencyRing
+    )}>
+      {/* Countdown ring + badge */}
+      <div className="flex items-center gap-2">
+        <div className="relative w-9 h-9 flex-shrink-0">
+          <svg width="36" height="36" viewBox="0 0 36 36" className="-rotate-90">
+            {/* Track */}
+            <circle cx="18" cy="18" r="14" fill="none" stroke="currentColor"
+              strokeWidth="3" className="text-secondary" />
+            {/* Progress */}
+            <circle cx="18" cy="18" r="14" fill="none"
+              stroke={days <= 3 ? "#ef4444" : days <= 14 ? "#eab308" : "hsl(var(--primary))"}
+              strokeWidth="3"
+              strokeDasharray={`${dash} ${circumference}`}
+              strokeLinecap="round"
+            />
+          </svg>
+          <span className={cn(
+            "absolute inset-0 flex items-center justify-center text-[9px] font-bold leading-none",
+            days <= 3 ? "text-red-400" : days <= 14 ? "text-yellow-400" : "text-primary"
+          )}>
+            {isToday ? "★" : isTomorrow ? "1d" : days > 99 ? "99+" : `${days}d`}
+          </span>
+        </div>
+        <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none", badgeColor)}>
+          {countdownLabel}
+        </span>
+      </div>
+
+      {/* Title */}
+      <p className="text-sm font-semibold leading-tight line-clamp-2">{release.title}</p>
+
+      {/* Date */}
+      <p className="text-[11px] text-muted-foreground mt-auto">{formattedDate}</p>
+    </a>
+  );
+}
+
+function ActivityRow({ item }: { item: ActivityItem }) {
+  const meta = ACTIVITY_META[item.type];
+  const Icon = meta.icon;
+  const isRecent = (Date.now() - new Date(item.ts).getTime()) < 7 * 86_400_000;
+  const isNew = item.action === "created" && isRecent;
+  return (
+    <a
+      href={item.href}
+      className="flex items-center gap-3 px-5 py-3 hover:bg-secondary/40 transition-colors group"
+    >
+      <span className={cn(
+        "w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0",
+        meta.bg, meta.color
+      )}>
+        <Icon className="h-3.5 w-3.5" />
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <p className="text-sm font-medium truncate">{item.title}</p>
+          {isNew && (
+            <span className="flex-shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/20 leading-none">
+              NUEVO
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground truncate">{item.subtitle}</p>
+      </div>
+      <span className="text-[10px] text-muted-foreground flex-shrink-0 whitespace-nowrap">
+        {timeAgo(item.ts)}
+      </span>
+    </a>
+  );
+}

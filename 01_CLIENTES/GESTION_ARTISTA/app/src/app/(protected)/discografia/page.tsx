@@ -9,7 +9,6 @@ import {
   Music,
   Play,
   Pause,
-  ExternalLink,
   Pencil,
   Trash2,
   Loader2,
@@ -27,8 +26,16 @@ import {
   Copy,
   Check,
   ImageOff,
+  FileText,
+  ArrowDownToLine,
+  Globe,
+  ExternalLink,
+  CalendarDays,
 } from "lucide-react";
+import Link from "next/link";
 import SongDetailPanel from "@/components/songs/SongDetailPanel";
+import LyricsPanel from "@/components/lyrics/LyricsPanel";
+import { SongRowSkeleton, SongCardSkeleton } from "@/components/ui/Skeletons";
 import { useAudioPlayerContext } from "@/components/audio/AudioPlayer";
 import SongForm from "@/components/songs/SongForm";
 import CommentsPanel from "@/components/comments/CommentsPanel";
@@ -44,6 +51,7 @@ import {
 import { formatTime } from "@/lib/utils";
 import type { Song } from "@/types/database";
 import { cn } from "@/lib/utils";
+import { getGenreColors } from "@/lib/genre-colors";
 
 const DEFAULT_YEARS = [2026, 2025, 2024, 2023, 2022, 2021, 2020, 2019];
 
@@ -68,6 +76,7 @@ export default function DiscografiaPage() {
   const [editingSong, setEditingSong] = useState<Song | undefined>(undefined);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [detailSong, setDetailSong] = useState<Song | null>(null);
+  const [lyricsSong, setLyricsSong] = useState<Song | null>(null);
 
   const [genreFilter, setGenreFilter] = useState<string | null>(null);
   const [missingPlatformFilter, setMissingPlatformFilter] = useState(false);
@@ -393,7 +402,15 @@ export default function DiscografiaPage() {
   handlePlaySongRef.current = handlePlaySong;
 
   return (
-    <div className="space-y-6">
+    <>
+    {/* ── Layout de dos columnas estilo Spotify ──────────────────────────── */}
+    <div className="flex items-start">
+
+      {/* ── COLUMNA IZQUIERDA: contenido principal (scrollable) ─────────── */}
+      <div className={cn(
+        "space-y-6 min-w-0 transition-all duration-300",
+        detailSong ? "flex-1" : "w-full"
+      )}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -479,6 +496,14 @@ export default function DiscografiaPage() {
               </button>
             </>
           )}
+          <Link
+            href="/discografia/timeline"
+            className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg hover:bg-secondary transition-colors text-sm text-muted-foreground hover:text-foreground"
+            title="Ver timeline de lanzamientos"
+          >
+            <CalendarDays className="h-4 w-4" />
+            <span className="hidden sm:inline">Timeline</span>
+          </Link>
           <button
             onClick={handleAdd}
             className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/80 transition-colors text-sm font-medium"
@@ -492,14 +517,14 @@ export default function DiscografiaPage() {
 
       {/* Barra de búsqueda */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
         <input
           ref={searchInputRef}
           type="text"
-          placeholder="Buscar… (/) por título, artista o género"
+          placeholder="Buscar por título, artista o género… (/)"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-10 pr-10 py-2.5 bg-card border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+          className="w-full pl-10 pr-10 py-2.5 bg-card/80 border border-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-all placeholder:text-muted-foreground/40"
         />
         {searchQuery && (
           <button
@@ -687,6 +712,11 @@ export default function DiscografiaPage() {
         );
       })()}
 
+      {/* Grid view skeleton */}
+      {viewMode === "grid" && loading && (
+        <SongCardSkeleton count={10} />
+      )}
+
       {/* Grid view */}
       {viewMode === "grid" && !loading && displayedSongs.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
@@ -703,60 +733,117 @@ export default function DiscografiaPage() {
               <div
                 key={song.id}
                 className={cn(
-                  "group relative bg-card border rounded-xl overflow-hidden transition-all duration-200 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 cursor-pointer",
-                  isPlaying ? "border-primary/50 bg-primary/5" : "border-border"
+                  "group relative bg-card border rounded-2xl overflow-hidden transition-all duration-200 cursor-pointer",
+                  "hover:shadow-[0_8px_30px_hsl(var(--background)/0.8),0_0_0_1px_hsl(var(--primary)/0.2)] hover:-translate-y-0.5",
+                  isPlaying
+                    ? "border-primary/50 shadow-[0_0_0_1px_hsl(var(--primary)/0.3),0_4px_20px_hsl(var(--primary)/0.15)]"
+                    : "border-border/60"
                 )}
                 onClick={() => handleSelectSong(song)}
               >
-                {/* Cover art area */}
-                <div
-                  className={cn(
-                    "relative flex items-center justify-center aspect-square text-4xl transition-colors overflow-hidden",
-                    isPlaying ? "bg-primary/20" : "bg-secondary/50 group-hover:bg-secondary"
-                  )}
-                >
+                {/* ── Cover art — full bleed ──────────────────────────── */}
+                <div className="relative aspect-square overflow-hidden">
                   {song.cover_art_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={song.cover_art_url}
-                      alt={song.title}
-                      className="absolute inset-0 w-full h-full object-cover"
-                    />
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={song.cover_art_url}
+                        alt={song.title}
+                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                      {/* Gradient overlay — bottom info legibility */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent opacity-60 group-hover:opacity-80 transition-opacity" />
+                    </>
                   ) : (
-                    <Disc3 className={cn("h-10 w-10 transition-all duration-300", isPlaying ? "text-primary animate-spin" : "text-muted-foreground/40 group-hover:text-muted-foreground")} style={isPlaying ? { animationDuration: "3s" } : {}} />
+                    /* Placeholder con gradiente de marca — no más gray aburrido */
+                    <div className={cn(
+                      "absolute inset-0 flex flex-col items-center justify-center gap-2",
+                      "bg-gradient-to-br",
+                      isPlaying
+                        ? "from-primary/30 via-primary/15 to-primary/5"
+                        : "from-secondary via-secondary/80 to-background/60"
+                    )}>
+                      {/* Círculos decorativos de fondo */}
+                      <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full bg-primary/8 blur-xl" />
+                      <div className="absolute -bottom-4 -left-4 w-16 h-16 rounded-full bg-primary/6 blur-lg" />
+                      <Disc3 className={cn(
+                        "h-12 w-12 relative z-10 transition-all duration-500",
+                        isPlaying
+                          ? "text-primary animate-spin drop-shadow-[0_0_8px_hsl(var(--primary)/0.6)]"
+                          : "text-muted-foreground/25 group-hover:text-muted-foreground/40 group-hover:scale-110"
+                      )} style={isPlaying ? { animationDuration: "3s" } : {}} />
+                      <span className="text-[10px] text-muted-foreground/30 font-medium relative z-10">Sin portada</span>
+                    </div>
                   )}
-                  {/* Dark overlay for readability on cover art */}
-                  {song.cover_art_url && (
-                    <div className="absolute inset-0 bg-black/20 group-hover:bg-black/30 transition-colors" />
-                  )}
+
+                  {/* Chips: género + año */}
+                  <div className="absolute top-2 left-2 right-2 flex items-center justify-between z-10">
+                    {song.genre ? (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-black/50 backdrop-blur-sm text-white/85 font-semibold truncate max-w-[70%]">
+                        {song.genre}
+                      </span>
+                    ) : <span />}
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-black/50 backdrop-blur-sm text-white/70 tabular-nums font-medium">
+                      {song.year}
+                    </span>
+                  </div>
+
+                  {/* Play button — botón grande centrado con glow */}
                   {hasAudio && (
                     <button
                       onClick={(e) => { e.stopPropagation(); handlePlaySong(song); }}
                       className={cn(
-                        "absolute inset-0 flex items-center justify-center transition-opacity",
+                        "absolute inset-0 flex items-center justify-center z-10 transition-opacity",
                         isPlaying ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                       )}
                     >
-                      <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shadow-lg">
+                      <div className={cn(
+                        "w-12 h-12 rounded-full flex items-center justify-center transition-all",
+                        "bg-primary/90 backdrop-blur-sm",
+                        isPlaying
+                          ? "shadow-[0_0_24px_hsl(var(--primary)/0.7)] scale-110"
+                          : "shadow-[0_4px_20px_hsl(0_0%_0%/0.4)] hover:scale-110 hover:bg-primary"
+                      )}>
                         {isPlaying
-                          ? <Pause className="h-4 w-4 text-primary-foreground" />
-                          : <Play className="h-4 w-4 text-primary-foreground ml-0.5" />
+                          ? <Pause className="h-5 w-5 text-white" />
+                          : <Play className="h-5 w-5 text-white ml-0.5" />
                         }
                       </div>
                     </button>
                   )}
-                  {song.genre && (
-                    <span className="absolute top-2 left-2 text-[10px] px-1.5 py-0.5 rounded-full bg-black/40 text-white/80 font-medium truncate max-w-[80%]">
-                      {song.genre}
-                    </span>
+
+                  {/* Equalizer si está reproduciendo */}
+                  {isPlaying && (
+                    <div className="absolute bottom-2 left-2 flex gap-[2px] items-end h-4 z-10">
+                      {[1,2,3,4].map(i => (
+                        <div key={i} className="eq-bar w-[2.5px] bg-primary rounded-full"
+                          style={{ height: `${[60,100,45,80][i-1]}%` }} />
+                      ))}
+                    </div>
                   )}
-                  <span className="absolute top-2 right-2 text-[10px] px-1.5 py-0.5 rounded-full bg-black/40 text-white/70 tabular-nums">
-                    {song.year}
-                  </span>
                 </div>
-                {/* Info */}
+
+                {/* ── Info section ─────────────────────────────────────── */}
                 <div className="p-3">
-                  <p className="text-sm font-semibold truncate leading-tight">{song.title}</p>
+                  <div className="flex items-start justify-between gap-1">
+                    <p className="text-sm font-semibold truncate leading-tight flex-1">{song.title}</p>
+                    {/* Download button in grid card */}
+                    {(song.drive_file_id || song.drive_file_url) && (
+                      <a
+                        href={song.drive_file_id
+                          ? `/api/drive/stream/${song.drive_file_id}?dl=1&name=${encodeURIComponent(song.title)}`
+                          : song.drive_file_url!}
+                        download={song.drive_file_id ? song.title : undefined}
+                        target={song.drive_file_id ? undefined : "_blank"}
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        title="Descargar audio"
+                        className="flex-shrink-0 p-1 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors opacity-0 group-hover:opacity-100"
+                      >
+                        <ArrowDownToLine className="h-3 w-3" />
+                      </a>
+                    )}
+                  </div>
                   <p className="text-[11px] text-muted-foreground truncate mt-0.5">
                     {song.artist_name}
                     {song.featuring.length > 0 && (
@@ -795,18 +882,29 @@ export default function DiscografiaPage() {
                         Sin streaming
                       </span>
                     )}
-                    <button
-                      onClick={(e) => handleCopySongLink(e, song.id)}
-                      title="Copiar enlace"
-                      className={cn(
-                        "p-1 rounded-md transition-colors opacity-0 group-hover:opacity-100",
-                        copiedSongId === song.id ? "text-green-400" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                    <div className="flex items-center gap-1">
+                      {song.lyrics && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setLyricsSong(song); }}
+                          title="Ver letra"
+                          className="p-1 rounded-md text-primary/60 hover:text-primary hover:bg-primary/10 transition-colors"
+                        >
+                          <FileText className="h-3 w-3" />
+                        </button>
                       )}
-                    >
-                      {copiedSongId === song.id
-                        ? <Check className="h-3 w-3" />
-                        : <Copy className="h-3 w-3" />}
-                    </button>
+                      <button
+                        onClick={(e) => handleCopySongLink(e, song.id)}
+                        title="Copiar enlace"
+                        className={cn(
+                          "p-1 rounded-md transition-colors opacity-0 group-hover:opacity-100",
+                          copiedSongId === song.id ? "text-green-400" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                        )}
+                      >
+                        {copiedSongId === song.id
+                          ? <Check className="h-3 w-3" />
+                          : <Copy className="h-3 w-3" />}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -819,8 +917,8 @@ export default function DiscografiaPage() {
       {(viewMode === "list" || loading || displayedSongs.length === 0) && (
       <div className="bg-card rounded-xl border border-border overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <div>
+            {Array.from({ length: 8 }).map((_, i) => <SongRowSkeleton key={i} />)}
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center py-16 text-center px-4">
@@ -833,49 +931,80 @@ export default function DiscografiaPage() {
             </button>
           </div>
         ) : songs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center px-4">
-            <Music className="h-12 w-12 text-muted-foreground/30 mb-4" />
-            <p className="text-muted-foreground text-sm">
-              {isSearching
-                ? `Sin resultados para "${searchQuery}"`
-                : `No hay canciones en ${selectedYear}`}
+          <div className="flex flex-col items-center justify-center py-20 text-center px-4">
+            <div className="relative mb-5">
+              <div className="absolute inset-0 bg-primary/15 rounded-2xl blur-xl scale-125" />
+              <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 flex items-center justify-center">
+                <Music className="h-8 w-8 text-primary/50" />
+              </div>
+            </div>
+            <p className="text-sm font-medium text-foreground/70">
+              {isSearching ? `Sin resultados para "${searchQuery}"` : `No hay canciones en ${selectedYear}`}
+            </p>
+            <p className="text-xs text-muted-foreground/50 mt-1">
+              {isSearching ? "Probá con otro término" : "Registrá tu primera canción de este año"}
             </p>
             {!isSearching && (
               <button
                 onClick={handleAdd}
-                className="mt-3 text-sm text-primary hover:underline"
+                className="mt-4 flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/25 text-primary rounded-xl text-sm font-medium hover:bg-primary/20 transition-colors"
               >
-                Agregar la primera
+                <Plus className="h-4 w-4" />
+                Agregar canción
               </button>
             )}
           </div>
         ) : displayedSongs.length === 0 && (genreFilter || sortBy !== "default" || missingPlatformFilter || missingGenreFilter || missingAudioFilter) ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center px-4">
+          <div className="flex flex-col items-center justify-center py-20 text-center px-4">
             {missingPlatformFilter && !genreFilter && !missingGenreFilter && !missingAudioFilter ? (
               <>
-                <Radio className="h-12 w-12 text-green-400/40 mb-4" />
-                <p className="text-muted-foreground text-sm font-medium">¡Todo en streaming!</p>
-                <p className="text-muted-foreground text-xs mt-1">Todas las canciones tienen al menos una plataforma configurada</p>
+                <div className="relative mb-5">
+                  <div className="absolute inset-0 bg-green-500/15 rounded-2xl blur-xl scale-125" />
+                  <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-green-500/20 to-green-700/5 border border-green-500/20 flex items-center justify-center">
+                    <Radio className="h-8 w-8 text-green-400/70" />
+                  </div>
+                </div>
+                <p className="text-sm font-medium text-foreground/70">¡Todo en streaming!</p>
+                <p className="text-xs text-muted-foreground/50 mt-1">Todas las canciones tienen al menos una plataforma</p>
               </>
             ) : missingGenreFilter && !genreFilter && !missingPlatformFilter && !missingAudioFilter ? (
               <>
-                <Music className="h-12 w-12 text-green-400/40 mb-4" />
-                <p className="text-muted-foreground text-sm font-medium">¡Géneros completos!</p>
-                <p className="text-muted-foreground text-xs mt-1">Todas las canciones tienen género asignado</p>
+                <div className="relative mb-5">
+                  <div className="absolute inset-0 bg-green-500/15 rounded-2xl blur-xl scale-125" />
+                  <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-green-500/20 to-green-700/5 border border-green-500/20 flex items-center justify-center">
+                    <Music className="h-8 w-8 text-green-400/70" />
+                  </div>
+                </div>
+                <p className="text-sm font-medium text-foreground/70">¡Géneros completos!</p>
+                <p className="text-xs text-muted-foreground/50 mt-1">Todas las canciones tienen género asignado</p>
               </>
             ) : missingAudioFilter && !genreFilter && !missingPlatformFilter && !missingGenreFilter ? (
               <>
-                <Play className="h-12 w-12 text-green-400/40 mb-4" />
-                <p className="text-muted-foreground text-sm font-medium">¡Todas tienen audio! 🎵</p>
-                <p className="text-muted-foreground text-xs mt-1">Todas las canciones tienen archivo de audio vinculado</p>
+                <div className="relative mb-5">
+                  <div className="absolute inset-0 bg-green-500/15 rounded-2xl blur-xl scale-125" />
+                  <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-green-500/20 to-green-700/5 border border-green-500/20 flex items-center justify-center">
+                    <Play className="h-8 w-8 text-green-400/70" />
+                  </div>
+                </div>
+                <p className="text-sm font-medium text-foreground/70">¡Todas tienen audio!</p>
+                <p className="text-xs text-muted-foreground/50 mt-1">Todas las canciones tienen archivo de audio vinculado</p>
               </>
             ) : (
               <>
-                <Filter className="h-12 w-12 text-muted-foreground/30 mb-4" />
-                <p className="text-muted-foreground text-sm">Sin canciones con ese filtro</p>
+                <div className="relative mb-5">
+                  <div className="absolute inset-0 bg-muted/20 rounded-2xl blur-xl scale-125" />
+                  <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-secondary to-secondary/50 border border-border/60 flex items-center justify-center">
+                    <Filter className="h-8 w-8 text-muted-foreground/40" />
+                  </div>
+                </div>
+                <p className="text-sm font-medium text-foreground/70">Sin canciones con ese filtro</p>
+                <p className="text-xs text-muted-foreground/50 mt-1">Probá ajustando los filtros activos</p>
               </>
             )}
-            <button onClick={() => { setGenreFilter(null); setSortBy("default"); setMissingPlatformFilter(false); setMissingGenreFilter(false); setMissingAudioFilter(false); }} className="mt-3 text-sm text-primary hover:underline">
+            <button
+              onClick={() => { setGenreFilter(null); setSortBy("default"); setMissingPlatformFilter(false); setMissingGenreFilter(false); setMissingAudioFilter(false); }}
+              className="mt-4 text-xs text-primary/70 hover:text-primary transition-colors"
+            >
               Quitar filtros
             </button>
           </div>
@@ -915,6 +1044,7 @@ export default function DiscografiaPage() {
                               onEdit={() => handleEdit(song)}
                               onDelete={() => handleDelete(song)}
                               onOpenDetail={() => setDetailSong(song)}
+                              onOpenLyrics={() => setLyricsSong(song)}
                             />
                           </div>
                         );
@@ -941,6 +1071,7 @@ export default function DiscografiaPage() {
                   onEdit={() => handleEdit(song)}
                   onDelete={() => handleDelete(song)}
                   onOpenDetail={() => setDetailSong(song)}
+                  onOpenLyrics={() => setLyricsSong(song)}
                 />
               </div>
             ))}
@@ -974,31 +1105,87 @@ export default function DiscografiaPage() {
 
       {ConfirmDialog}
 
-      {/* Panel de detalle */}
+      </div> {/* ← cierra columna izquierda */}
+
+      {/* ── COLUMNA DERECHA: panel sticky (desktop) ─────────────────────── */}
       {detailSong && (
-        <SongDetailPanel
-          song={detailSong}
-          onClose={() => setDetailSong(null)}
-          onEdit={() => {
-            handleEdit(detailSong);
-            setDetailSong(null);
-          }}
-        />
+        <>
+          {/* Desktop: sidebar fijo a la derecha */}
+          <div
+            className="hidden md:flex flex-col flex-shrink-0 w-80 xl:w-[360px] sticky top-0 self-start border-l border-border overflow-hidden"
+            style={{ height: "calc(100vh - 72px)" }}
+          >
+            <SongDetailPanel
+              song={detailSong}
+              mode="sidebar"
+              onClose={() => setDetailSong(null)}
+              onEdit={() => {
+                handleEdit(detailSong);
+                setDetailSong(null);
+              }}
+              onOpenLyrics={() => {
+                setLyricsSong(detailSong);
+                setDetailSong(null);
+              }}
+            />
+          </div>
+
+          {/* Mobile: overlay clásico */}
+          <div className="md:hidden">
+            <SongDetailPanel
+              song={detailSong}
+              mode="overlay"
+              onClose={() => setDetailSong(null)}
+              onEdit={() => {
+                handleEdit(detailSong);
+                setDetailSong(null);
+              }}
+              onOpenLyrics={() => {
+                setLyricsSong(detailSong);
+                setDetailSong(null);
+              }}
+            />
+          </div>
+        </>
       )}
 
-      {/* Modal de formulario */}
-      {showForm && (
-        <SongForm
-          song={editingSong}
-          artistName={profile?.full_name ?? undefined}
-          onClose={() => {
-            setShowForm(false);
-            setEditingSong(undefined);
-          }}
-          onSaved={handleSaved}
-        />
-      )}
-    </div>
+    </div> {/* ← cierra flex */}
+
+    {/* ── OVERLAYS: fuera del flex, siempre sobre todo ─────────────────── */}
+
+    {/* Panel de letras */}
+    {lyricsSong && (
+      <LyricsPanel
+        type="song"
+        id={lyricsSong.id}
+        title={lyricsSong.title}
+        artist={lyricsSong.artist_name}
+        initialLyrics={lyricsSong.lyrics}
+        onClose={() => setLyricsSong(null)}
+        onSaved={(newLyrics) => {
+          setSongs((prev) =>
+            prev.map((s) =>
+              s.id === lyricsSong.id ? { ...s, lyrics: newLyrics } : s
+            )
+          );
+          setLyricsSong((prev) => prev ? { ...prev, lyrics: newLyrics } : prev);
+        }}
+      />
+    )}
+
+    {/* Modal de formulario */}
+    {showForm && (
+      <SongForm
+        song={editingSong}
+        artistName={profile?.full_name ?? undefined}
+        onClose={() => {
+          setShowForm(false);
+          setEditingSong(undefined);
+        }}
+        onSaved={handleSaved}
+      />
+    )}
+  </>
   );
 }
 
@@ -1014,6 +1201,7 @@ interface SongRowProps {
   onEdit: () => void;
   onDelete: () => void;
   onOpenDetail: () => void;
+  onOpenLyrics: () => void;
 }
 
 function SongRow({
@@ -1028,9 +1216,19 @@ function SongRow({
   onEdit,
   onDelete,
   onOpenDetail,
+  onOpenLyrics,
 }: SongRowProps) {
   const hasAudio = !!(song.drive_file_url || song.drive_file_id);
   const [linkCopied, setLinkCopied] = useState(false);
+
+  function getDownloadUrl() {
+    if (song.drive_file_id) {
+      return `/api/drive/stream/${song.drive_file_id}?dl=1&name=${encodeURIComponent(song.title)}`;
+    }
+    if (song.drive_file_url) return song.drive_file_url;
+    return null;
+  }
+  const downloadUrl = getDownloadUrl();
 
   function handleCopyLink(e: React.MouseEvent) {
     e.stopPropagation();
@@ -1047,10 +1245,12 @@ function SongRow({
     { label: "SoundCloud",abbr: "SC",color: "text-[#ff5500] hover:bg-[#ff5500]/10", url: song.soundcloud_url },
   ].filter((l) => l.url);
 
+  const genreColors = getGenreColors(song.genre ?? null);
+
   return (
     <div
       className={cn(
-        "flex items-center gap-3 px-4 py-3 hover:bg-secondary/40 transition-colors group",
+        "stagger-item flex items-center gap-3 px-4 py-3 hover:bg-secondary/40 transition-all duration-150 group rounded-lg mx-1",
         isPlaying && "bg-primary/5",
         isSelected && "bg-secondary/60",
         isKeyboardSelected && "ring-1 ring-inset ring-primary/50 bg-primary/5"
@@ -1092,16 +1292,19 @@ function SongRow({
       </div>
 
       {/* Cover art placeholder */}
-      <div className="w-9 h-9 flex-shrink-0 rounded bg-secondary flex items-center justify-center">
+      <div className={cn(
+        "w-9 h-9 flex-shrink-0 rounded-lg flex items-center justify-center overflow-hidden",
+        !song.cover_art_url && genreColors ? genreColors.bg : "bg-secondary"
+      )}>
         {song.cover_art_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={song.cover_art_url}
             alt={song.title}
-            className="w-9 h-9 rounded object-cover"
+            className="w-9 h-9 rounded-lg object-cover"
           />
         ) : (
-          <Music className="h-4 w-4 text-muted-foreground/50" />
+          <Music className={cn("h-4 w-4", genreColors ? genreColors.text : "text-muted-foreground/50")} />
         )}
       </div>
 
@@ -1113,12 +1316,21 @@ function SongRow({
         <p className={cn("text-sm font-medium truncate", isPlaying && "text-primary")}>
           {song.title}
         </p>
-        <p className="text-xs text-muted-foreground truncate">
-          {song.artist_name}
-          {song.featuring.length > 0 &&
-            ` ft. ${song.featuring.join(", ")}`}
-          {song.genre && ` · ${song.genre}`}
-        </p>
+        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+          <span className="text-xs text-muted-foreground truncate">
+            {song.artist_name}
+            {song.featuring.length > 0 && ` ft. ${song.featuring.join(", ")}`}
+          </span>
+          {song.genre && genreColors && (
+            <span className={cn("inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0", genreColors.bg, genreColors.text)}>
+              <span className={cn("w-1.5 h-1.5 rounded-full", genreColors.dot)} />
+              {song.genre}
+            </span>
+          )}
+          {song.genre && !genreColors && (
+            <span className="text-xs text-muted-foreground"> · {song.genre}</span>
+          )}
+        </div>
       </button>
 
       {/* Tags */}
@@ -1160,8 +1372,39 @@ function SongRow({
         </div>
       )}
 
+      {/* Descarga — siempre visible cuando hay audio */}
+      {downloadUrl && (
+        <a
+          href={downloadUrl}
+          download={song.drive_file_id ? `${song.title}` : undefined}
+          target={song.drive_file_id ? undefined : "_blank"}
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          title="Descargar audio"
+          className="flex-shrink-0 p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+        >
+          <ArrowDownToLine className="h-3.5 w-3.5" />
+        </a>
+      )}
+
+      {/* Public badge (always visible) */}
+      {song.is_public && (
+        <span title="Canción pública — visible en EPK" className="flex-shrink-0 p-1.5 text-green-400/60">
+          <Globe className="h-3.5 w-3.5" />
+        </span>
+      )}
+
       {/* Acciones */}
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+        {/* Open full detail page */}
+        <Link
+          href={`/discografia/${song.id}`}
+          onClick={(e) => e.stopPropagation()}
+          title="Abrir página completa"
+          className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+        </Link>
         <button
           onClick={handleCopyLink}
           className={cn(
@@ -1183,6 +1426,18 @@ function SongRow({
           title="Comentarios"
         >
           <MessageSquare className="h-3.5 w-3.5" />
+        </button>
+        <button
+          onClick={onOpenLyrics}
+          className={cn(
+            "p-1.5 rounded-lg transition-colors",
+            song.lyrics
+              ? "text-primary/70 hover:text-primary hover:bg-primary/10"
+              : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+          )}
+          title={song.lyrics ? "Ver / editar letra" : "Agregar letra"}
+        >
+          <FileText className="h-3.5 w-3.5" />
         </button>
         <button
           onClick={onEdit}

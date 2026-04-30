@@ -41,6 +41,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import type { Project, ProjectType, ProjectStatus, ProjectTrack, Song, Draft } from "@/types/database";
+import CoverArtUploader from "@/components/cover/CoverArtUploader";
 
 const TYPES: { value: "todos" | ProjectType; label: string }[] = [
   { value: "todos", label: "Todos" },
@@ -724,65 +725,6 @@ export default function ProyectosPage() {
 
         return (
           <div className="space-y-3">
-            {/* Pipeline bar */}
-            <div className="bg-card border border-border rounded-xl p-4">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pipeline</span>
-                <span className="text-xs text-muted-foreground">{total} proyecto{total !== 1 ? "s" : ""}</span>
-              </div>
-              {/* Bar */}
-              <div className="flex h-2.5 rounded-full overflow-hidden gap-px mb-3">
-                {STATUS_OPTIONS.map((s) => {
-                  const count = statusCounts[s.value];
-                  if (count === 0) return null;
-                  const pct = (count / total) * 100;
-                  const isActive = statusFilter === s.value;
-                  return (
-                    <button
-                      key={s.value}
-                      title={`${s.label}: ${count}`}
-                      onClick={() => setStatusFilter(isActive ? "todos" : s.value)}
-                      style={{ width: `${pct}%`, backgroundColor: STATUS_BAR_COLORS[s.value] }}
-                      className={cn(
-                        "h-full rounded-sm first:rounded-l-full last:rounded-r-full transition-all cursor-pointer",
-                        isActive ? "opacity-100 ring-2 ring-white/30" : "opacity-70 hover:opacity-100"
-                      )}
-                    />
-                  );
-                })}
-              </div>
-              {/* Legend chips */}
-              <div className="flex flex-wrap gap-x-3 gap-y-1.5">
-                {STATUS_OPTIONS.map((s) => {
-                  const count = statusCounts[s.value];
-                  if (count === 0) return null;
-                  const isActive = statusFilter === s.value;
-                  return (
-                    <button
-                      key={s.value}
-                      onClick={() => setStatusFilter(isActive ? "todos" : s.value)}
-                      className={cn(
-                        "flex items-center gap-1.5 transition-colors rounded-full px-1.5 py-0.5",
-                        isActive ? "bg-secondary" : "hover:bg-secondary/50"
-                      )}
-                    >
-                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: STATUS_BAR_COLORS[s.value] }} />
-                      <span className={cn("text-[11px]", isActive ? "text-foreground font-semibold" : "text-muted-foreground")}>{s.label}</span>
-                      <span className="text-[11px] font-semibold text-foreground tabular-nums">{count}</span>
-                    </button>
-                  );
-                })}
-                {statusFilter !== "todos" && (
-                  <button
-                    onClick={() => setStatusFilter("todos")}
-                    className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5"
-                  >
-                    <X className="h-2.5 w-2.5" />
-                    Todos
-                  </button>
-                )}
-              </div>
-            </div>
 
             {/* Chips row */}
             <div className="flex flex-wrap items-center gap-2">
@@ -1156,21 +1098,17 @@ export default function ProyectosPage() {
               <FormField label="Descripción" error={undefined}>
                 <textarea value={form.description ?? ""} onChange={(e) => setField("description", e.target.value || null)} rows={2} className={iClass(false) + " resize-none"} />
               </FormField>
-              <FormField label="URL de portada (opcional)" error={formErrors.cover_art_url}>
-                <input type="url" value={form.cover_art_url ?? ""} onChange={(e) => setField("cover_art_url", e.target.value || null)} placeholder="https://..." className={iClass(!!formErrors.cover_art_url)} />
-                {form.cover_art_url && (
-                  <div className="mt-2 relative w-full aspect-square max-h-32 rounded-lg overflow-hidden border border-border bg-secondary/50 flex items-center justify-center">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={form.cover_art_url}
-                      alt="Preview"
-                      className="w-full h-full object-cover"
-                      onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = "none"; }}
-                      onLoad={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = ""; }}
-                    />
-                  </div>
+              <div>
+                <CoverArtUploader
+                  value={form.cover_art_url ?? null}
+                  onChange={(url) => setField("cover_art_url", url)}
+                  label="Portada (opcional)"
+                  size="md"
+                />
+                {formErrors.cover_art_url && (
+                  <p className="text-xs text-red-500 mt-1">{formErrors.cover_art_url}</p>
                 )}
-              </FormField>
+              </div>
               <FormField label="Fecha objetivo" error={undefined}>
                 <input type="date" value={form.target_date ?? ""} onChange={(e) => setField("target_date", e.target.value || null)} className={iClass(false)} />
               </FormField>
