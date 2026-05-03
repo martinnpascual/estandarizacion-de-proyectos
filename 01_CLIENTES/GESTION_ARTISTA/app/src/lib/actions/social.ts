@@ -1,6 +1,6 @@
 "use server";
 
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, createAdminSupabaseClient } from "@/lib/supabase/server";
 import type { SocialLink, SocialStat, SocialPlatform } from "@/types/database";
 import { SocialLinkSchema, SocialStatSchema, type SocialLinkFormData, type SocialStatFormData } from "@/lib/schemas";
 export type { SocialLinkFormData, SocialStatFormData };
@@ -103,7 +103,8 @@ export async function deleteSocialLink(id: string): Promise<{ error: string | nu
   } = await supabase.auth.getUser();
   if (!user) return { error: "No autenticado" };
 
-  const { error } = await supabase
+  const admin = createAdminSupabaseClient();
+  const { error } = await admin
     .from("social_links")
     .update({ is_deleted: true, deleted_at: new Date().toISOString(), deleted_by: user.id })
     .eq("id", id);

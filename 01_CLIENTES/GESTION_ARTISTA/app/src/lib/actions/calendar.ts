@@ -1,6 +1,6 @@
 "use server";
 
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, createAdminSupabaseClient } from "@/lib/supabase/server";
 import type { CalendarEvent, CalendarEventType } from "@/types/database";
 import { CalendarEventSchema, type CalendarEventFormData } from "@/lib/schemas";
 export type { CalendarEventFormData };
@@ -113,7 +113,8 @@ export async function deleteCalendarEvent(id: string): Promise<{ error: string |
   } = await supabase.auth.getUser();
   if (!user) return { error: "No autenticado" };
 
-  const { error } = await supabase
+  const admin = createAdminSupabaseClient();
+  const { error } = await admin
     .from("calendar_events")
     .update({ is_deleted: true, deleted_at: new Date().toISOString(), deleted_by: user.id })
     .eq("id", id);

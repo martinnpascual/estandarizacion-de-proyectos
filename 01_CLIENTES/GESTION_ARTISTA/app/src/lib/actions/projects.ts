@@ -1,6 +1,6 @@
 "use server";
 
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, createAdminSupabaseClient } from "@/lib/supabase/server";
 import type { Project, ProjectType, ProjectStatus, ProjectTrack } from "@/types/database";
 import { ProjectSchema, type ProjectFormData } from "@/lib/schemas";
 export type { ProjectFormData };
@@ -106,7 +106,8 @@ export async function deleteProject(
   } = await supabase.auth.getUser();
   if (!user) return { error: "No autenticado" };
 
-  const { error } = await supabase
+  const admin = createAdminSupabaseClient();
+  const { error } = await admin
     .from("projects")
     .update({
       is_deleted: true,
@@ -150,7 +151,8 @@ export async function removeTrackFromProject(
   } = await supabase.auth.getUser();
   if (!user) return { error: "No autenticado" };
 
-  const { error } = await supabase
+  const admin = createAdminSupabaseClient();
+  const { error } = await admin
     .from("project_tracks")
     .update({
       deleted_at: new Date().toISOString(),

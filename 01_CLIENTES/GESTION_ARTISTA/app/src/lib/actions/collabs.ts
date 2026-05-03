@@ -1,6 +1,6 @@
 "use server";
 
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, createAdminSupabaseClient } from "@/lib/supabase/server";
 import type { Collaboration, CollabStatus } from "@/types/database";
 import { CollabSchema, type CollabFormData } from "@/lib/schemas";
 export type { CollabFormData };
@@ -85,7 +85,8 @@ export async function deleteCollab(
   } = await supabase.auth.getUser();
   if (!user) return { error: "No autenticado" };
 
-  const { error } = await supabase
+  const admin = createAdminSupabaseClient();
+  const { error } = await admin
     .from("collaborations")
     .update({
       is_deleted: true,
