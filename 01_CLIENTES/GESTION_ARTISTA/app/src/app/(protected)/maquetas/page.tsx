@@ -19,7 +19,6 @@ import {
   LayoutList,
   LayoutGrid,
   ListMusic,
-  ArrowUpDown,
   MessageSquare,
   Download,
   Copy,
@@ -544,102 +543,25 @@ export default function MaquetasPage() {
         </div>
       )}
 
-      {/* Filtros */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
-          <input
-            ref={searchInputRef}
-            type="text"
-            placeholder="Buscar maqueta o productor… (/)"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-10 py-2.5 bg-card/80 border border-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-all placeholder:text-muted-foreground/40"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {STATUSES.map((s) => (
-            <button
-              key={s.value}
-              onClick={() => setStatusFilter(s.value)}
-              className={cn(
-                "px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors",
-                statusFilter === s.value
-                  ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
-                  : "bg-secondary text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {s.label}
-              {s.value !== "todos" && counts[s.value] ? (
-                <span className="ml-1.5 opacity-70">
-                  ({counts[s.value]})
-                </span>
-              ) : null}
-            </button>
-          ))}
-          {/* Missing audio chip */}
-          {!loading && !error && (() => {
-            const noAudioCount = drafts.filter(d => !d.drive_file_id && !d.drive_file_url).length;
-            if (noAudioCount === 0) return null;
-            return (
-              <button
-                onClick={() => setMissingAudioFilter(v => !v)}
-                className={cn(
-                  "flex items-center gap-1.5 text-xs px-2.5 py-2 rounded-lg border transition-colors flex-shrink-0",
-                  missingAudioFilter
-                    ? "bg-orange-500/15 border-orange-500/30 text-orange-400"
-                    : "bg-secondary border-0 text-muted-foreground hover:text-foreground"
-                )}
-                title="Filtrar maquetas sin archivo de audio"
-              >
-                <FileAudio className={cn("h-3.5 w-3.5", missingAudioFilter ? "text-orange-400" : "")} />
-                <span>{noAudioCount} sin audio</span>
-                {missingAudioFilter && <X className="h-3 w-3 ml-0.5 opacity-70" />}
-              </button>
-            );
-          })()}
-          {/* Producer chips — only when ≥2 distinct producers */}
-          {!loading && !error && uniqueProducers.length >= 2 && uniqueProducers.map((producer) => (
-            <button
-              key={producer}
-              onClick={() => setProducerFilter(producerFilter === producer ? null : producer)}
-              className={cn(
-                "flex items-center gap-1.5 text-xs px-2.5 py-2 rounded-lg border transition-colors flex-shrink-0 whitespace-nowrap",
-                producerFilter === producer
-                  ? "bg-purple-500/15 border-purple-500/30 text-purple-400"
-                  : "bg-secondary border-0 text-muted-foreground hover:text-foreground"
-              )}
-              title={`Filtrar por productor: ${producer}`}
-            >
-              <ListMusic className={cn("h-3.5 w-3.5", producerFilter === producer ? "text-purple-400" : "")} />
-              <span>{producer}</span>
-              {producerFilter === producer && <X className="h-3 w-3 ml-0.5 opacity-70" />}
-            </button>
-          ))}
-          {/* Sort */}
-          <div className="relative flex-shrink-0">
-            <ArrowUpDown className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-              className="pl-8 pr-3 py-2 rounded-lg bg-secondary border-0 text-xs text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer appearance-none"
-            >
-              <option value="default">Por mes</option>
-              <option value="newest">Actualizado</option>
-              <option value="az">A → Z</option>
-              <option value="pipeline">Por estado</option>
-              <option value="oldest">Más antigua</option>
-            </select>
-          </div>
-        </div>
+      {/* Buscador */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
+        <input
+          ref={searchInputRef}
+          type="text"
+          placeholder="Buscar maqueta o productor… (/)"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full pl-10 pr-10 py-2.5 bg-card/80 border border-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-all placeholder:text-muted-foreground/40"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       {/* Vista Tablero */}
