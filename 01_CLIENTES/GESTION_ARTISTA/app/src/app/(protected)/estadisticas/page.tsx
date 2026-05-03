@@ -15,6 +15,7 @@ import {
 import { getAllStats, type AllStats } from "@/lib/actions/stats";
 import { getSocialLinks, type SocialLinkWithLatestStat } from "@/lib/actions/social";
 import { cn } from "@/lib/utils";
+import { AnimatedCounter } from "@/components/ui/MotionWrapper";
 
 // Hex colors matching genre-colors.ts for Recharts
 const GENRE_CHART_COLORS: Record<string, string> = {
@@ -75,9 +76,12 @@ function formatDuration(seconds: number): string {
   return `${m} min`;
 }
 
-function StatCard({ icon: Icon, label, value, sub, color, href }: {
+function StatCard({ icon: Icon, label, value, sub, color, href, delta }: {
   icon: React.ElementType; label: string; value: string; sub?: string; color: string; href?: string;
+  delta?: number;
 }) {
+  // Auto-detect pure integer values to animate them
+  const numericValue = /^\d+$/.test(value.trim()) ? Number(value) : null;
   const inner = (
     <>
       <div className="flex items-center justify-between mb-4">
@@ -86,7 +90,24 @@ function StatCard({ icon: Icon, label, value, sub, color, href }: {
           <Icon className={cn("h-4 w-4", color)} />
         </div>
       </div>
-      <p className="text-3xl font-bold leading-none tabular-nums">{value}</p>
+      {numericValue !== null ? (
+        <AnimatedCounter
+          value={numericValue}
+          className="text-3xl font-bold leading-none tabular-nums block"
+          duration={1.4}
+        />
+      ) : (
+        <p className="text-3xl font-bold leading-none tabular-nums">{value}</p>
+      )}
+      {delta !== undefined && delta !== 0 && (
+        <div className={cn(
+          "inline-flex items-center gap-0.5 text-[11px] font-medium mt-1.5 px-1.5 py-0.5 rounded-full",
+          delta > 0 ? "text-green-400 bg-green-400/10" : "text-red-400 bg-red-400/10"
+        )}>
+          {delta > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+          {delta > 0 ? "+" : ""}{delta} vs mes ant.
+        </div>
+      )}
       {sub && <p className="text-xs text-muted-foreground mt-2">{sub}</p>}
     </>
   );

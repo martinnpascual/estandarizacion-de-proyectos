@@ -844,11 +844,38 @@ export default function ProyectosPage() {
             <p className="text-sm text-red-500">{error}</p>
           </div>
         ) : projects.length === 0 ? (
-          <div className="bg-card rounded-xl border border-border flex flex-col items-center justify-center py-16 text-center px-4">
-            <FolderOpen className="h-12 w-12 text-muted-foreground/30 mb-4" />
-            <p className="text-muted-foreground text-sm">No hay proyectos</p>
-            <button onClick={() => openCreate()} className="mt-3 text-sm text-primary hover:underline">
-              Crear el primero
+          <div className="bg-card rounded-2xl border border-border/60 flex flex-col items-center justify-center py-20 text-center px-6">
+            {/* SVG illustration */}
+            <div className="relative mb-6">
+              <div className="absolute inset-0 bg-purple-500/10 rounded-full blur-2xl scale-150" />
+              <svg width="96" height="96" viewBox="0 0 96 96" fill="none" className="relative">
+                <circle cx="48" cy="48" r="44" fill="hsl(var(--secondary))" opacity="0.6" />
+                {/* Folder back */}
+                <rect x="14" y="38" width="68" height="40" rx="6" fill="#c084fc" opacity="0.25" />
+                {/* Folder tab */}
+                <path d="M14 38h20l4-6h8a6 6 0 016 6v0H14z" fill="#c084fc" opacity="0.4" />
+                {/* Folder front */}
+                <rect x="14" y="42" width="68" height="36" rx="6" fill="#c084fc" opacity="0.3" />
+                {/* Music note in folder */}
+                <path d="M53 54l-8 2v8l8-2V54z" fill="#c084fc" opacity="0.9" />
+                <circle cx="45" cy="64" r="3" fill="#c084fc" opacity="0.9" />
+                <circle cx="53" cy="62" r="3" fill="#c084fc" opacity="0.9" />
+                {/* Stars */}
+                <circle cx="22" cy="28" r="2" fill="#c084fc" opacity="0.3" />
+                <circle cx="74" cy="22" r="3" fill="#c084fc" opacity="0.2" />
+                <circle cx="78" cy="34" r="2" fill="#c084fc" opacity="0.3" />
+              </svg>
+            </div>
+            <h3 className="text-base font-semibold mb-1">Sin proyectos todavía</h3>
+            <p className="text-muted-foreground text-sm max-w-xs leading-relaxed">
+              Organizá tus lanzamientos, EPs, álbumes y metas en proyectos para darle seguimiento.
+            </p>
+            <button
+              onClick={() => openCreate()}
+              className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400 text-sm font-medium hover:bg-purple-500/20 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              Crear primer proyecto
             </button>
           </div>
         ) : displayedProjects.length === 0 ? (

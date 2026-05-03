@@ -135,7 +135,7 @@ export default function CalendarioPage() {
       setFormProjects(
         [...(projectsRes.data ?? [])].sort((a, b) => a.name.localeCompare(b.name))
       );
-    });
+    }).catch(() => { /* silently ignore load errors for dropdowns */ });
   }, []);
 
   // Auto-focus and Escape to close the event form modal / expanded event detail

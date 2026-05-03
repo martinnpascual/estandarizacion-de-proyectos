@@ -179,6 +179,7 @@ export default function DiscografiaPage() {
       artist: s.artist_name,
       url: audioUrl,
       duration: s.duration_seconds ?? undefined,
+      coverArt: s.cover_art_url ?? undefined,
     };
   }
 
@@ -852,11 +853,25 @@ export default function DiscografiaPage() {
                       </span>
                     )}
                   </p>
-                  {song.duration_seconds && (
-                    <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {formatTime(song.duration_seconds)}
-                    </p>
+                  {(song.duration_seconds || song.bpm || song.key_signature) && (
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      {song.duration_seconds && (
+                        <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {formatTime(song.duration_seconds)}
+                        </span>
+                      )}
+                      {song.bpm && (
+                        <span className="text-[10px] text-blue-400/70 font-mono tabular-nums" title="BPM">
+                          {song.bpm}bpm
+                        </span>
+                      )}
+                      {song.key_signature && (
+                        <span className="text-[10px] text-purple-400/70 font-medium" title="Tonalidad">
+                          {song.key_signature}
+                        </span>
+                      )}
+                    </div>
                   )}
                   <div className="flex items-center justify-between mt-2">
                     {platforms.length > 0 ? (

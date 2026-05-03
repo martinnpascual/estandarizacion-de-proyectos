@@ -25,6 +25,8 @@ import {
   Check,
   FileText,
   ArrowDownToLine,
+  CheckSquare,
+  Square,
 } from "lucide-react";
 import DraftVersionsPanel from "@/components/drafts/DraftVersionsPanel";
 import LyricsPanel from "@/components/lyrics/LyricsPanel";
@@ -132,6 +134,8 @@ export default function MaquetasPage() {
   const [commentsOpenId, setCommentsOpenId] = useState<string | null>(null);
   const [lyricsDraft, setLyricsDraft] = useState<Draft | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "board">("list");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const [sortBy, setSortBy] = useState<"default" | "az" | "pipeline" | "newest" | "oldest">("default");
   const [missingAudioFilter, setMissingAudioFilter] = useState(false);
   const [producerFilter, setProducerFilter] = useState<string | null>(null);
@@ -251,6 +255,7 @@ export default function MaquetasPage() {
       title: d.title,
       artist: d.producer ?? "Sin productor",
       url: audioUrl,
+      coverArt: d.cover_art_url ?? undefined,
     };
   }
 
@@ -385,6 +390,72 @@ export default function MaquetasPage() {
     draftsByMonth.sort((a, b) => b.month.localeCompare(a.month));
   }
 
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    const visible = displayedDrafts.map(d => d.id);
+    const allSelected = visible.every(id => selectedIds.has(id));
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(visible));
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (!await confirm({
+      title: `¿Eliminar ${selectedIds.size} maqueta${selectedIds.size !== 1 ? "s" : ""}?`,
+      message: "Esta acción no se puede deshacer.",
+      confirmLabel: "Eliminar todas",
+    })) return;
+    setBulkActionLoading(true);
+    const ids = Array.from(selectedIds);
+    await Promise.all(ids.map(id => deleteDraft(id)));
+    setDrafts(prev => prev.filter(d => !selectedIds.has(d.id)));
+    setSelectedIds(new Set());
+    toast.success(`${ids.length} maqueta${ids.length !== 1 ? "s" : ""} eliminada${ids.length !== 1 ? "s" : ""}`);
+    setBulkActionLoading(false);
+  }
+
+  async function handleBulkAdvanceStatus() {
+    setBulkActionLoading(true);
+    const ids = Array.from(selectedIds);
+    const updates = ids.map(async (id) => {
+      const draft = drafts.find(d => d.id === id);
+      if (!draft) return;
+      const next = STATUS_NEXT[draft.status];
+      if (!next) return;
+      const result = await updateDraftStatus(id, next);
+      if (result.data) setDrafts(prev => prev.map(d => d.id === id ? result.data! : d));
+    });
+    await Promise.all(updates);
+    setSelectedIds(new Set());
+    toast.success(`Estado avanzado en ${ids.length} maqueta${ids.length !== 1 ? "s" : ""}`);
+    setBulkActionLoading(false);
+  }
+
+  function handleBulkExport() {
+    const selected = displayedDrafts.filter(d => selectedIds.has(d.id));
+    if (selected.length === 0) return;
+    const headers = ["Título", "Productor", "Status", "Fecha", "Notas"];
+    const rows = selected.map(d => [
+      d.title, d.producer ?? "", translateDraftStatus(d.status),
+      d.updated_at ? new Date(d.updated_at).toLocaleDateString("es-ES") : "", d.notes ?? "",
+    ]);
+    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = "maquetas-seleccion.csv"; a.click();
+    URL.revokeObjectURL(url);
+    setSelectedIds(new Set());
+  }
+
   function handleExportCSV() {
     if (displayedDrafts.length === 0) return;
     const headers = ["Título", "Productor", "Status", "Fecha actualización", "Notas"];
@@ -492,6 +563,46 @@ export default function MaquetasPage() {
       </div>
 
 
+      {/* Pipeline visual — distribución de estados */}
+      {!loading && !error && drafts.length > 0 && (() => {
+        const total = drafts.length;
+        const pipeline = ([
+          { status: "borrador"            as DraftStatus, label: "Borrador",          color: "text-zinc-400",   bg: "bg-zinc-500",   count: counts["borrador"] ?? 0 },
+          { status: "en_mezcla"           as DraftStatus, label: "En mezcla",         color: "text-blue-400",   bg: "bg-blue-500",   count: counts["en_mezcla"] ?? 0 },
+          { status: "masterizada"         as DraftStatus, label: "Masterizada",       color: "text-purple-400", bg: "bg-purple-500", count: counts["masterizada"] ?? 0 },
+          { status: "lista_para_publicar" as DraftStatus, label: "Lista p/ publicar", color: "text-green-400",  bg: "bg-green-500",  count: counts["lista_para_publicar"] ?? 0 },
+        ] as { status: DraftStatus; label: string; color: string; bg: string; count: number }[]).filter(s => s.count > 0);
+
+        return (
+          <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded-2xl p-4 space-y-3">
+            {/* Bar segmentada */}
+            <div className="flex h-2 rounded-full overflow-hidden gap-[2px]">
+              {pipeline.map((s) => (
+                <div
+                  key={s.status}
+                  className={`${s.bg} opacity-80 transition-all duration-500`}
+                  style={{ width: `${(s.count / total) * 100}%` }}
+                  title={`${s.label}: ${s.count}`}
+                />
+              ))}
+            </div>
+            {/* Leyenda */}
+            <div className="flex items-center gap-4 flex-wrap">
+              {pipeline.map((s) => (
+                <div key={s.status} className="flex items-center gap-1.5">
+                  <div className={`w-2 h-2 rounded-full ${s.bg} opacity-80 flex-shrink-0`} />
+                  <span className={`text-[11px] font-medium ${s.color}`}>{s.label}</span>
+                  <span className="text-[11px] text-muted-foreground/60 tabular-nums">
+                    {s.count} · {Math.round((s.count / total) * 100)}%
+                  </span>
+                </div>
+              ))}
+              <div className="ml-auto text-[11px] text-muted-foreground/50 tabular-nums">{total} total</div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Lista para publicar alert */}
       {!loading && !error && (counts["lista_para_publicar"] ?? 0) > 0 && statusFilter !== "lista_para_publicar" && (
         <button
@@ -511,6 +622,18 @@ export default function MaquetasPage() {
       {/* Tabs de años */}
       {!isSearching && (
         <div className="flex items-center gap-3">
+          {/* Select all toggle */}
+          {!loading && displayedDrafts.length > 0 && (
+            <button
+              onClick={toggleSelectAll}
+              title={displayedDrafts.every(d => selectedIds.has(d.id)) ? "Deseleccionar todo" : "Seleccionar todo"}
+              className="flex-shrink-0 text-muted-foreground hover:text-primary transition-colors"
+            >
+              {displayedDrafts.every(d => selectedIds.has(d.id))
+                ? <CheckSquare className="h-4 w-4 text-primary" />
+                : <Square className="h-4 w-4" />}
+            </button>
+          )}
           <div className="flex gap-2 overflow-x-auto pb-1 flex-1">
             {DRAFT_YEARS.map((year) => {
               const count = drafts.filter(d => d.month_created?.startsWith(String(year))).length;
@@ -655,6 +778,9 @@ export default function MaquetasPage() {
                           isUpdatingStatus={updatingStatusId === draft.id}
                           versionsOpen={versionsOpenId === draft.id}
                           commentsOpen={commentsOpenId === draft.id}
+                          selected={selectedIds.has(draft.id)}
+                          anySelected={selectedIds.size > 0}
+                          onSelect={() => toggleSelect(draft.id)}
                           onPlay={() => handlePlayDraft(draft)}
                           onEdit={() => { setEditingDraft(draft); setShowForm(true); }}
                           onDelete={() => handleDelete(draft)}
@@ -689,6 +815,9 @@ export default function MaquetasPage() {
                       isUpdatingStatus={updatingStatusId === draft.id}
                       versionsOpen={versionsOpenId === draft.id}
                       commentsOpen={commentsOpenId === draft.id}
+                      selected={selectedIds.has(draft.id)}
+                      anySelected={selectedIds.size > 0}
+                      onSelect={() => toggleSelect(draft.id)}
                       onPlay={() => handlePlayDraft(draft)}
                       onEdit={() => { setEditingDraft(draft); setShowForm(true); }}
                       onDelete={() => handleDelete(draft)}
@@ -713,6 +842,52 @@ export default function MaquetasPage() {
           </div>
         )}
       </div>
+
+      {/* Bulk action floating bar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 animate-slide-up">
+          <div className="flex items-center gap-2 px-4 py-3 bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl shadow-2xl shadow-black/40">
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+              title="Deseleccionar todo"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <span className="text-sm font-semibold tabular-nums text-primary mr-1">
+              {selectedIds.size} seleccionada{selectedIds.size !== 1 ? "s" : ""}
+            </span>
+            <div className="w-px h-5 bg-border/60" />
+            <button
+              onClick={handleBulkAdvanceStatus}
+              disabled={bulkActionLoading}
+              title="Avanzar estado de todas"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 text-xs font-medium transition-colors disabled:opacity-50"
+            >
+              {bulkActionLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ChevronDown className="h-3.5 w-3.5 rotate-[-90deg]" />}
+              Avanzar estado
+            </button>
+            <button
+              onClick={handleBulkExport}
+              disabled={bulkActionLoading}
+              title="Exportar seleccionadas a CSV"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 text-xs font-medium transition-colors disabled:opacity-50"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Exportar
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              disabled={bulkActionLoading}
+              title="Eliminar seleccionadas"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 text-xs font-medium transition-colors disabled:opacity-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Eliminar
+            </button>
+          </div>
+        </div>
+      )}
 
       {ConfirmDialog}
 
@@ -767,6 +942,9 @@ interface DraftRowProps {
   isUpdatingStatus: boolean;
   versionsOpen: boolean;
   commentsOpen: boolean;
+  selected: boolean;
+  anySelected: boolean;
+  onSelect: () => void;
   onPlay: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -784,6 +962,9 @@ function DraftRow({
   isUpdatingStatus,
   versionsOpen,
   commentsOpen,
+  selected,
+  anySelected,
+  onSelect,
   onPlay,
   onEdit,
   onDelete,
@@ -812,10 +993,24 @@ function DraftRow({
       className={cn(
         "border-l-2 transition-all group",
         STATUS_LEFT_BORDER[draft.status],
-        isPlaying ? "bg-primary/5" : "hover:bg-secondary/30",
+        selected ? "bg-primary/5 border-l-primary/60" : isPlaying ? "bg-primary/5" : "hover:bg-secondary/30",
       )}
     >
     <div className="flex items-center gap-3 px-4 py-3">
+      {/* Checkbox de selección */}
+      <button
+        onClick={onSelect}
+        className={cn(
+          "flex-shrink-0 transition-all duration-150",
+          anySelected ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+          "text-muted-foreground hover:text-primary"
+        )}
+        title={selected ? "Deseleccionar" : "Seleccionar"}
+      >
+        {selected
+          ? <CheckSquare className="h-4 w-4 text-primary" />
+          : <Square className="h-4 w-4" />}
+      </button>
       {/* Cover art thumbnail / Play button */}
       <div className={cn(
         "w-9 h-9 flex-shrink-0 relative rounded-lg overflow-hidden border border-border/60 flex items-center justify-center",
@@ -860,6 +1055,16 @@ function DraftRow({
           {draft.producer && (
             <span className="text-xs text-muted-foreground truncate">
               {draft.producer}
+            </span>
+          )}
+          {draft.bpm && (
+            <span className="text-[10px] text-blue-400/70 font-mono tabular-nums" title="BPM">
+              {draft.bpm}bpm
+            </span>
+          )}
+          {draft.key_signature && (
+            <span className="text-[10px] text-purple-400/70 font-medium" title="Tonalidad">
+              {draft.key_signature}
             </span>
           )}
           <span className="text-xs text-muted-foreground/50" title={draft.month_created}>

@@ -30,6 +30,13 @@ const GENRES = [
   "Otro",
 ];
 
+const KEY_SIGNATURES = [
+  "C mayor", "G mayor", "D mayor", "A mayor", "E mayor", "B mayor",
+  "F# mayor", "C# mayor", "F mayor", "Bb mayor", "Eb mayor", "Ab mayor",
+  "A menor", "E menor", "B menor", "F# menor", "C# menor", "G# menor",
+  "D menor", "G menor", "C menor", "F menor", "Bb menor", "Eb menor",
+];
+
 const EMPTY_FORM: SongFormData = {
   title: "",
   artist_name: "BERTIAKA",
@@ -37,6 +44,8 @@ const EMPTY_FORM: SongFormData = {
   year: CURRENT_YEAR,
   genre: null,
   duration_seconds: null,
+  bpm: null,
+  key_signature: null,
   cover_art_url: null,
   drive_file_id: null,
   drive_file_url: null,
@@ -56,6 +65,8 @@ function songToForm(song: Song): SongFormData {
     year: song.year,
     genre: song.genre,
     duration_seconds: song.duration_seconds,
+    bpm: song.bpm ?? null,
+    key_signature: song.key_signature ?? null,
     cover_art_url: song.cover_art_url,
     drive_file_id: song.drive_file_id,
     drive_file_url: song.drive_file_url,
@@ -298,6 +309,37 @@ export default function SongForm({ song, artistName, onClose, onSaved }: SongFor
                 <p className="text-red-400 text-xs mt-1">{errors.cover_art_url}</p>
               )}
             </div>
+          </div>
+
+          {/* BPM + Tonalidad */}
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="BPM" error={errors.bpm}>
+              <input
+                type="number"
+                min={1}
+                max={300}
+                value={form.bpm ?? ""}
+                onChange={(e) =>
+                  set("bpm", e.target.value === "" ? null : Math.round(Number(e.target.value)))
+                }
+                placeholder="120"
+                className={inputClass(!!errors.bpm)}
+              />
+            </Field>
+            <Field label="Tonalidad" error={errors.key_signature}>
+              <select
+                value={form.key_signature ?? ""}
+                onChange={(e) =>
+                  set("key_signature", e.target.value === "" ? null : e.target.value)
+                }
+                className={inputClass(false)}
+              >
+                <option value="">Sin especificar</option>
+                {KEY_SIGNATURES.map((k) => (
+                  <option key={k} value={k}>{k}</option>
+                ))}
+              </select>
+            </Field>
           </div>
 
           {/* Featuring */}

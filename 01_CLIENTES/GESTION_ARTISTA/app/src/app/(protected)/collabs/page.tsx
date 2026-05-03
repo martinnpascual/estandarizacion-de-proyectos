@@ -748,11 +748,37 @@ export default function CollabsPage() {
             </button>
           </div>
         ) : collabs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center px-4">
-            <Users className="h-12 w-12 text-muted-foreground/30 mb-4" />
-            <p className="text-muted-foreground text-sm">No hay colaboraciones</p>
-            <button onClick={openCreate} className="mt-3 text-sm text-primary hover:underline">
-              Agregar la primera
+          <div className="flex flex-col items-center justify-center py-20 text-center px-6">
+            {/* SVG illustration */}
+            <div className="relative mb-6">
+              <div className="absolute inset-0 bg-yellow-400/10 rounded-full blur-2xl scale-150" />
+              <svg width="96" height="96" viewBox="0 0 96 96" fill="none" className="relative">
+                {/* Background circle */}
+                <circle cx="48" cy="48" r="44" fill="hsl(var(--secondary))" opacity="0.6" />
+                {/* Left person */}
+                <circle cx="30" cy="36" r="9" fill="hsl(var(--muted-foreground))" opacity="0.4" />
+                <path d="M14 62c0-8.8 7.2-16 16-16s16 7.2 16 16" stroke="hsl(var(--muted-foreground))" strokeWidth="2.5" strokeLinecap="round" opacity="0.4" fill="none" />
+                {/* Right person */}
+                <circle cx="66" cy="36" r="9" fill="#facc15" opacity="0.6" />
+                <path d="M50 62c0-8.8 7.2-16 16-16s16 7.2 16 16" stroke="#facc15" strokeWidth="2.5" strokeLinecap="round" opacity="0.6" fill="none" />
+                {/* Plus in center */}
+                <circle cx="48" cy="52" r="10" fill="hsl(var(--card))" stroke="#facc15" strokeWidth="2" />
+                <path d="M48 47v10M43 52h10" stroke="#facc15" strokeWidth="2" strokeLinecap="round" />
+                {/* Music note */}
+                <path d="M58 24l-6 1.5v6l6-1.5V24z" fill="#facc15" opacity="0.5" />
+                <circle cx="52" cy="31.5" r="2" fill="#facc15" opacity="0.5" />
+              </svg>
+            </div>
+            <h3 className="text-base font-semibold mb-1">Sin colaboraciones todavía</h3>
+            <p className="text-muted-foreground text-sm max-w-xs leading-relaxed">
+              Registrá tus featurings, colabos y proyectos con otros artistas para tener todo en un solo lugar.
+            </p>
+            <button
+              onClick={openCreate}
+              className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-yellow-400/10 border border-yellow-400/30 text-yellow-400 text-sm font-medium hover:bg-yellow-400/20 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              Agregar primera colaboración
             </button>
           </div>
         ) : filteredCollabs.length === 0 ? (
