@@ -24,6 +24,8 @@ export const SongSchema = z.object({
   soundcloud_url: z.string().url("URL de SoundCloud inválida").nullable().default(null),
   tags: z.array(z.string()).default([]),
   lyrics: z.string().nullable().default(null),
+  isrc: z.string().nullable().default(null),
+  pro_registration: z.string().nullable().default(null),
 });
 export type SongFormData = z.infer<typeof SongSchema>;
 

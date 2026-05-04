@@ -81,6 +81,9 @@ export interface Song {
   tags: string[];
   lyrics: string | null;
   is_public: boolean;
+  isrc: string | null;
+  pro_registration: string | null;
+  distribution_status: Record<string, string> | null;
   created_at: string;
   updated_at: string;
   created_by: string;
@@ -301,4 +304,132 @@ export interface ReleaseChecklistItem {
   created_at: string;
   updated_at: string;
   created_by: string;
+}
+
+// ─── Expenses / Gastos ────────────────────────────────────────────────────────
+export type ExpenseCategory =
+  | "studio" | "mixing" | "mastering" | "distribucion"
+  | "artwork" | "marketing" | "equipamiento" | "viajes" | "legales" | "otro";
+
+export interface Expense {
+  id: string;
+  category: ExpenseCategory;
+  amount: number;
+  currency: string;
+  description: string;
+  period_month: string; // YYYY-MM
+  song_id: string | null;
+  project_id: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  is_deleted: boolean;
+  deleted_at?: string | null;
+  deleted_by?: string | null;
+}
+
+// ─── Setlists ─────────────────────────────────────────────────────────────────
+export interface Setlist {
+  id: string;
+  name: string;
+  description: string | null;
+  event_date: string | null;
+  venue: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  is_deleted: boolean;
+  deleted_at?: string | null;
+  deleted_by?: string | null;
+}
+
+export interface SetlistSong {
+  id: string;
+  setlist_id: string;
+  song_id: string | null;
+  draft_id: string | null;
+  track_order: number;
+  notes: string | null;
+  created_at: string;
+  // Joined
+  song?: Song;
+  draft?: Draft;
+}
+
+// ─── Industry Contacts / CRM ──────────────────────────────────────────────────
+export type ContactRole =
+  | "productor" | "ingeniero" | "manager" | "booking_agent"
+  | "sello" | "periodista" | "playlist_curator" | "otro";
+
+export interface IndustryContact {
+  id: string;
+  name: string;
+  role: ContactRole;
+  email: string | null;
+  phone: string | null;
+  instagram: string | null;
+  notes: string | null;
+  last_contact: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  is_deleted: boolean;
+  deleted_at?: string | null;
+  deleted_by?: string | null;
+}
+
+// ─── Royalty Splits ───────────────────────────────────────────────────────────
+export type SplitRole = "artista" | "productor" | "featuring" | "publisher" | "otro";
+
+export interface RoyaltySplit {
+  id: string;
+  song_id: string;
+  participant_name: string;
+  role: SplitRole;
+  percentage: number;
+  notes: string | null;
+  created_at: string;
+  created_by: string;
+}
+
+// ─── Release Tasks ────────────────────────────────────────────────────────────
+export type ReleaseTaskCategory = "arte" | "metadata" | "distribucion" | "promo" | "redes" | "legal" | "otro";
+
+export interface ReleaseTask {
+  id: string;
+  project_id: string | null;
+  song_id: string | null;
+  title: string;
+  category: ReleaseTaskCategory;
+  is_done: boolean;
+  due_date: string | null;
+  assigned_to: string | null;
+  notes: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+}
+
+// ─── Extended Song with new fields ───────────────────────────────────────────
+// (Augment the existing Song interface — add these fields in the Song interface above)
+// songs.isrc, songs.pro_registration, songs.distribution_status are now in DB
+// We extend via declaration here for TS awareness:
+export interface SongExtended extends Song {
+  isrc: string | null;
+  pro_registration: string | null;
+  distribution_status: Record<string, string> | null; // { spotify: "publicado", apple_music: "pendiente", ... }
+}
+
+// ─── Trash (soft-deleted items aggregated) ────────────────────────────────────
+export type TrashItemType = "song" | "draft" | "collab" | "project" | "event";
+
+export interface TrashItem {
+  id: string;
+  type: TrashItemType;
+  title: string;
+  deleted_at: string;
+  deleted_by: string;
+  data: Song | Draft | Collaboration | Project | CalendarEvent;
 }

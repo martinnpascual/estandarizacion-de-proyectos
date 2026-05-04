@@ -56,6 +56,8 @@ const EMPTY_FORM: SongFormData = {
   soundcloud_url: null,
   tags: [],
   lyrics: null,
+  isrc: null,
+  pro_registration: null,
 };
 
 function songToForm(song: Song): SongFormData {
@@ -77,6 +79,8 @@ function songToForm(song: Song): SongFormData {
     soundcloud_url: song.soundcloud_url,
     tags: song.tags ?? [],
     lyrics: song.lyrics ?? null,
+    isrc: song.isrc ?? null,
+    pro_registration: song.pro_registration ?? null,
   };
 }
 
@@ -498,6 +502,38 @@ export default function SongForm({ song, artistName, onClose, onSaved }: SongFor
               </div>
             </div>
           </Field>
+
+          {/* ISRC + PRO */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-px bg-border/40" />
+              <p className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest px-1">
+                Derechos
+              </p>
+              <div className="flex-1 h-px bg-border/40" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="ISRC" error={undefined}>
+                <input
+                  type="text"
+                  value={form.isrc ?? ""}
+                  onChange={(e) => set("isrc", e.target.value.trim() || null)}
+                  placeholder="AR-ABC-24-00001"
+                  className={inputClass(false)}
+                  maxLength={12}
+                />
+              </Field>
+              <Field label="Registro PRO" error={undefined}>
+                <input
+                  type="text"
+                  value={form.pro_registration ?? ""}
+                  onChange={(e) => set("pro_registration", e.target.value.trim() || null)}
+                  placeholder="SADAIC, BMI, ASCAP..."
+                  className={inputClass(false)}
+                />
+              </Field>
+            </div>
+          </div>
 
           {/* Links plataformas */}
           <div className="space-y-3">

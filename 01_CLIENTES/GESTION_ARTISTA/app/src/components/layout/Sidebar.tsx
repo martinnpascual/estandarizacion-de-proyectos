@@ -23,6 +23,9 @@ import {
   Keyboard,
   DollarSign,
   Target,
+  Receipt,
+  ListMusic,
+  Trash2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useCommandMenu } from "@/components/search/CommandMenu";
@@ -30,6 +33,7 @@ import NotificationBell from "@/components/notifications/NotificationBell";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { useUser } from "@/hooks/useUser";
 import { getNotifications } from "@/lib/actions/notifications";
+import CommandPalette from "@/components/ui/CommandPalette";
 
 // Tab bar items shown on mobile bottom nav (most important 5)
 const mobileTabBar = [
@@ -47,6 +51,7 @@ const navigationGroups = [
       { name: "Dashboard",   href: "/dashboard",   icon: LayoutDashboard },
       { name: "Discografía", href: "/discografia",  icon: Disc3 },
       { name: "Maquetas",    href: "/maquetas",     icon: FileAudio },
+      { name: "Setlists",    href: "/setlists",     icon: ListMusic },
     ],
   },
   {
@@ -57,15 +62,17 @@ const navigationGroups = [
       { name: "Calendario",  href: "/calendario",   icon: Calendar },
       { name: "Redes",       href: "/redes",        icon: Share2 },
       { name: "Ingresos",    href: "/ingresos",     icon: DollarSign },
+      { name: "Gastos",      href: "/gastos",       icon: Receipt },
       { name: "Metas",       href: "/metas",        icon: Target },
     ],
   },
   {
     label: "Análisis",
     items: [
-      { name: "Estadísticas",    href: "/estadisticas",  icon: BarChart2 },
-      { name: "Equipo",          href: "/equipo",        icon: UserCog },
+      { name: "Estadísticas",    href: "/estadisticas",   icon: BarChart2 },
+      { name: "Equipo",          href: "/equipo",         icon: UserCog },
       { name: "Notificaciones",  href: "/notificaciones", icon: Bell },
+      { name: "Papelera",        href: "/papelera",       icon: Trash2 },
     ],
   },
 ];
@@ -371,6 +378,9 @@ export default function Sidebar() {
           })}
         </div>
       </nav>
+
+      {/* Command Palette global — Cmd+K */}
+      <CommandPalette />
 
       {/* Keyboard shortcuts modal */}
       {showShortcuts && (
