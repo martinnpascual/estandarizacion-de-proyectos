@@ -11,7 +11,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area,
 } from "recharts";
-import { AnimatedCounter } from "@/components/ui/MotionWrapper";
+import { NumberTicker } from "@/components/ui/MotionWrapper";
 import {
   getDashboardStats, getLatestDrafts, getActiveCollabs,
   getSongsChartData, getRecentActivity, getActiveProjects,
@@ -893,9 +893,9 @@ function StatCard({ icon: Icon, label, value, iconBg, iconColor, accent, href }:
         <span className="text-xs text-muted-foreground font-medium leading-tight">{label}</span>
       </div>
 
-      {/* Value */}
+      {/* Value — NumberTicker anima desde 0 al montar para cada stat */}
       {isNumeric ? (
-        <AnimatedCounter value={numValue} className="text-2xl font-black tracking-tight" />
+        <NumberTicker value={numValue} className="text-2xl font-black tracking-tight tabular-nums" />
       ) : (
         <p className="text-2xl font-black tracking-tight">{value}</p>
       )}

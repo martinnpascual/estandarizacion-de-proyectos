@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useTransition, useRef, memo } from "react";
+import { useState, useEffect, useCallback, useTransition, useRef, memo, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Disc3,
@@ -33,6 +33,7 @@ import {
   CalendarDays,
 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import SongDetailPanel from "@/components/songs/SongDetailPanel";
 import LyricsPanel from "@/components/lyrics/LyricsPanel";
 import { SongRowSkeleton, SongCardSkeleton } from "@/components/ui/Skeletons";
@@ -49,6 +50,7 @@ import {
   getAvailableYears,
 } from "@/lib/actions/songs";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useOptimisticList } from "@/hooks/useOptimisticList";
 import { formatTime } from "@/lib/utils";
 import type { Song } from "@/types/database";
 import { cn } from "@/lib/utils";
@@ -69,13 +71,12 @@ export default function DiscografiaPage() {
     new Date().getFullYear()
   );
   const [searchQuery, setSearchQuery] = useState("");
-  const [songs, setSongs] = useState<Song[]>([]);
+  const { items: songs, setItems: setSongs, removeOptimistic } = useOptimisticList<Song>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [showForm, setShowForm] = useState(false);
   const [editingSong, setEditingSong] = useState<Song | undefined>(undefined);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [detailSong, setDetailSong] = useState<Song | null>(null);
   const [lyricsSong, setLyricsSong] = useState<Song | null>(null);
 
@@ -98,15 +99,17 @@ export default function DiscografiaPage() {
   }
 
   const debouncedSearch = useDebounce(searchQuery, 280);
+  const isSearchPending = searchQuery !== debouncedSearch;
   const [isPending, startTransition] = useTransition();
 
   // Keyboard navigation state
   const [keyboardSongId, setKeyboardSongId] = useState<string | null>(null);
   const keyboardSongIdRef = useRef<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  // Mutable refs so keyboard handler always sees latest values without re-registration
+  // Mutable refs so handlers always see latest values without re-registration
   const displayedSongsRef = useRef<Song[]>([]);
   const handlePlaySongRef = useRef<(s: Song) => void>(() => {});
+  const handleDeleteRef = useRef<(s: Song) => Promise<void>>(async () => {});
 
   // ?new=1 deep-link; ?song=<id> loads all songs, switches to the right year, auto-selects and opens detail panel
   useEffect(() => {
@@ -343,17 +346,15 @@ export default function DiscografiaPage() {
     URL.revokeObjectURL(url);
   }
 
-  async function handleDelete(song: Song) {
-    if (!await confirm({ title: `¿Eliminar "${song.title}"?`, message: "Esta acción no se puede deshacer.", confirmLabel: "Eliminar" })) return;
-    setDeletingId(song.id);
+  // Optimistic delete — la fila desaparece al instante, vuelve si hay error
+  // Se asigna al ref para que onAction siempre use la versión más fresca
+  handleDeleteRef.current = async (song: Song) => {
+    if (!await confirm({ title: `¿Eliminar "${song.title}"?`, message: "Esta acción no se puede deshacer.", confirmLabel: "Eliminar", variant: "danger" })) return;
+    const revert = removeOptimistic(song.id);
     const { error } = await deleteSong(song.id);
-    if (error) toast.error(error);
-    else {
-      setSongs((prev) => prev.filter((s) => s.id !== song.id));
-      toast.success(`"${song.title}" eliminada`);
-    }
-    setDeletingId(null);
-  }
+    if (error) { revert(); toast.error(error); }
+    else toast.success(`"${song.title}" eliminada`);
+  };
 
   function handlePlayAll() {
     const playable = displayedSongsRef.current.filter(s => !!s.drive_file_url || !!s.drive_file_id);
@@ -370,36 +371,37 @@ export default function DiscografiaPage() {
 
   const isSearching = debouncedSearch.trim().length > 0;
 
-  // Derived: filter + sort client-side
-  const displayedSongs = (() => {
+  // useMemo: evita recalcular filtros/sort en cada keystroke de búsqueda
+  const displayedSongs = useMemo(() => {
     let result = [...songs];
-    if (genreFilter) {
-      result = result.filter(s => (s.genre ?? "Sin género") === genreFilter);
-    }
-    if (missingPlatformFilter) {
-      result = result.filter(s => !s.spotify_url && !s.youtube_url && !s.apple_music_url && !s.soundcloud_url);
-    }
-    if (missingGenreFilter) {
-      result = result.filter(s => !s.genre);
-    }
-    if (missingAudioFilter) {
-      result = result.filter(s => !s.drive_file_url && !s.drive_file_id);
-    }
-    if (missingCoverArtFilter) {
-      result = result.filter(s => !s.cover_art_url);
-    }
+    if (genreFilter) result = result.filter(s => (s.genre ?? "Sin género") === genreFilter);
+    if (missingPlatformFilter) result = result.filter(s => !s.spotify_url && !s.youtube_url && !s.apple_music_url && !s.soundcloud_url);
+    if (missingGenreFilter) result = result.filter(s => !s.genre);
+    if (missingAudioFilter) result = result.filter(s => !s.drive_file_url && !s.drive_file_id);
+    if (missingCoverArtFilter) result = result.filter(s => !s.cover_art_url);
     switch (sortBy) {
-      case "az":           result.sort((a, b) => a.title.localeCompare(b.title)); break;
-      case "za":           result.sort((a, b) => b.title.localeCompare(a.title)); break;
-      case "duration_asc": result.sort((a, b) => (a.duration_seconds ?? 0) - (b.duration_seconds ?? 0)); break;
-      case "duration_desc":result.sort((a, b) => (b.duration_seconds ?? 0) - (a.duration_seconds ?? 0)); break;
-      case "newest":       result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()); break;
-      case "oldest":       result.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()); break;
+      case "az":            result.sort((a, b) => a.title.localeCompare(b.title)); break;
+      case "za":            result.sort((a, b) => b.title.localeCompare(a.title)); break;
+      case "duration_asc":  result.sort((a, b) => (a.duration_seconds ?? 0) - (b.duration_seconds ?? 0)); break;
+      case "duration_desc": result.sort((a, b) => (b.duration_seconds ?? 0) - (a.duration_seconds ?? 0)); break;
+      case "newest":        result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()); break;
+      case "oldest":        result.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()); break;
     }
     return result;
-  })();
+  }, [songs, genreFilter, missingPlatformFilter, missingGenreFilter, missingAudioFilter, missingCoverArtFilter, sortBy]);
 
-  // Keep mutable refs in sync with latest values (used in keyboard handler)
+  // Stable dispatch — onAction no cambia entre renders → memo en SongRow funciona
+  type SongActionType = "play" | "select" | "edit" | "delete" | "detail" | "lyrics";
+  const onAction = useCallback((type: SongActionType, song: Song) => {
+    if (type === "play")   handlePlaySongRef.current(song);
+    else if (type === "select") setSelectedSong(prev => prev?.id === song.id ? null : song);
+    else if (type === "edit")   { setEditingSong(song); setShowForm(true); }
+    else if (type === "delete") handleDeleteRef.current(song);
+    else if (type === "detail") setDetailSong(song);
+    else if (type === "lyrics") setLyricsSong(song);
+  }, []);
+
+  // Keep mutable refs in sync with latest values (used in keyboard / action handlers)
   displayedSongsRef.current = displayedSongs;
   handlePlaySongRef.current = handlePlaySong;
 
@@ -528,14 +530,19 @@ export default function DiscografiaPage() {
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full pl-10 pr-10 py-2.5 bg-card/80 border border-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-all placeholder:text-muted-foreground/40"
         />
-        {searchQuery && (
-          <button
-            onClick={() => setSearchQuery("")}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        )}
+        {/* Indicador de búsqueda pendiente o botón de limpiar */}
+        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+          {isSearchPending ? (
+            <Loader2 className="h-4 w-4 animate-spin text-primary/60" />
+          ) : searchQuery ? (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {/* Tabs de años + count — solo visible cuando no hay búsqueda */}
@@ -741,17 +748,20 @@ export default function DiscografiaPage() {
                     ? "border-primary/50 shadow-[0_0_0_1px_hsl(var(--primary)/0.3),0_4px_20px_hsl(var(--primary)/0.15)]"
                     : "border-border/60"
                 )}
-                onClick={() => handleSelectSong(song)}
+                onClick={() => onAction("select", song)}
               >
                 {/* ── Cover art — full bleed ──────────────────────────── */}
                 <div className="relative aspect-square overflow-hidden">
                   {song.cover_art_url ? (
                     <>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
+                      <Image
                         src={song.cover_art_url}
                         alt={song.title}
-                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        fill
+                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                        placeholder="blur"
+                        blurDataURL="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='4' height='4' fill='%23171820'/%3E%3C/svg%3E"
                       />
                       {/* Gradient overlay — bottom info legibility */}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent opacity-60 group-hover:opacity-80 transition-opacity" />
@@ -1054,13 +1064,7 @@ export default function DiscografiaPage() {
                               isPlaying={player.currentTrack?.id === song.id && player.isPlaying}
                               isSelected={selectedSong?.id === song.id}
                               isKeyboardSelected={keyboardSongId === song.id}
-                              isDeleting={deletingId === song.id}
-                              onPlay={() => handlePlaySong(song)}
-                              onSelect={() => handleSelectSong(song)}
-                              onEdit={() => handleEdit(song)}
-                              onDelete={() => handleDelete(song)}
-                              onOpenDetail={() => setDetailSong(song)}
-                              onOpenLyrics={() => setLyricsSong(song)}
+                              onAction={onAction}
                             />
                           </div>
                         );
@@ -1081,13 +1085,7 @@ export default function DiscografiaPage() {
                   isPlaying={player.currentTrack?.id === song.id && player.isPlaying}
                   isSelected={selectedSong?.id === song.id}
                   isKeyboardSelected={keyboardSongId === song.id}
-                  isDeleting={deletingId === song.id}
-                  onPlay={() => handlePlaySong(song)}
-                  onSelect={() => handleSelectSong(song)}
-                  onEdit={() => handleEdit(song)}
-                  onDelete={() => handleDelete(song)}
-                  onOpenDetail={() => setDetailSong(song)}
-                  onOpenLyrics={() => setLyricsSong(song)}
+                  onAction={onAction}
                 />
               </div>
             ))}
@@ -1179,8 +1177,8 @@ export default function DiscografiaPage() {
         initialLyrics={lyricsSong.lyrics}
         onClose={() => setLyricsSong(null)}
         onSaved={(newLyrics) => {
-          setSongs((prev) =>
-            prev.map((s) =>
+          setSongs((prev: Song[]) =>
+            prev.map((s: Song) =>
               s.id === lyricsSong.id ? { ...s, lyrics: newLyrics } : s
             )
           );
@@ -1205,19 +1203,14 @@ export default function DiscografiaPage() {
   );
 }
 
+type SongActionType = "play" | "select" | "edit" | "delete" | "detail" | "lyrics";
 interface SongRowProps {
   song: Song;
   index: number;
   isPlaying: boolean;
   isSelected: boolean;
   isKeyboardSelected: boolean;
-  isDeleting: boolean;
-  onPlay: () => void;
-  onSelect: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
-  onOpenDetail: () => void;
-  onOpenLyrics: () => void;
+  onAction: (type: SongActionType, song: Song) => void;
 }
 
 const SongRow = memo(function SongRow({
@@ -1226,13 +1219,7 @@ const SongRow = memo(function SongRow({
   isPlaying,
   isSelected,
   isKeyboardSelected,
-  isDeleting,
-  onPlay,
-  onSelect,
-  onEdit,
-  onDelete,
-  onOpenDetail,
-  onOpenLyrics,
+  onAction,
 }: SongRowProps) {
   const hasAudio = !!(song.drive_file_url || song.drive_file_id);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -1278,7 +1265,7 @@ const SongRow = memo(function SongRow({
           /* Playing: show waveform, replace with Pause on hover */
           <>
             <button
-              onClick={onPlay}
+              onClick={() => onAction("play", song)}
               title="Pausar"
               className="hidden group-hover:flex items-center justify-center w-7 h-7 rounded-full bg-primary text-primary-foreground hover:bg-primary/80 transition-colors"
             >
@@ -1295,7 +1282,7 @@ const SongRow = memo(function SongRow({
         ) : hasAudio ? (
           /* Not playing, has audio: always-visible play button */
           <button
-            onClick={onPlay}
+            onClick={() => onAction("play", song)}
             title="Reproducir"
             className="flex items-center justify-center w-7 h-7 rounded-full text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-colors"
           >
@@ -1309,15 +1296,16 @@ const SongRow = memo(function SongRow({
 
       {/* Cover art placeholder */}
       <div className={cn(
-        "w-9 h-9 flex-shrink-0 rounded-lg flex items-center justify-center overflow-hidden",
+        "w-9 h-9 flex-shrink-0 rounded-lg flex items-center justify-center overflow-hidden relative",
         !song.cover_art_url && genreColors ? genreColors.bg : "bg-secondary"
       )}>
         {song.cover_art_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <Image
             src={song.cover_art_url}
             alt={song.title}
-            className="w-9 h-9 rounded-lg object-cover"
+            fill
+            sizes="36px"
+            className="rounded-lg object-cover"
           />
         ) : (
           <Music className={cn("h-4 w-4", genreColors ? genreColors.text : "text-muted-foreground/50")} />
@@ -1326,7 +1314,7 @@ const SongRow = memo(function SongRow({
 
       {/* Info — click opens detail panel */}
       <button
-        onClick={onOpenDetail}
+        onClick={() => onAction("detail", song)}
         className="flex-1 min-w-0 text-left"
       >
         <p className={cn("text-sm font-medium truncate", isPlaying && "text-primary")}>
@@ -1432,7 +1420,7 @@ const SongRow = memo(function SongRow({
           {linkCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
         </button>
         <button
-          onClick={onSelect}
+          onClick={() => onAction("select", song)}
           className={cn(
             "p-1.5 rounded-lg transition-colors",
             isSelected
@@ -1444,7 +1432,7 @@ const SongRow = memo(function SongRow({
           <MessageSquare className="h-3.5 w-3.5" />
         </button>
         <button
-          onClick={onOpenLyrics}
+          onClick={() => onAction("lyrics", song)}
           className={cn(
             "p-1.5 rounded-lg transition-colors",
             song.lyrics
@@ -1456,23 +1444,18 @@ const SongRow = memo(function SongRow({
           <FileText className="h-3.5 w-3.5" />
         </button>
         <button
-          onClick={onEdit}
+          onClick={() => onAction("edit", song)}
           className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
           title="Editar"
         >
           <Pencil className="h-3.5 w-3.5" />
         </button>
         <button
-          onClick={onDelete}
-          disabled={isDeleting}
-          className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors text-muted-foreground hover:text-red-500 disabled:opacity-50"
+          onClick={() => onAction("delete", song)}
+          className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors text-muted-foreground hover:text-red-500"
           title="Eliminar"
         >
-          {isDeleting ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Trash2 className="h-3.5 w-3.5" />
-          )}
+          <Trash2 className="h-3.5 w-3.5" />
         </button>
       </div>
     </div>
