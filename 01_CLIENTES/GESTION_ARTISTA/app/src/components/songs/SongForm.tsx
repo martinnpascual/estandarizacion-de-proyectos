@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, Loader2, Plus, FolderOpen, Music } from "lucide-react";
+import { X, Loader2, Plus, FolderOpen, Music, Sparkles, Zap, CheckCircle2, AlertCircle } from "lucide-react";
 import { SongSchema, type SongFormData } from "@/lib/schemas";
 import type { Song } from "@/types/database";
 import DriveBrowser, { type DriveFile } from "@/components/drive/DriveBrowser";
 import CoverArtUploader from "@/components/cover/CoverArtUploader";
+import { useAudioAnalysis } from "@/hooks/useAudioAnalysis";
 
 type FormErrors = Partial<Record<keyof SongFormData | "root", string>>;
 
@@ -111,7 +112,9 @@ export default function SongForm({ song, artistName, onClose, onSaved }: SongFor
   const [tagInput, setTagInput] = useState("");
   const [showDrivePicker, setShowDrivePicker] = useState(false);
   const [durationInput, setDurationInput] = useState<string>(secondsToMMSS(song?.duration_seconds ?? null));
+  const [justDetected, setJustDetected] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
+  const { analyzing, phase, error: analysisError, analyze, reset: resetAnalysis } = useAudioAnalysis();
 
   useEffect(() => {
     setTimeout(() => titleRef.current?.focus(), 50);
@@ -154,6 +157,19 @@ export default function SongForm({ song, artistName, onClose, onSaved }: SongFor
       "tags",
       form.tags.filter((t) => t !== tag)
     );
+  }
+
+  async function handleDetect() {
+    if (!form.drive_file_url) return;
+    setJustDetected(false);
+    resetAnalysis();
+    const result = await analyze(form.drive_file_url);
+    if (result) {
+      set("bpm", result.bpm);
+      set("key_signature", result.key);
+      setJustDetected(true);
+      setTimeout(() => setJustDetected(false), 4000);
+    }
   }
 
   function nullableUrl(val: string): string | null {
@@ -221,9 +237,10 @@ export default function SongForm({ song, artistName, onClose, onSaved }: SongFor
 
         <form onSubmit={handleSubmit} className="p-5 space-y-5">
           {errors.root && (
-            <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-xl">
+            <div className="flex items-center gap-2 text-sm text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-2.5 rounded-xl">
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
               {errors.root}
-            </p>
+            </div>
           )}
 
           {/* Título */}
@@ -311,35 +328,81 @@ export default function SongForm({ song, artistName, onClose, onSaved }: SongFor
             </div>
           </div>
 
-          {/* BPM + Tonalidad */}
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="BPM" error={errors.bpm}>
-              <input
-                type="number"
-                min={1}
-                max={300}
-                value={form.bpm ?? ""}
-                onChange={(e) =>
-                  set("bpm", e.target.value === "" ? null : Math.round(Number(e.target.value)))
-                }
-                placeholder="120"
-                className={inputClass(!!errors.bpm)}
-              />
-            </Field>
-            <Field label="Tonalidad" error={errors.key_signature}>
-              <select
-                value={form.key_signature ?? ""}
-                onChange={(e) =>
-                  set("key_signature", e.target.value === "" ? null : e.target.value)
-                }
-                className={inputClass(false)}
-              >
-                <option value="">Sin especificar</option>
-                {KEY_SIGNATURES.map((k) => (
-                  <option key={k} value={k}>{k}</option>
-                ))}
-              </select>
-            </Field>
+          {/* BPM + Tonalidad con detección automática */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">BPM y Tonalidad</span>
+
+              {form.drive_file_url ? (
+                <button
+                  type="button"
+                  onClick={handleDetect}
+                  disabled={analyzing}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all border
+                    disabled:opacity-60 disabled:cursor-not-allowed
+                    bg-violet-500/10 border-violet-500/25 text-violet-400 hover:bg-violet-500/20"
+                >
+                  {analyzing ? (
+                    <>
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      {phase || "Analizando…"}
+                    </>
+                  ) : justDetected ? (
+                    <>
+                      <CheckCircle2 className="h-3 w-3 text-green-400" />
+                      <span className="text-green-400">Detectado</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-3 w-3" />
+                      Detectar automáticamente
+                    </>
+                  )}
+                </button>
+              ) : (
+                <span className="text-[10px] text-muted-foreground/50 flex items-center gap-1">
+                  <Zap className="h-2.5 w-2.5" />
+                  Vinculá un audio para detectar
+                </span>
+              )}
+            </div>
+
+            {analysisError && (
+              <div className="flex items-center gap-2 text-[11px] text-red-400 bg-red-500/10 border border-red-500/20 px-2.5 py-1.5 rounded-lg">
+                <AlertCircle className="h-3 w-3 flex-shrink-0" />
+                {analysisError}
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="BPM" error={errors.bpm}>
+                <input
+                  type="number"
+                  min={1}
+                  max={300}
+                  value={form.bpm ?? ""}
+                  onChange={(e) =>
+                    set("bpm", e.target.value === "" ? null : Math.round(Number(e.target.value)))
+                  }
+                  placeholder="120"
+                  className={inputClass(!!errors.bpm) + (justDetected ? " ring-2 ring-green-500/40 border-green-500/40" : "")}
+                />
+              </Field>
+              <Field label="Tonalidad" error={errors.key_signature}>
+                <select
+                  value={form.key_signature ?? ""}
+                  onChange={(e) =>
+                    set("key_signature", e.target.value === "" ? null : e.target.value)
+                  }
+                  className={inputClass(false) + (justDetected ? " ring-2 ring-green-500/40 border-green-500/40" : "")}
+                >
+                  <option value="">Sin especificar</option>
+                  {KEY_SIGNATURES.map((k) => (
+                    <option key={k} value={k}>{k}</option>
+                  ))}
+                </select>
+              </Field>
+            </div>
           </div>
 
           {/* Featuring */}
