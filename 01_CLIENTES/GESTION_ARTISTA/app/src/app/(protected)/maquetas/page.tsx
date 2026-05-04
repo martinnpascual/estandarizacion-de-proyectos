@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, memo } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   FileAudio,
@@ -45,6 +45,7 @@ import {
   deleteDraft,
   updateDraftStatus,
 } from "@/lib/actions/drafts";
+import { useDebounce } from "@/hooks/useDebounce";
 import { translateDraftStatus } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import type { Draft, DraftStatus, Song } from "@/types/database";
@@ -141,14 +142,15 @@ export default function MaquetasPage() {
   const [producerFilter, setProducerFilter] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const debouncedSearch = useDebounce(searchQuery, 280);
 
   const loadDrafts = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       let result;
-      if (searchQuery.trim()) {
-        result = await searchDrafts(searchQuery.trim());
+      if (debouncedSearch.trim()) {
+        result = await searchDrafts(debouncedSearch.trim());
       } else {
         result = await getDrafts(
           statusFilter !== "todos" ? statusFilter : undefined
@@ -167,7 +169,7 @@ export default function MaquetasPage() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, searchQuery]);
+  }, [statusFilter, debouncedSearch]);
 
   // ?new=1 deep-link; ?status=<status> pre-filters; ?draft=<id> highlights and expands the matching draft row
   useEffect(() => {
@@ -202,9 +204,8 @@ export default function MaquetasPage() {
   }, [drafts, deepLinkDraftId]);
 
   useEffect(() => {
-    const timer = setTimeout(loadDrafts, searchQuery ? 300 : 0);
-    return () => clearTimeout(timer);
-  }, [loadDrafts, searchQuery]);
+    loadDrafts();
+  }, [loadDrafts]);
 
   // Keyboard shortcuts: N = nueva maqueta, / = focus search, E = export, V = toggle view
   useEffect(() => {
@@ -346,7 +347,7 @@ export default function MaquetasPage() {
 
   const uniqueProducers = Array.from(new Set(drafts.filter(d => d.producer).map(d => d.producer!))).sort((a, b) => a.localeCompare(b, "es"));
 
-  const isSearching = searchQuery.trim().length > 0;
+  const isSearching = debouncedSearch.trim().length > 0;
 
   const displayedDrafts = (() => {
     let result = [...drafts];

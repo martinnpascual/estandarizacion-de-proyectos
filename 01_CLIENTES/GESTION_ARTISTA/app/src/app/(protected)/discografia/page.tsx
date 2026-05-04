@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useTransition, useRef } from "react";
+import { useState, useEffect, useCallback, useTransition, useRef, memo } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Disc3,
@@ -48,6 +48,7 @@ import {
   deleteSong,
   getAvailableYears,
 } from "@/lib/actions/songs";
+import { useDebounce } from "@/hooks/useDebounce";
 import { formatTime } from "@/lib/utils";
 import type { Song } from "@/types/database";
 import { cn } from "@/lib/utils";
@@ -96,6 +97,7 @@ export default function DiscografiaPage() {
     });
   }
 
+  const debouncedSearch = useDebounce(searchQuery, 280);
   const [isPending, startTransition] = useTransition();
 
   // Keyboard navigation state
@@ -144,8 +146,8 @@ export default function DiscografiaPage() {
     setLoading(true);
     setError(null);
     try {
-      const result = searchQuery.trim()
-        ? await searchSongs(searchQuery.trim())
+      const result = debouncedSearch.trim()
+        ? await searchSongs(debouncedSearch.trim())
         : await getSongsByYear(selectedYear);
 
       if (result.error) {
@@ -160,12 +162,11 @@ export default function DiscografiaPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedYear, searchQuery]);
+  }, [selectedYear, debouncedSearch]);
 
   useEffect(() => {
-    const timer = setTimeout(loadSongs, searchQuery ? 300 : 0);
-    return () => clearTimeout(timer);
-  }, [loadSongs, searchQuery]);
+    loadSongs();
+  }, [loadSongs]);
 
   // Usa el proxy de streaming para archivos de Drive (soporta Range/seeking)
   // Fallback a la URL directa para archivos externos (Soundcloud, etc.)
@@ -367,7 +368,7 @@ export default function DiscografiaPage() {
     player.play(songToTrack(shuffled[0]), shuffled.map(songToTrack));
   }
 
-  const isSearching = searchQuery.trim().length > 0;
+  const isSearching = debouncedSearch.trim().length > 0;
 
   // Derived: filter + sort client-side
   const displayedSongs = (() => {
@@ -1219,7 +1220,7 @@ interface SongRowProps {
   onOpenLyrics: () => void;
 }
 
-function SongRow({
+const SongRow = memo(function SongRow({
   song,
   index,
   isPlaying,
@@ -1476,4 +1477,4 @@ function SongRow({
       </div>
     </div>
   );
-}
+});

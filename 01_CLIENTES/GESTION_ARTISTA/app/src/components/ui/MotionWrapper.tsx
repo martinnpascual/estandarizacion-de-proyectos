@@ -4,9 +4,15 @@
  * MotionWrapper — Primitivas de animación con Framer Motion
  * Usar en páginas/componentes para transiciones y micro-animaciones
  */
-import { motion, AnimatePresence, useSpring, useMotionValue, useTransform } from "framer-motion";
-import { useEffect, useRef } from "react";
-import type { HTMLAttributes, ReactNode } from "react";
+import {
+  motion,
+  AnimatePresence,
+  useSpring,
+  useMotionValue,
+  useTransform,
+} from "framer-motion";
+import { useEffect, useRef, useState, memo } from "react";
+import type { HTMLAttributes, ReactNode, ButtonHTMLAttributes } from "react";
 
 // ─── FadeIn ───────────────────────────────────────────────────────────────────
 interface FadeInProps {
@@ -50,19 +56,66 @@ export function SlideUp({ children, delay = 0, duration = 0.4, className }: Slid
   );
 }
 
+// ─── Reveal (viewport-triggered) ─────────────────────────────────────────────
+/**
+ * Se anima al entrar en el viewport.
+ * Ideal para secciones lazy que aparecen al hacer scroll.
+ */
+interface RevealProps {
+  children: ReactNode;
+  delay?: number;
+  direction?: "up" | "down" | "left" | "right" | "scale";
+  className?: string;
+  once?: boolean;
+}
+export function Reveal({
+  children,
+  delay = 0,
+  direction = "up",
+  className,
+  once = true,
+}: RevealProps) {
+  const initial = {
+    up:    { opacity: 0, y: 24 },
+    down:  { opacity: 0, y: -24 },
+    left:  { opacity: 0, x: 24 },
+    right: { opacity: 0, x: -24 },
+    scale: { opacity: 0, scale: 0.92 },
+  }[direction];
+
+  const animate = direction === "scale"
+    ? { opacity: 1, scale: 1 }
+    : direction === "left" || direction === "right"
+      ? { opacity: 1, x: 0 }
+      : { opacity: 1, y: 0 };
+
+  return (
+    <motion.div
+      initial={initial}
+      whileInView={animate}
+      viewport={{ once, margin: "-40px" }}
+      transition={{ duration: 0.45, delay, ease: [0.16, 1, 0.3, 1] }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
 // ─── StaggerList ──────────────────────────────────────────────────────────────
 const staggerContainer = {
   hidden: {},
   show: {
     transition: {
-      staggerChildren: 0.07,
+      staggerChildren: 0.055,
+      delayChildren: 0.05,
     },
   },
 };
 
 const staggerItem = {
-  hidden: { opacity: 0, y: 16 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.35 } },
+  hidden: { opacity: 0, y: 14 },
+  show: { opacity: 1, y: 0 },
 };
 
 interface StaggerListProps {
@@ -84,7 +137,11 @@ export function StaggerList({ children, className }: StaggerListProps) {
 
 export function StaggerItem({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <motion.div variants={staggerItem} className={className}>
+    <motion.div
+      variants={staggerItem}
+      transition={{ duration: 0.32, ease: "easeOut" }}
+      className={className}
+    >
       {children}
     </motion.div>
   );
@@ -106,6 +163,84 @@ export function SpringCard({ children, className, ...props }: SpringCardProps) {
     >
       {children}
     </motion.div>
+  );
+}
+
+// ─── GestureCard (3D tilt on hover) ──────────────────────────────────────────
+/**
+ * Tarjeta con efecto 3D de perspectiva al pasar el cursor.
+ * Rota suavemente siguiendo la posición del mouse.
+ * @example
+ * <GestureCard className="rounded-2xl border p-4">…</GestureCard>
+ */
+interface GestureCardProps extends HTMLAttributes<HTMLDivElement> {
+  children: ReactNode;
+  className?: string;
+  intensity?: number; // grados máximos de rotación (default: 8)
+}
+export function GestureCard({ children, className, intensity = 8, ...props }: GestureCardProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const rotateX = useMotionValue(0);
+  const rotateY = useMotionValue(0);
+  const scale   = useMotionValue(1);
+
+  const springConfig = { stiffness: 300, damping: 30, mass: 0.5 };
+  const springX = useSpring(rotateX, springConfig);
+  const springY = useSpring(rotateY, springConfig);
+  const springS = useSpring(scale,   { stiffness: 400, damping: 30 });
+
+  function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const cx = rect.left + rect.width  / 2;
+    const cy = rect.top  + rect.height / 2;
+    const dx = (e.clientX - cx) / (rect.width  / 2);
+    const dy = (e.clientY - cy) / (rect.height / 2);
+    rotateY.set( dx * intensity);
+    rotateX.set(-dy * intensity);
+    scale.set(1.025);
+  }
+
+  function handleMouseLeave() {
+    rotateX.set(0);
+    rotateY.set(0);
+    scale.set(1);
+  }
+
+  return (
+    <motion.div
+      ref={ref}
+      style={{ rotateX: springX, rotateY: springY, scale: springS, transformPerspective: 800 }}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      className={className}
+      {...(props as any)}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+// ─── PressButton (spring press haptic) ───────────────────────────────────────
+/**
+ * Botón con micro-animación de spring al presionar.
+ * Reemplaza className btn-press para un efecto más natural.
+ */
+interface PressButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  children: ReactNode;
+  className?: string;
+}
+export function PressButton({ children, className, ...props }: PressButtonProps) {
+  return (
+    <motion.button
+      whileTap={{ scale: 0.95 }}
+      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+      className={className}
+      {...(props as any)}
+    >
+      {children}
+    </motion.button>
   );
 }
 
@@ -157,9 +292,9 @@ export function AnimatedCounter({
 export function PageTransition({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, ease: "easeOut" }}
+      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
       className={className}
     >
       {children}
@@ -185,13 +320,62 @@ export function PresenceItem({
     <motion.div
       key={id}
       layout
-      initial={{ opacity: 0, scale: 0.95 }}
+      initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95, height: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0 }}
-      transition={{ duration: 0.25, ease: "easeOut" }}
+      exit={{
+        opacity: 0,
+        scale: 0.96,
+        height: 0,
+        marginBottom: 0,
+        paddingTop: 0,
+        paddingBottom: 0,
+      }}
+      transition={{ duration: 0.22, ease: "easeOut" }}
       className={className}
     >
       {children}
     </motion.div>
   );
 }
+
+// ─── NumberTicker (conteo animado para métricas grandes) ──────────────────────
+/**
+ * Muestra un número que cuenta desde 0 hasta `value` al montar.
+ * Ideal para stat cards en el dashboard.
+ */
+export const NumberTicker = memo(function NumberTicker({
+  value,
+  className,
+  prefix = "",
+  suffix = "",
+  decimals = 0,
+}: AnimatedCounterProps) {
+  const [displayed, setDisplayed] = useState(0);
+
+  useEffect(() => {
+    const start = performance.now();
+    const duration = 900;
+
+    function easeOutQuart(t: number) {
+      return 1 - Math.pow(1 - t, 4);
+    }
+
+    let raf: number;
+    function tick(now: number) {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / duration, 1);
+      setDisplayed(value * easeOutQuart(progress));
+      if (progress < 1) raf = requestAnimationFrame(tick);
+    }
+
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+
+  const formatted =
+    prefix +
+    displayed.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ",") +
+    suffix;
+
+  return <span className={className}>{formatted}</span>;
+});

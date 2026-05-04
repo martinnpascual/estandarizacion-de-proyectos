@@ -80,6 +80,9 @@
   html {
     font-feature-settings: "cv11", "ss01";
     font-variation-settings: "opsz" 32;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
   body {
@@ -88,6 +91,16 @@
       radial-gradient(ellipse 80% 60% at 10% 0%,   hsl(var(--primary) / 0.05) 0%, transparent 70%),
       radial-gradient(ellipse 60% 50% at 90% 100%, hsl(220 90% 60% / 0.03) 0%, transparent 70%);
     background-attachment: fixed;
+  }
+
+  /* ── Selection color — primary brand ─── */
+  ::selection {
+    background: hsl(var(--primary) / 0.25);
+    color: hsl(var(--foreground));
+  }
+  ::-moz-selection {
+    background: hsl(var(--primary) / 0.25);
+    color: hsl(var(--foreground));
   }
 
   /* Smooth focus ring */
@@ -192,8 +205,8 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 @keyframes shimmer {
-  from { background-position: -200% center; }
-  to   { background-position:  200% center; }
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
 }
 
 @keyframes ping-once {
@@ -336,6 +349,7 @@ input[type="range"]::-webkit-slider-thumb {
 
 /* ── Card hover lift — versión mejorada ─────────────────────────────────────── */
 .card-lift {
+  will-change: transform;
   transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
               box-shadow 0.22s ease,
               border-color 0.22s ease;
@@ -376,14 +390,16 @@ input[type="range"]::-webkit-slider-thumb {
 
 /* ── Shimmer skeleton ───────────────────────────────────────────────────────── */
 .skeleton {
+  will-change: background-position;
   background: linear-gradient(
     90deg,
     hsl(var(--secondary)) 0%,
-    hsl(var(--muted-foreground) / 0.12) 50%,
+    hsl(var(--muted-foreground) / 0.14) 40%,
+    hsl(var(--muted-foreground) / 0.14) 60%,
     hsl(var(--secondary)) 100%
   );
-  background-size: 200% auto;
-  animation: shimmer 1.5s linear infinite;
+  background-size: 300% auto;
+  animation: shimmer 1.8s ease-in-out infinite;
   border-radius: 6px;
 }
 
