@@ -88,7 +88,7 @@ export function detectBPM(audioBuffer: AudioBuffer): number {
 
   // Work with a low-sample-rate mono signal (~4 kHz is plenty for beats)
   const factor = Math.max(1, Math.round(sr / 4000));
-  const mono = toMono(audioBuffer, 90);
+  const mono = toMono(audioBuffer, 120);
   const ds = downsample(mono, factor);
   const dsr = sr / factor; // effective sample rate after downsample
 
@@ -227,7 +227,7 @@ export function detectKey(audioBuffer: AudioBuffer): string {
     }
 
     frames++;
-    if (frames >= 150) break; // ~10 minutes of audio max
+    if (frames >= 600) break; // cap at ~56 s (hopSize 4096 / 44100 Hz × 600 ≈ 55.7 s)
   }
 
   // Normalize chroma
