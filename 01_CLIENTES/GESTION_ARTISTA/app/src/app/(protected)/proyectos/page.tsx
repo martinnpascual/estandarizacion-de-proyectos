@@ -23,6 +23,7 @@ import {
   List,
   Copy,
   Check,
+  Play,
 } from "lucide-react";
 import {
   getProjects,
@@ -33,7 +34,10 @@ import {
   addTrackToProject,
   removeTrackFromProject,
   reorderProjectTracks,
+  type TrackWithAudio,
 } from "@/lib/actions/projects";
+import { useAudioPlayerContext } from "@/components/audio/AudioPlayer";
+import type { Track as AudioTrack } from "@/hooks/useAudioPlayer";
 import { ProjectSchema, type ProjectFormData } from "@/lib/schemas";
 import { getSongsByYear } from "@/lib/actions/songs";
 import { getDrafts } from "@/lib/actions/drafts";
@@ -131,14 +135,13 @@ const EMPTY_FORM: ProjectFormData = {
   cover_art_url: null,
 };
 
-type TrackWithMeta = ProjectTrack & {
-  song?: { title: string; artist_name: string } | null;
-  draft?: { title: string } | null;
-};
+// TrackWithMeta = TrackWithAudio — re-alias so the rest of the file compiles unchanged
+type TrackWithMeta = TrackWithAudio;
 
 export default function ProyectosPage() {
   const toast = useToast();
   const { confirm, ConfirmDialog } = useConfirm();
+  const player = useAudioPlayerContext();
   const searchParams = useSearchParams();
   const [typeFilter, setTypeFilter] = useState<"todos" | ProjectType>("todos");
   const [statusFilter, setStatusFilter] = useState<"todos" | ProjectStatus>("todos");
@@ -279,8 +282,21 @@ export default function ProyectosPage() {
     if (!result.error && result.data) {
       const newTrack: TrackWithMeta = {
         ...result.data,
-        song: type === "song" ? { title: (item as Song).title, artist_name: (item as Song).artist_name } : null,
-        draft: type === "draft" ? { title: item.title } : null,
+        song: type === "song" ? {
+          title: (item as Song).title,
+          artist_name: (item as Song).artist_name,
+          drive_file_id: (item as Song).drive_file_id ?? null,
+          drive_file_url: (item as Song).drive_file_url ?? null,
+          cover_art_url: (item as Song).cover_art_url ?? null,
+          duration_seconds: (item as Song).duration_seconds ?? null,
+        } : null,
+        draft: type === "draft" ? {
+          title: item.title,
+          drive_file_id: (item as Draft).drive_file_id ?? null,
+          drive_file_url: (item as Draft).drive_file_url ?? null,
+          cover_art_url: (item as Draft).cover_art_url ?? null,
+          duration_seconds: null,
+        } : null,
       };
       setTracks((prev) => ({
         ...prev,
@@ -471,6 +487,66 @@ export default function ProyectosPage() {
       toast.success("Proyecto eliminado");
     }
     setDeletingId(null);
+  }
+
+  // ── Audio helpers ─────────────────────────────────────────────────────
+
+  function trackToAudioTrack(track: TrackWithMeta): AudioTrack | null {
+    if (track.song) {
+      const { drive_file_id, drive_file_url, cover_art_url, title, artist_name, duration_seconds } = track.song;
+      if (!drive_file_id && !drive_file_url) return null;
+      return {
+        id: track.id,
+        title,
+        artist: artist_name,
+        url: drive_file_id ? `/api/drive/stream/${drive_file_id}` : drive_file_url!,
+        coverArt: cover_art_url ?? undefined,
+        duration: duration_seconds ?? undefined,
+      };
+    }
+    if (track.draft) {
+      const { drive_file_id, drive_file_url, cover_art_url, title, duration_seconds } = track.draft;
+      if (!drive_file_id && !drive_file_url) return null;
+      return {
+        id: track.id,
+        title,
+        artist: "Maqueta",
+        url: drive_file_id ? `/api/drive/stream/${drive_file_id}` : drive_file_url!,
+        coverArt: cover_art_url ?? undefined,
+        duration: duration_seconds ?? undefined,
+      };
+    }
+    return null;
+  }
+
+  function handlePlayProject(projectId: string, startTrack?: TrackWithMeta) {
+    const projectTracks = tracks[projectId] ?? [];
+    const playable = projectTracks
+      .map(trackToAudioTrack)
+      .filter((t): t is AudioTrack => t !== null);
+    if (playable.length === 0) return;
+    if (startTrack) {
+      const startAT = trackToAudioTrack(startTrack);
+      player.play(startAT ?? playable[0], playable);
+    } else {
+      player.play(playable[0], playable);
+    }
+  }
+
+  function isProjectPlaying(projectId: string): boolean {
+    if (!player.currentTrack || !player.isPlaying) return false;
+    return (tracks[projectId] ?? []).some(t => {
+      const at = trackToAudioTrack(t);
+      return at && at.id === player.currentTrack!.id;
+    });
+  }
+
+  function isProjectLoaded(projectId: string): boolean {
+    if (!player.currentTrack) return false;
+    return (tracks[projectId] ?? []).some(t => {
+      const at = trackToAudioTrack(t);
+      return at && at.id === player.currentTrack!.id;
+    });
   }
 
   function handleExportCSV() {
@@ -950,6 +1026,37 @@ export default function ProyectosPage() {
                   </span>
                 )}
 
+                {/* Play project button — only when tracks have audio */}
+                {tracks[project.id] && tracks[project.id].some(t => trackToAudioTrack(t) !== null) && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (isProjectLoaded(project.id)) {
+                        player.togglePlay();
+                      } else {
+                        handlePlayProject(project.id);
+                      }
+                    }}
+                    title={isProjectPlaying(project.id) ? "Pausar" : "Reproducir proyecto"}
+                    className={cn(
+                      "hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-medium transition-colors flex-shrink-0",
+                      isProjectPlaying(project.id)
+                        ? "bg-green-500/15 text-green-400 border-green-500/25"
+                        : isProjectLoaded(project.id)
+                        ? "bg-secondary text-muted-foreground border-border hover:text-foreground"
+                        : "bg-secondary text-muted-foreground border-border hover:text-foreground hover:bg-primary/10 hover:border-primary/30 hover:text-primary"
+                    )}
+                  >
+                    {isProjectPlaying(project.id) ? (
+                      <><EQBars /> Reproduciendo</>
+                    ) : isProjectLoaded(project.id) ? (
+                      <><Play className="h-3 w-3 fill-current" /> Continuar</>
+                    ) : (
+                      <><Play className="h-3 w-3 fill-current" /> Reproducir</>
+                    )}
+                  </button>
+                )}
+
                 {/* Target date badge */}
                 {(() => {
                   const info = getTargetDateInfo(project.target_date);
@@ -1029,42 +1136,78 @@ export default function ProyectosPage() {
                         </div>
                       ) : (
                         <div className="divide-y divide-border">
-                          {(tracks[project.id] ?? []).map((track, idx) => (
-                            <div
-                              key={track.id}
-                              draggable
-                              onDragStart={() => handleDragStart(track.id)}
-                              onDragOver={(e) => handleDragOver(e, track.id)}
-                              onDrop={() => handleDrop(project.id, track.id)}
-                              onDragEnd={handleDragEnd}
-                              className={cn(
-                                "flex items-center gap-3 px-4 py-2.5 group/track transition-colors",
-                                dragOverTrackId === track.id
-                                  ? "bg-primary/10 border-l-2 border-primary"
-                                  : "hover:bg-secondary/30"
-                              )}
-                            >
-                              <GripVertical className="h-4 w-4 text-muted-foreground/40 flex-shrink-0 cursor-grab active:cursor-grabbing" />
-                              <span className="text-xs text-muted-foreground w-5 text-right flex-shrink-0">{idx + 1}</span>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm truncate">
-                                  {track.song?.title ?? track.draft?.title ?? "—"}
-                                </p>
-                                {track.song && (
-                                  <p className="text-xs text-muted-foreground">{track.song.artist_name}</p>
+                          {(tracks[project.id] ?? []).map((track, idx) => {
+                            const audioTrack = trackToAudioTrack(track);
+                            const isCurrent = !!audioTrack && player.currentTrack?.id === audioTrack.id;
+                            const isNowPlaying = isCurrent && player.isPlaying;
+                            return (
+                              <div
+                                key={track.id}
+                                draggable
+                                onDragStart={() => handleDragStart(track.id)}
+                                onDragOver={(e) => handleDragOver(e, track.id)}
+                                onDrop={() => handleDrop(project.id, track.id)}
+                                onDragEnd={handleDragEnd}
+                                className={cn(
+                                  "flex items-center gap-3 px-4 py-2.5 group/track transition-colors",
+                                  dragOverTrackId === track.id
+                                    ? "bg-primary/10 border-l-2 border-primary"
+                                    : isCurrent
+                                    ? "bg-green-500/5"
+                                    : "hover:bg-secondary/30"
                                 )}
-                                {track.draft && (
-                                  <span className="text-[10px] text-blue-400">maqueta</span>
-                                )}
-                              </div>
-                              <button
-                                onClick={() => handleRemoveTrack(project.id, track.id)}
-                                className="opacity-0 group-hover/track:opacity-100 p-1 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-all"
                               >
-                                <X className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          ))}
+                                <GripVertical className="h-4 w-4 text-muted-foreground/40 flex-shrink-0 cursor-grab active:cursor-grabbing" />
+
+                                {/* Track number / play button / EQ indicator */}
+                                {audioTrack ? (
+                                  <button
+                                    onClick={() => isNowPlaying ? player.togglePlay() : handlePlayProject(project.id, track)}
+                                    title={isNowPlaying ? "Pausar" : "Reproducir"}
+                                    className={cn(
+                                      "w-5 flex-shrink-0 flex items-center justify-center transition-colors",
+                                      isCurrent ? "text-green-400" : "text-muted-foreground"
+                                    )}
+                                  >
+                                    {isNowPlaying ? (
+                                      <EQBars />
+                                    ) : (
+                                      <>
+                                        <span className="text-xs group-hover/track:hidden">{idx + 1}</span>
+                                        <Play className="h-3 w-3 fill-current hidden group-hover/track:block" />
+                                      </>
+                                    )}
+                                  </button>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground w-5 text-right flex-shrink-0">{idx + 1}</span>
+                                )}
+
+                                <div className="flex-1 min-w-0">
+                                  <p className={cn("text-sm truncate", isCurrent && "text-green-400 font-medium")}>
+                                    {track.song?.title ?? track.draft?.title ?? "—"}
+                                  </p>
+                                  {track.song && (
+                                    <p className="text-xs text-muted-foreground">{track.song.artist_name}</p>
+                                  )}
+                                  {track.draft && (
+                                    <span className="text-[10px] text-blue-400">maqueta</span>
+                                  )}
+                                </div>
+
+                                {/* No audio indicator */}
+                                {!audioTrack && (
+                                  <span className="hidden group-hover/track:inline text-[10px] text-muted-foreground/50 flex-shrink-0">sin audio</span>
+                                )}
+
+                                <button
+                                  onClick={() => handleRemoveTrack(project.id, track.id)}
+                                  className="opacity-0 group-hover/track:opacity-100 p-1 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-all"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                       <div className="px-4 py-3 border-t border-border">
@@ -1254,6 +1397,26 @@ export default function ProyectosPage() {
         );
       })()}
     </div>
+  );
+}
+
+// ── EQ bars — animated indicator for currently-playing track ────────────────
+function EQBars({ className }: { className?: string }) {
+  return (
+    <span className={cn("flex items-end gap-px h-3.5", className)}>
+      <span
+        className="w-0.5 rounded-sm bg-current"
+        style={{ height: "60%", transformOrigin: "bottom", animation: "eq-bounce 0.65s ease-in-out infinite" }}
+      />
+      <span
+        className="w-0.5 rounded-sm bg-current"
+        style={{ height: "100%", transformOrigin: "bottom", animation: "eq-bounce 0.65s ease-in-out infinite 0.18s" }}
+      />
+      <span
+        className="w-0.5 rounded-sm bg-current"
+        style={{ height: "75%", transformOrigin: "bottom", animation: "eq-bounce 0.65s ease-in-out infinite 0.35s" }}
+      />
+    </span>
   );
 }
 

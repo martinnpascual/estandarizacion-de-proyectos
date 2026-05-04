@@ -35,21 +35,45 @@ export async function getProjects(
   return { data: data as Project[], error: null };
 }
 
+export type TrackSongMeta = {
+  title: string;
+  artist_name: string;
+  drive_file_id: string | null;
+  drive_file_url: string | null;
+  cover_art_url: string | null;
+  duration_seconds: number | null;
+};
+
+export type TrackDraftMeta = {
+  title: string;
+  drive_file_id: string | null;
+  drive_file_url: string | null;
+  cover_art_url: string | null;
+  duration_seconds: number | null;
+};
+
+export type TrackWithAudio = ProjectTrack & {
+  song?: TrackSongMeta | null;
+  draft?: TrackDraftMeta | null;
+};
+
 export async function getProjectTracks(projectId: string): Promise<{
-  data: Array<ProjectTrack & { song?: { title: string; artist_name: string } | null; draft?: { title: string } | null }> | null;
+  data: TrackWithAudio[] | null;
   error: string | null;
 }> {
   const supabase = await createServerSupabaseClient();
 
   const { data, error } = await supabase
     .from("project_tracks")
-    .select("*, song:songs(title, artist_name), draft:drafts(title)")
+    .select(
+      "*, song:songs(title, artist_name, drive_file_id, drive_file_url, cover_art_url, duration_seconds), draft:drafts(title, drive_file_id, drive_file_url, cover_art_url, duration_seconds)"
+    )
     .eq("project_id", projectId)
     .is("deleted_at", null)
     .order("track_order", { ascending: true });
 
   if (error) return { data: null, error: error.message };
-  return { data: data as (ProjectTrack & { song?: { title: string; artist_name: string } | null; draft?: { title: string } | null })[], error: null };
+  return { data: data as TrackWithAudio[], error: null };
 }
 
 export async function createProject(
