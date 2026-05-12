@@ -15,6 +15,8 @@ import {
   ArrowRight,
   Clock,
   X,
+  Zap,
+  Music,
 } from "lucide-react";
 import { globalSearch, type SearchResult } from "@/lib/actions/search";
 import { cn } from "@/lib/utils";
@@ -217,11 +219,20 @@ function BuscarContent() {
   return (
     <div className="space-y-6 max-w-2xl">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold">Búsqueda global</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Encuentra canciones, maquetas, featurings, proyectos y eventos
-        </p>
+      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card">
+        <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/8 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-cyan-500/6 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative flex items-center gap-3 px-6 py-5">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/30 to-cyan-600/10 border border-cyan-500/20 flex items-center justify-center flex-shrink-0">
+            <Search className="h-5 w-5 text-cyan-400" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold leading-tight">Búsqueda global</h1>
+            <p className="text-muted-foreground text-xs mt-0.5">
+              Encuentra canciones, maquetas, featurings, proyectos y eventos
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Search input */}
@@ -234,7 +245,7 @@ function BuscarContent() {
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           placeholder="Buscar en todo el catálogo…"
-          className="w-full bg-card border border-border rounded-xl pl-10 pr-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-colors"
+          className="w-full bg-card border border-border/60 rounded-xl pl-10 pr-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-colors"
           aria-label="Búsqueda global"
           autoComplete="off"
         />
@@ -251,7 +262,7 @@ function BuscarContent() {
               router.replace("/buscar", { scroll: false });
               inputRef.current?.focus();
             }}
-            className="absolute right-3.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+            className="absolute right-3.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground transition-all active:scale-95"
             aria-label="Limpiar búsqueda"
           >
             <X className="h-4 w-4" />
@@ -276,7 +287,7 @@ function BuscarContent() {
                   { label: "Nuevo proyecto",href: "/proyectos?new=1",   icon: FolderOpen, color: "text-purple-400" },
                 ].map(({ label, href, icon: Icon, color }) => (
                   <a key={href} href={href}
-                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-border hover:bg-secondary transition-colors">
+                    className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-border/60 hover:bg-secondary transition-all active:scale-95">
                     <Icon className={cn("h-3 w-3", color)} />
                     {label}
                   </a>
@@ -302,9 +313,9 @@ function BuscarContent() {
                   <button
                     onClick={() => { setResultTypeFilter("all"); setSelectedIndex(-1); }}
                     className={cn(
-                      "flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition-colors",
+                      "flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition-all active:scale-95",
                       resultTypeFilter === "all"
-                        ? "bg-primary/10 border-primary/30 text-primary font-medium"
+                        ? "bg-primary/10 border-primary/30 text-primary font-semibold"
                         : "border-border text-muted-foreground hover:text-foreground bg-secondary"
                     )}
                   >
@@ -321,9 +332,9 @@ function BuscarContent() {
                         key={type}
                         onClick={() => { setResultTypeFilter(isActive ? "all" : type as SearchResult["type"]); setSelectedIndex(-1); }}
                         className={cn(
-                          "flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition-colors",
+                          "flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition-all active:scale-95",
                           isActive
-                            ? "bg-secondary border-border text-foreground font-medium ring-1 ring-inset ring-border"
+                            ? "bg-secondary border-border text-foreground font-semibold ring-1 ring-inset ring-border"
                             : "border-border text-muted-foreground hover:text-foreground bg-secondary hover:border-border/80"
                         )}
                       >
@@ -341,9 +352,9 @@ function BuscarContent() {
                 const meta = TYPE_META[type as SearchResult["type"]];
                 const Icon = meta.icon;
                 return (
-                  <div key={type} className="bg-card border border-border rounded-xl overflow-hidden">
+                  <div key={type} className="bg-card border border-border/60 rounded-2xl overflow-hidden">
                     {/* Section header */}
-                    <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-secondary/30">
+                    <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/60 bg-secondary/30">
                       <Icon className={cn("h-3.5 w-3.5", meta.color)} />
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                         {meta.label}s
@@ -352,21 +363,35 @@ function BuscarContent() {
                     </div>
 
                     {/* Items */}
-                    <div className="divide-y divide-border">
+                    <div className="divide-y divide-border/50">
                       {items.map((result) => (
                         <Link
                           key={result.id}
                           href={result.href}
                           ref={(el) => { resultsRef.current[result.globalIdx] = el; }}
                           className={cn(
-                            "flex items-center gap-3 px-4 py-3 transition-colors group",
+                            "flex items-center gap-3 px-4 py-3 transition-all active:scale-[0.99] group",
                             selectedIndex === result.globalIdx
                               ? "bg-primary/10"
                               : "hover:bg-secondary/50"
                           )}
                           onMouseEnter={() => setSelectedIndex(result.globalIdx)}
                         >
-                          <Icon className={cn("h-4 w-4 flex-shrink-0", meta.color)} />
+                          {/* Cover art thumbnail for songs, icon otherwise */}
+                          {result.type === "song" && result.cover_art_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={result.cover_art_url}
+                              alt=""
+                              className="w-8 h-8 rounded-xl object-cover flex-shrink-0 border border-border/60"
+                            />
+                          ) : result.type === "song" ? (
+                            <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                              <Music className="h-3.5 w-3.5 text-primary group-hover:scale-110 transition-transform" />
+                            </div>
+                          ) : (
+                            <Icon className={cn("h-4 w-4 flex-shrink-0", meta.color)} />
+                          )}
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{result.title}</p>
                             {result.subtitle && (
@@ -374,10 +399,26 @@ function BuscarContent() {
                                 {result.subtitle}
                               </p>
                             )}
+                            {/* BPM + key chips for songs */}
+                            {result.type === "song" && (result.bpm || result.key_signature) && (
+                              <div className="flex items-center gap-1.5 mt-1">
+                                {result.bpm && (
+                                  <span className="flex items-center gap-0.5 text-[10px] text-blue-400/80 font-mono tabular-nums">
+                                    <Zap className="h-2.5 w-2.5" />
+                                    {result.bpm} bpm
+                                  </span>
+                                )}
+                                {result.key_signature && (
+                                  <span className="text-[10px] text-purple-400/80 font-medium">
+                                    ♪ {result.key_signature}
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
                           <ChevronRight className={cn(
-                            "h-4 w-4 text-muted-foreground flex-shrink-0 transition-opacity",
-                            selectedIndex === result.globalIdx ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                            "h-4 w-4 text-muted-foreground flex-shrink-0 transition-all group-hover:translate-x-0.5",
+                            selectedIndex === result.globalIdx ? "opacity-100 translate-x-0.5" : "opacity-0 group-hover:opacity-100"
                           )} />
                         </Link>
                       ))}
@@ -406,7 +447,7 @@ function BuscarContent() {
                     try { localStorage.removeItem(RECENT_SEARCHES_KEY); } catch { /* ignore */ }
                     setRecentSearches([]);
                   }}
-                  className="text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                  className="text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-all active:scale-95"
                 >
                   Limpiar todo
                 </button>
@@ -416,7 +457,7 @@ function BuscarContent() {
                   <button
                     key={q}
                     onClick={() => handleRecentClick(q)}
-                    className="group flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full border border-border hover:bg-secondary transition-colors"
+                    className="group flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full border border-border/60 hover:bg-secondary transition-all active:scale-95"
                   >
                     <Clock className="h-3 w-3 text-muted-foreground" />
                     <span>{q}</span>
@@ -425,7 +466,7 @@ function BuscarContent() {
                       tabIndex={0}
                       onClick={(e) => handleRemoveRecent(q, e)}
                       onKeyDown={(e) => { if (e.key === "Enter") handleRemoveRecent(q, e as unknown as React.MouseEvent); }}
-                      className="ml-0.5 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                      className="ml-0.5 text-muted-foreground/50 hover:text-muted-foreground transition-all active:scale-95"
                       aria-label={`Eliminar búsqueda "${q}"`}
                     >
                       <X className="h-2.5 w-2.5" />
@@ -448,7 +489,7 @@ function BuscarContent() {
                 { label: "Calendario",  href: "/calendario",  icon: Calendar,   color: "text-green-400",     desc: "Eventos y fechas" },
               ].map(({ label, href, icon: Icon, color, desc }) => (
                 <a key={href} href={href}
-                  className="flex items-start gap-3 p-3.5 rounded-xl border border-border bg-card hover:bg-secondary/50 transition-colors group">
+                  className="flex items-start gap-3 p-3.5 rounded-2xl border border-border/60 bg-card hover:bg-secondary/50 hover:-translate-y-0.5 hover:shadow-sm transition-all active:scale-[0.99] group">
                   <div className={cn("mt-0.5 flex-shrink-0", color)}>
                     <Icon className="h-4 w-4" />
                   </div>
@@ -456,7 +497,7 @@ function BuscarContent() {
                     <p className="text-sm font-medium group-hover:text-foreground">{label}</p>
                     <p className="text-xs text-muted-foreground">{desc}</p>
                   </div>
-                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-muted-foreground flex-shrink-0 mt-0.5 ml-auto transition-colors" />
+                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-muted-foreground group-hover:translate-x-0.5 flex-shrink-0 mt-0.5 ml-auto transition-all" />
                 </a>
               ))}
             </div>
@@ -474,7 +515,7 @@ function BuscarContent() {
                 { label: "Proyecto",  href: "/proyectos?new=1",   icon: FolderOpen, color: "text-purple-400" },
               ].map(({ label, href, icon: Icon, color }) => (
                 <a key={href} href={href}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full border border-border hover:bg-secondary transition-colors">
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full border border-border/60 hover:bg-secondary transition-all active:scale-95">
                   <Plus className="h-3 w-3 text-muted-foreground" />
                   <Icon className={cn("h-3 w-3", color)} />
                   {label}
@@ -485,11 +526,11 @@ function BuscarContent() {
 
           {/* Keyboard hint */}
           <p className="text-xs text-muted-foreground/60 flex items-center gap-1.5">
-            <kbd className="text-[10px] bg-secondary border border-border px-1.5 py-0.5 rounded font-mono">↑↓</kbd>
+            <kbd className="text-[10px] bg-secondary border border-border/60 px-1.5 py-0.5 rounded font-mono">↑↓</kbd>
             navegar resultados ·
-            <kbd className="text-[10px] bg-secondary border border-border px-1.5 py-0.5 rounded font-mono">Enter</kbd>
+            <kbd className="text-[10px] bg-secondary border border-border/60 px-1.5 py-0.5 rounded font-mono">Enter</kbd>
             abrir ·
-            <kbd className="text-[10px] bg-secondary border border-border px-1.5 py-0.5 rounded font-mono">Esc</kbd>
+            <kbd className="text-[10px] bg-secondary border border-border/60 px-1.5 py-0.5 rounded font-mono">Esc</kbd>
             cerrar
           </p>
         </div>

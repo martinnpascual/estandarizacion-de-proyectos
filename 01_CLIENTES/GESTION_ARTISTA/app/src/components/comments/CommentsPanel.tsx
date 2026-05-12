@@ -193,7 +193,7 @@ export default function CommentsPanel({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
         <h3 className="text-sm font-semibold flex items-center gap-2">
           <MessageSquare className="h-4 w-4 text-primary" />
           Comentarios
@@ -206,7 +206,7 @@ export default function CommentsPanel({
         {resolvedCount > 0 && (
           <button
             onClick={() => setShowResolved((v) => !v)}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            className="text-xs text-muted-foreground hover:text-foreground transition-all active:scale-95"
           >
             {showResolved ? "Ocultar resueltos" : `Ver ${resolvedCount} resueltos`}
           </button>
@@ -231,7 +231,7 @@ export default function CommentsPanel({
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-border">
+          <div className="divide-y divide-border/50">
             {visible.map((comment) => (
               <CommentItem
                 key={comment.id}
@@ -256,13 +256,13 @@ export default function CommentsPanel({
       </div>
 
       {/* Input */}
-      <div className="border-t border-border p-3 space-y-2">
+      <div className="border-t border-border/60 p-3 space-y-2">
         {/* Timestamp selector */}
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={handleAddAtCurrentTime}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors text-xs text-muted-foreground hover:text-foreground"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-secondary hover:bg-secondary/80 transition-all active:scale-95 text-xs text-muted-foreground hover:text-foreground"
           >
             <Clock className="h-3.5 w-3.5" />
             + En {formatTime(Math.floor(player.currentTime))}
@@ -276,7 +276,7 @@ export default function CommentsPanel({
               onChange={(e) =>
                 setNewTimestamp(Math.max(0, Number(e.target.value)))
               }
-              className="w-16 px-2 py-1 bg-background border border-border rounded text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
+              className="w-16 px-2 py-1 bg-background border border-border/60 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/50"
             />
             <span className="text-muted-foreground/60">
               ({formatTime(newTimestamp)})
@@ -298,7 +298,7 @@ export default function CommentsPanel({
               }}
               placeholder="Escribe un comentario... (Enter para enviar)"
               rows={2}
-              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50 pb-5"
+              className="w-full px-3 py-2 bg-background border border-border/60 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50 pb-5"
             />
             {newBody.length > 0 && (
               <span className={cn(
@@ -312,7 +312,7 @@ export default function CommentsPanel({
           <button
             type="submit"
             disabled={submitting || !newBody.trim()}
-            className="self-end p-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/80 transition-colors disabled:opacity-50"
+            className="self-end p-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -352,7 +352,7 @@ function CommentItem({
     <div
       ref={commentRef}
       className={cn(
-        "px-4 py-3 group transition-colors",
+        "px-4 py-3 group transition-all",
         isActive ? "bg-yellow-500/5 border-l-2 border-yellow-500/40" : "hover:bg-secondary/30",
         comment.is_resolved && "opacity-50"
       )}
@@ -362,7 +362,7 @@ function CommentItem({
         <button
           onClick={onSeek}
           className={cn(
-            "flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] font-mono transition-colors mt-0.5",
+            "flex-shrink-0 px-1.5 py-0.5 rounded-xl text-[11px] font-mono transition-all active:scale-95 mt-0.5",
             isActive
               ? "bg-yellow-500/30 text-yellow-400 hover:bg-yellow-500/40"
               : "bg-yellow-500/15 text-yellow-500 hover:bg-yellow-500/25"
@@ -397,20 +397,20 @@ function CommentItem({
                 }}
                 rows={2}
                 autoFocus
-                className="w-full px-2 py-1.5 bg-background border border-primary/40 rounded-lg text-sm resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
+                className="w-full px-2 py-1.5 bg-background border border-primary/40 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
               />
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={onSaveEdit}
                   disabled={savingEdit || !editBody.trim()}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/80 disabled:opacity-50 transition-colors"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/80 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
                 >
                   {savingEdit ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
                   Guardar
                 </button>
                 <button
                   onClick={onCancelEdit}
-                  className="px-2.5 py-1 rounded-lg border border-border text-xs hover:bg-secondary transition-colors"
+                  className="px-2.5 py-1 rounded-xl border border-border/60 text-xs hover:bg-secondary transition-all active:scale-95"
                 >
                   Cancelar
                 </button>
@@ -428,7 +428,7 @@ function CommentItem({
               <button
                 onClick={onResolve}
                 title="Marcar como resuelto"
-                className="p-1 rounded hover:bg-green-500/15 text-muted-foreground hover:text-green-500 transition-colors"
+                className="p-1 rounded-xl hover:bg-green-500/15 text-muted-foreground hover:text-green-500 transition-all active:scale-95"
               >
                 <Check className="h-3.5 w-3.5" />
               </button>
@@ -437,7 +437,7 @@ function CommentItem({
               <button
                 onClick={onStartEdit}
                 title="Editar"
-                className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+                className="p-1 rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground transition-all active:scale-95"
               >
                 <Pencil className="h-3.5 w-3.5" />
               </button>
@@ -446,7 +446,7 @@ function CommentItem({
               <button
                 onClick={onDelete}
                 title="Eliminar"
-                className="p-1 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-colors"
+                className="p-1 rounded-xl hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-all active:scale-95"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>

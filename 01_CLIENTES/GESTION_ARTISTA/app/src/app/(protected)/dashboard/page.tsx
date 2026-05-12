@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Disc3, FileAudio, Users, Calendar, TrendingUp, TrendingDown, Clock,
@@ -84,7 +84,7 @@ function getGenreColor(genre: string, i: number) {
 const TOOLTIP_STYLE = {
   background: "hsl(var(--card))",
   border: "1px solid hsl(var(--border) / 0.6)",
-  borderRadius: 12,
+  borderRadius: 16,
   fontSize: 11,
   boxShadow: "0 8px 32px hsl(0 0% 0% / 0.3)",
   padding: "8px 12px",
@@ -146,44 +146,62 @@ export default function DashboardPage() {
   const [activeProjects, setActiveProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [googleLinked, setGoogleLinked] = useState<boolean | null>(null);
-  const [activityFilter, setActivityFilter] = useState<ActivityItem["type"] | "all">("all");
+  const [activityFilter, setActivityFilter] = useState<ActivityItem["type"] | "all">(() =>
+    typeof window !== "undefined"
+      ? (localStorage.getItem("dashboard-activity-filter") as ActivityItem["type"] | "all") || "all"
+      : "all"
+  );
+
+  useEffect(() => { localStorage.setItem("dashboard-activity-filter", activityFilter); }, [activityFilter]);
+
+  const load = useCallback(async () => {
+    try {
+      const [statsRes, draftsRes, collabsRes, eventsRes, chartRes, activityRes, releasesRes, projectsRes] = await Promise.all([
+        getDashboardStats(),
+        getLatestDrafts(4),
+        getActiveCollabs(4),
+        getUpcomingEvents(5),
+        getSongsChartData(),
+        getRecentActivity(30),
+        getUpcomingReleases(5),
+        getActiveProjects(4),
+      ]);
+      setStats(statsRes.data);
+      setDrafts(draftsRes.data ?? []);
+      setCollabs(collabsRes.data ?? []);
+      setEvents(eventsRes.data ?? []);
+      setByYear(chartRes.byYear ?? []);
+      setByGenre(chartRes.byGenre ?? []);
+      setActivity(activityRes.data ?? []);
+      setReleases(releasesRes.data ?? []);
+      setActiveProjects(projectsRes.data ?? []);
+    } catch (e) {
+      console.error("Dashboard load error:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    async function load() {
-      try {
-        const [statsRes, draftsRes, collabsRes, eventsRes, chartRes, activityRes, releasesRes, projectsRes] = await Promise.all([
-          getDashboardStats(),
-          getLatestDrafts(4),
-          getActiveCollabs(4),
-          getUpcomingEvents(5),
-          getSongsChartData(),
-          getRecentActivity(30),
-          getUpcomingReleases(5),
-          getActiveProjects(4),
-        ]);
-        setStats(statsRes.data);
-        setDrafts(draftsRes.data ?? []);
-        setCollabs(collabsRes.data ?? []);
-        setEvents(eventsRes.data ?? []);
-        setByYear(chartRes.byYear ?? []);
-        setByGenre(chartRes.byGenre ?? []);
-        setActivity(activityRes.data ?? []);
-        setReleases(releasesRes.data ?? []);
-        setActiveProjects(projectsRes.data ?? []);
-      } catch (e) {
-        console.error("Dashboard load error:", e);
-      } finally {
-        setLoading(false);
-      }
-    }
     load();
-
     // Verificar si Google está conectado consultando el perfil
     fetch("/api/drive/files?q=__check__")
       .then((r) => r.json())
       .then((j) => setGoogleLinked(!j.needs_auth))
       .catch(() => setGoogleLinked(false));
-  }, []);
+  }, [load]);
+
+  // Keyboard: R = refresh dashboard
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT") return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "r" || e.key === "R") { e.preventDefault(); setLoading(true); load(); }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [load]);
 
   // Use profile's full_name if available, fall back to email prefix
   const firstName = profile?.full_name
@@ -314,28 +332,28 @@ export default function DashboardPage() {
               <h1 className="text-4xl sm:text-5xl font-black tracking-tight leading-none gradient-text">
                 {firstName}
               </h1>
-              <p className="text-muted-foreground/70 text-sm mt-1.5 font-medium capitalize">{todayLabel}</p>
+              <p className="text-muted-foreground/70 text-sm mt-1.5 font-medium">{todayLabel.charAt(0).toUpperCase() + todayLabel.slice(1)}</p>
             </div>
           </div>
 
           {/* Right side: streak + activity */}
           <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
             {streak >= 2 && (
-              <div className="flex flex-col items-center px-4 py-3 rounded-xl bg-orange-500/10 border border-orange-500/20">
+              <div className="flex flex-col items-center px-4 py-3 rounded-2xl bg-orange-500/10 border border-orange-500/20">
                 <span className="text-xl">{streak >= 14 ? "🔥🔥" : streak >= 7 ? "🔥" : "⚡"}</span>
                 <span className="text-xs font-bold text-orange-400 tabular-nums">{streak}d</span>
                 <span className="text-[10px] text-orange-400/60 uppercase tracking-wide">racha</span>
               </div>
             )}
             {weekTotal > 0 && (
-              <div className="flex flex-col items-center px-4 py-3 rounded-xl bg-primary/8 border border-primary/15">
+              <div className="flex flex-col items-center px-4 py-3 rounded-2xl bg-primary/8 border border-primary/15">
                 <Zap className="h-4 w-4 text-primary mb-0.5" />
                 <span className="text-xs font-bold text-primary tabular-nums">{weekTotal}</span>
                 <span className="text-[10px] text-primary/50 uppercase tracking-wide">esta semana</span>
               </div>
             )}
             {!loading && stats && (
-              <div className="flex flex-col items-center px-4 py-3 rounded-xl bg-secondary/60 border border-border/60">
+              <div className="flex flex-col items-center px-4 py-3 rounded-2xl bg-secondary/60 border border-border/60">
                 <Disc3 className="h-4 w-4 text-muted-foreground mb-0.5" />
                 <span className="text-xs font-bold tabular-nums">{stats.totalSongs}</span>
                 <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wide">canciones</span>
@@ -347,13 +365,13 @@ export default function DashboardPage() {
 
       {/* Alerts Google */}
       {googleConnected && (
-        <div className="flex items-center gap-2 px-4 py-3 bg-green-500/10 border border-green-500/20 rounded-xl text-sm text-green-400">
+        <div className="flex items-center gap-2 px-4 py-3 bg-green-500/10 border border-green-500/20 rounded-2xl text-sm text-green-400">
           <CheckCircle className="h-4 w-4 flex-shrink-0" />
           Google Drive y Calendar conectados correctamente.
         </div>
       )}
       {googleError && (
-        <div className="flex items-center gap-2 px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-xl text-sm text-red-400">
+        <div className="flex items-center gap-2 px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-2xl text-sm text-red-400">
           <AlertCircle className="h-4 w-4 flex-shrink-0" />
           Error al conectar con Google: {googleError}.
         </div>
@@ -361,7 +379,7 @@ export default function DashboardPage() {
 
       {/* Google connection banner */}
       {googleLinked === false && !googleConnected && !googleError && (
-        <div className="flex items-center justify-between px-4 py-3 bg-card border border-border rounded-xl">
+        <div className="flex items-center justify-between px-4 py-3 bg-card border border-border/60 rounded-2xl">
           <div className="flex items-center gap-2">
             <FolderOpen className="h-4 w-4 text-muted-foreground" />
             <div>
@@ -369,7 +387,7 @@ export default function DashboardPage() {
               <p className="text-xs text-muted-foreground">Para vincular archivos de audio y sincronizar eventos</p>
             </div>
           </div>
-          <a href="/api/auth/google" className="px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium hover:bg-primary/80 transition-colors flex-shrink-0">
+          <a href="/api/auth/google" className="px-3 py-1.5 bg-primary text-primary-foreground rounded-xl text-xs font-semibold hover:bg-primary/80 transition-all active:scale-95 flex-shrink-0">
             Conectar
           </a>
         </div>
@@ -391,54 +409,54 @@ export default function DashboardPage() {
         const total = overdueCollabs.length + overdueProjects.length;
         if (total === 0) return null;
         return (
-          <a href="/notificaciones?filter=overdue" className="flex items-center justify-between px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-xl hover:bg-red-500/15 transition-colors">
+          <a href="/notificaciones?filter=overdue" className="flex items-center justify-between px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-2xl hover:bg-red-500/15 hover:-translate-y-0.5 hover:shadow-sm transition-all active:scale-[0.99] group">
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-red-400 flex-shrink-0" />
               <p className="text-sm font-medium text-red-400">
                 {total} elemento{total !== 1 ? "s" : ""} vencido{total !== 1 ? "s" : ""} — atención requerida
               </p>
             </div>
-            <ChevronRight className="h-4 w-4 text-red-400 flex-shrink-0" />
+            <ChevronRight className="h-4 w-4 text-red-400 flex-shrink-0 group-hover:translate-x-0.5 transition-transform" />
           </a>
         );
       })()}
 
       {/* Maquetas listas alert */}
       {!loading && (stats?.readyToPublish ?? 0) > 0 && (
-        <a href="/maquetas?status=lista_para_publicar" className="flex items-center justify-between px-4 py-3 bg-green-500/10 border border-green-500/30 rounded-xl hover:bg-green-500/15 transition-colors">
+        <a href="/maquetas?status=lista_para_publicar" className="flex items-center justify-between px-4 py-3 bg-green-500/10 border border-green-500/30 rounded-2xl hover:bg-green-500/15 hover:-translate-y-0.5 hover:shadow-sm transition-all active:scale-[0.99] group">
           <div className="flex items-center gap-2">
             <CheckCircle className="h-4 w-4 text-green-400 flex-shrink-0" />
             <p className="text-sm font-medium text-green-400">
               {stats!.readyToPublish} maqueta{stats!.readyToPublish !== 1 ? "s" : ""} lista{stats!.readyToPublish !== 1 ? "s" : ""} para publicar
             </p>
           </div>
-          <ChevronRight className="h-4 w-4 text-green-400 flex-shrink-0" />
+          <ChevronRight className="h-4 w-4 text-green-400 flex-shrink-0 group-hover:translate-x-0.5 transition-transform" />
         </a>
       )}
 
       {/* Proyectos listos alert */}
       {!loading && (stats?.listoProjects ?? 0) > 0 && (
-        <a href="/proyectos?status=listo" className="flex items-center justify-between px-4 py-3 bg-purple-500/10 border border-purple-500/30 rounded-xl hover:bg-purple-500/15 transition-colors">
+        <a href="/proyectos?status=listo" className="flex items-center justify-between px-4 py-3 bg-purple-500/10 border border-purple-500/30 rounded-2xl hover:bg-purple-500/15 hover:-translate-y-0.5 hover:shadow-sm transition-all active:scale-[0.99] group">
           <div className="flex items-center gap-2">
             <FolderOpen className="h-4 w-4 text-purple-400 flex-shrink-0" />
             <p className="text-sm font-medium text-purple-400">
               {stats!.listoProjects} proyecto{stats!.listoProjects !== 1 ? "s" : ""} listo{stats!.listoProjects !== 1 ? "s" : ""} — pendiente{stats!.listoProjects !== 1 ? "s" : ""} de publicar
             </p>
           </div>
-          <ChevronRight className="h-4 w-4 text-purple-400 flex-shrink-0" />
+          <ChevronRight className="h-4 w-4 text-purple-400 flex-shrink-0 group-hover:translate-x-0.5 transition-transform" />
         </a>
       )}
 
       {/* Collabs listos alert */}
       {!loading && (stats?.listoCollabs ?? 0) > 0 && (
-        <a href="/collabs?status=listo" className="flex items-center justify-between px-4 py-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl hover:bg-yellow-500/15 transition-colors">
+        <a href="/collabs?status=listo" className="flex items-center justify-between px-4 py-3 bg-yellow-500/10 border border-yellow-500/30 rounded-2xl hover:bg-yellow-500/15 hover:-translate-y-0.5 hover:shadow-sm transition-all active:scale-[0.99] group">
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 text-yellow-400 flex-shrink-0" />
             <p className="text-sm font-medium text-yellow-400">
               {stats!.listoCollabs} collab{stats!.listoCollabs !== 1 ? "s" : ""} lista{stats!.listoCollabs !== 1 ? "s" : ""} — parte grabada recibida
             </p>
           </div>
-          <ChevronRight className="h-4 w-4 text-yellow-400 flex-shrink-0" />
+          <ChevronRight className="h-4 w-4 text-yellow-400 flex-shrink-0 group-hover:translate-x-0.5 transition-transform" />
         </a>
       )}
 
@@ -462,7 +480,7 @@ export default function DashboardPage() {
           { label: "Nuevo proyecto", icon: FolderPlus,href: "/proyectos?new=1",   grad: "from-pink-500 to-rose-600",      shadow: "shadow-pink-900/40"    },
         ].map(({ label, icon: Icon, href, grad, shadow }) => (
           <a key={href} href={href}
-            className="flex flex-col items-center gap-2.5 py-4 px-2 rounded-xl border border-border/60 bg-card hover:bg-secondary/30 transition-all group text-center hover:border-border hover:shadow-lg">
+            className="flex flex-col items-center gap-2.5 py-4 px-2 rounded-2xl border border-border/60 bg-card hover:bg-secondary/30 transition-all active:scale-[0.97] group text-center hover:border-border hover:shadow-lg">
             <div className={cn(
               "w-11 h-11 rounded-xl flex items-center justify-center bg-gradient-to-br shadow-lg transition-all group-hover:scale-110 group-hover:shadow-xl",
               grad, shadow
@@ -481,7 +499,7 @@ export default function DashboardPage() {
             <CalendarDays className="h-4 w-4 text-muted-foreground" />
             <h2 className="font-semibold text-sm">Esta semana</h2>
           </div>
-          <a href="/calendario" className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-0.5">
+          <a href="/calendario" className="text-xs text-muted-foreground hover:text-foreground transition-all active:scale-95 flex items-center gap-0.5">
             Agenda completa <ChevronRight className="h-3 w-3" />
           </a>
         </div>
@@ -490,7 +508,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-7 gap-1 mb-4">
           {weekDays.map((day) => (
             <div key={day.dateStr} className={cn(
-              "flex flex-col items-center gap-0.5 py-2 px-0.5 rounded-lg",
+              "flex flex-col items-center gap-0.5 py-2 px-0.5 rounded-xl",
               day.isToday ? "bg-primary/10 ring-1 ring-primary/30" : "bg-secondary/50"
             )}>
               <span className={cn("text-[9px] uppercase tracking-wide font-medium",
@@ -535,7 +553,7 @@ export default function DashboardPage() {
                 </div>
                 {group.items.map(item => (
                   <a key={item.id} href={item.href}
-                    className="flex items-center gap-3 px-5 py-2 hover:bg-secondary/40 transition-colors group">
+                    className="flex items-center gap-3 px-5 py-2 hover:bg-secondary/40 transition-all active:scale-[0.99] group">
                     {item.kind === "event" && (
                       <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0 mt-0.5" />
                     )}
@@ -588,20 +606,37 @@ export default function DashboardPage() {
           {loading ? <WidgetSkeleton /> : drafts.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">Sin maquetas aún</p>
           ) : (
-            <div className="divide-y divide-border -mx-5">
-              {drafts.map((d) => (
-                <a key={d.id} href={`/maquetas?draft=${d.id}`}
-                  className="flex items-center gap-3 py-2.5 px-5 hover:bg-secondary/40 transition-colors group">
-                  <Music className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">{d.title}</p>
-                    {d.producer && <p className="text-xs text-muted-foreground truncate">{d.producer}</p>}
-                  </div>
-                  <span className={cn("text-xs flex-shrink-0", DRAFT_STATUS_COLOR[d.status])}>
-                    {DRAFT_STATUS_LABEL[d.status]}
-                  </span>
-                </a>
-              ))}
+            <div className="divide-y divide-border/50 -mx-5">
+              {drafts.map((d) => {
+                const statusColor = DRAFT_STATUS_COLOR[d.status];
+                const dotColor = {
+                  borrador: "bg-zinc-500",
+                  en_mezcla: "bg-blue-500",
+                  masterizada: "bg-purple-500",
+                  lista_para_publicar: "bg-green-500",
+                }[d.status] ?? "bg-muted-foreground";
+                return (
+                  <a key={d.id} href={`/maquetas?draft=${d.id}`}
+                    className="flex items-center gap-3 py-2.5 px-5 hover:bg-secondary/40 transition-all active:scale-[0.99] group">
+                    {/* Status dot */}
+                    <span className={cn("w-2 h-2 rounded-full flex-shrink-0", dotColor)} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">{d.title}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {d.producer && <p className="text-xs text-muted-foreground truncate">{d.producer}</p>}
+                        {d.bpm && (
+                          <span className="flex items-center gap-0.5 text-[10px] text-blue-400/70 font-mono tabular-nums flex-shrink-0">
+                            <Zap className="h-2.5 w-2.5" />{d.bpm}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span className={cn("text-xs flex-shrink-0", statusColor)}>
+                      {DRAFT_STATUS_LABEL[d.status]}
+                    </span>
+                  </a>
+                );
+              })}
             </div>
           )}
         </Widget>
@@ -614,7 +649,7 @@ export default function DashboardPage() {
             <div className="space-y-1 -mx-5">
               {events.map((ev) => (
                 <a key={ev.id} href={`/calendario?event=${ev.id}`}
-                  className="flex items-start gap-3 px-5 py-2.5 rounded-lg hover:bg-secondary/40 transition-colors group">
+                  className="flex items-start gap-3 px-5 py-2.5 rounded-xl hover:bg-secondary/40 transition-all active:scale-[0.99] group">
                   <span className={cn("w-2 h-2 rounded-full mt-1.5 flex-shrink-0", EVENT_TYPE_DOTS[ev.event_type])} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">{ev.title}</p>
@@ -634,12 +669,21 @@ export default function DashboardPage() {
           {loading ? <WidgetSkeleton /> : collabs.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">Sin collabs activas</p>
           ) : (
-            <div className="divide-y divide-border -mx-5">
+            <div className="divide-y divide-border/50 -mx-5">
               {collabs.map((c) => {
                 const chip = deadlineChip(c.deadline);
+                const initials = c.artist_name
+                  .split(" ")
+                  .slice(0, 2)
+                  .map((w: string) => w[0]?.toUpperCase() ?? "")
+                  .join("");
                 return (
                   <a key={c.id} href={`/collabs?collab=${c.id}`}
-                    className="flex items-center gap-3 py-2.5 px-5 hover:bg-secondary/40 transition-colors group">
+                    className="flex items-center gap-3 py-2.5 px-5 hover:bg-secondary/40 transition-all active:scale-[0.99] group">
+                    {/* Artist avatar */}
+                    <div className="w-7 h-7 rounded-full bg-yellow-500/15 border border-yellow-500/20 flex items-center justify-center flex-shrink-0">
+                      <span className="text-[10px] font-bold text-yellow-400">{initials}</span>
+                    </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">{c.song_title}</p>
                       <p className="text-xs text-muted-foreground truncate">con {c.artist_name}</p>
@@ -666,7 +710,7 @@ export default function DashboardPage() {
           {loading ? <WidgetSkeleton /> : activeProjects.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">Sin proyectos activos</p>
           ) : (
-            <div className="divide-y divide-border -mx-5">
+            <div className="divide-y divide-border/50 -mx-5">
               {activeProjects.map((p) => {
                 const targetDate = p.target_date
                   ? (() => {
@@ -680,7 +724,7 @@ export default function DashboardPage() {
                   : null;
                 return (
                   <a key={p.id} href={`/proyectos?project=${p.id}`}
-                    className="flex items-center gap-3 py-2.5 px-5 hover:bg-secondary/40 transition-colors group">
+                    className="flex items-center gap-3 py-2.5 px-5 hover:bg-secondary/40 transition-all active:scale-[0.99] group">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">{p.name}</p>
                       <p className="text-xs text-muted-foreground">{PROJECT_TYPE_LABEL[p.type] ?? p.type}</p>
@@ -841,7 +885,7 @@ export default function DashboardPage() {
                     key={key}
                     onClick={() => setActivityFilter(key)}
                     className={cn(
-                      "flex items-center gap-1 text-[11px] px-2 py-1 rounded-full whitespace-nowrap transition-colors",
+                      "flex items-center gap-1 text-[11px] px-2 py-1 rounded-full whitespace-nowrap transition-all active:scale-95",
                       activityFilter === key
                         ? "bg-primary/15 text-primary font-medium"
                         : "bg-secondary text-muted-foreground hover:text-foreground"
@@ -853,7 +897,7 @@ export default function DashboardPage() {
                 );
               })}
             </div>
-            <div className="divide-y divide-border -mx-5">
+            <div className="divide-y divide-border/50 -mx-5">
               {(activityFilter === "all" ? activity : activity.filter(a => a.type === activityFilter))
                 .slice(0, 10)
                 .map((item) => (
@@ -887,7 +931,7 @@ function StatCard({ icon: Icon, label, value, iconBg, iconColor, accent, href }:
 
       {/* Icon + label row */}
       <div className="flex items-center gap-2.5 mb-3">
-        <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0", iconBg)}>
+        <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform", iconBg)}>
           <Icon className={cn("h-3.5 w-3.5", iconColor)} />
         </div>
         <span className="text-xs text-muted-foreground font-medium leading-tight">{label}</span>
@@ -905,7 +949,7 @@ function StatCard({ icon: Icon, label, value, iconBg, iconColor, accent, href }:
   if (href) {
     return (
       <a href={href}
-        className="bg-card/80 backdrop-blur-sm rounded-2xl border border-border/60 p-4 pb-5 block hover:border-primary/25 hover:shadow-lg transition-all duration-200 group hover:-translate-y-0.5">
+        className="bg-card/80 backdrop-blur-sm rounded-2xl border border-border/60 p-4 pb-5 block hover:border-primary/25 hover:shadow-lg transition-all duration-200 group hover:-translate-y-0.5 active:scale-[0.98]">
         {inner}
       </a>
     );
@@ -933,8 +977,8 @@ function Widget({ title, icon: Icon, href, accentColor = "bg-primary", children 
             <h2 className="font-semibold text-sm tracking-tight">{title}</h2>
           </div>
           <a href={href}
-            className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-0.5 font-medium">
-            Ver todo <ChevronRight className="h-3 w-3" />
+            className="text-xs text-muted-foreground hover:text-primary transition-all active:scale-95 flex items-center gap-0.5 font-medium group">
+            Ver todo <ChevronRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
           </a>
         </div>
         {children}
@@ -1098,7 +1142,7 @@ function ReleaseCard({ release }: { release: CalendarEvent }) {
 
   return (
     <a href={`/calendario?event=${release.id}`} className={cn(
-      "flex-shrink-0 w-44 rounded-xl border p-3 flex flex-col gap-2 transition-all hover:scale-[1.02] cursor-pointer",
+      "flex-shrink-0 w-44 rounded-xl border p-3 flex flex-col gap-2 transition-all hover:scale-[1.02] active:scale-[0.97] cursor-pointer",
       urgencyRing
     )}>
       {/* Countdown ring + badge */}
@@ -1145,7 +1189,7 @@ function ActivityRow({ item }: { item: ActivityItem }) {
   return (
     <a
       href={item.href}
-      className="flex items-center gap-3 px-5 py-3 hover:bg-secondary/40 transition-colors group"
+      className="flex items-center gap-3 px-5 py-3 hover:bg-secondary/40 transition-all active:scale-[0.99] group"
     >
       <span className={cn(
         "w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0",

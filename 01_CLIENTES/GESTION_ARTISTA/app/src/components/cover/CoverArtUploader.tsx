@@ -108,8 +108,8 @@ export default function CoverArtUploader({
           {/* Image preview / placeholder */}
           <div
             className={cn(
-              "relative rounded-xl border-2 border-dashed border-border bg-muted/40 overflow-hidden",
-              "flex items-center justify-center shrink-0 group cursor-pointer transition-colors hover:border-primary/50",
+              "relative rounded-2xl border-2 border-dashed border-border bg-muted/40 overflow-hidden",
+              "flex items-center justify-center shrink-0 group cursor-pointer transition-all active:scale-[0.99] hover:border-primary/50",
               container,
               uploading && "opacity-60"
             )}
@@ -155,7 +155,7 @@ export default function CoverArtUploader({
               type="button"
               disabled={uploading}
               onClick={() => inputRef.current?.click()}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm hover:bg-secondary transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl border text-sm hover:bg-secondary transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {uploading ? (
                 <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Subiendo…</>
@@ -169,7 +169,7 @@ export default function CoverArtUploader({
               type="button"
               disabled={uploading}
               onClick={() => setShowDrivePicker(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm text-[#4285f4] border-[#4285f4]/30 hover:bg-[#4285f4]/5 transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl border text-sm text-[#4285f4] border-[#4285f4]/30 hover:bg-[#4285f4]/5 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <FolderOpen className="h-3.5 w-3.5" /> Desde Drive
             </button>
@@ -179,7 +179,7 @@ export default function CoverArtUploader({
               <button
                 type="button"
                 onClick={() => { setMode("url"); setUrlInput(value ?? ""); }}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl border text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-all active:scale-95"
               >
                 <Link className="h-3.5 w-3.5" /> Pegar URL
               </button>
@@ -190,7 +190,7 @@ export default function CoverArtUploader({
               <button
                 type="button"
                 onClick={() => { onChange(null); setUrlInput(""); setMode("preview"); }}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-red-200 text-red-500 text-sm hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-red-200 text-red-500 text-sm hover:bg-red-50 dark:hover:bg-red-950/20 transition-all active:scale-95"
               >
                 <X className="h-3.5 w-3.5" /> Quitar
               </button>
@@ -207,20 +207,20 @@ export default function CoverArtUploader({
               onChange={(e) => setUrlInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), confirmUrl())}
               placeholder="https://... o /api/drive/stream/..."
-              className="flex-1 border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className="flex-1 border border-border/60 rounded-xl px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
               autoFocus
             />
             <button
               type="button"
               onClick={confirmUrl}
-              className="px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+              className="px-3 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:bg-primary/90 transition-all active:scale-95"
             >
               OK
             </button>
             <button
               type="button"
               onClick={() => setMode("preview")}
-              className="px-3 py-2 border rounded-lg text-sm hover:bg-secondary transition-colors"
+              className="px-3 py-2 border border-border/60 rounded-xl text-sm hover:bg-secondary transition-all active:scale-95"
             >
               ✕
             </button>
@@ -229,7 +229,7 @@ export default function CoverArtUploader({
 
         {/* Drive auth prompt */}
         {needsAuth && (
-          <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-sm text-amber-700 dark:text-amber-300">
+          <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl text-sm text-amber-700 dark:text-amber-300">
             <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
             <div>
               Drive no conectado.{" "}
@@ -243,7 +243,7 @@ export default function CoverArtUploader({
 
         {/* Upload error */}
         {error && !needsAuth && (
-          <div className="flex items-center gap-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-600 dark:text-red-400">
+          <div className="flex items-center gap-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-600 dark:text-red-400">
             <AlertCircle className="h-4 w-4 shrink-0" />
             {error}
             <button type="button" onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600">

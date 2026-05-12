@@ -10,7 +10,7 @@ import {
 import {
   BarChart2, Disc3, Clock, Tag, Users2, Music2,
   FileAudio, Users, FolderOpen, CheckCircle2, AlertTriangle, CalendarClock, ChevronRight,
-  LayoutDashboard, Award, TrendingUp, TrendingDown, Share2, Play,
+  LayoutDashboard, Award, TrendingUp, TrendingDown, Share2, Play, Zap,
 } from "lucide-react";
 import { getAllStats, type AllStats } from "@/lib/actions/stats";
 import { getSocialLinks, type SocialLinkWithLatestStat } from "@/lib/actions/social";
@@ -42,7 +42,7 @@ function getGenreChartColor(genre: string, index: number): string {
 const TOOLTIP_STYLE = {
   background: "hsl(var(--card))",
   border: "1px solid hsl(var(--border) / 0.6)",
-  borderRadius: 12,
+  borderRadius: 16,
   fontSize: 12,
   boxShadow: "0 8px 32px hsl(0 0% 0% / 0.3)",
   padding: "8px 12px",
@@ -86,7 +86,7 @@ function StatCard({ icon: Icon, label, value, sub, color, href, delta }: {
     <>
       <div className="flex items-center justify-between mb-4">
         <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</span>
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-secondary/60">
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-secondary/60 group-hover:scale-110 transition-all">
           <Icon className={cn("h-4 w-4", color)} />
         </div>
       </div>
@@ -113,7 +113,7 @@ function StatCard({ icon: Icon, label, value, sub, color, href, delta }: {
   );
   if (href) {
     return (
-      <a href={href} className="bg-card/80 backdrop-blur-sm border border-border/60 rounded-2xl p-5 block hover:border-primary/30 hover:bg-card transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 group">
+      <a href={href} className="bg-card/80 backdrop-blur-sm border border-border/60 rounded-2xl p-5 block hover:border-primary/30 hover:bg-card transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] group">
         {inner}
       </a>
     );
@@ -194,11 +194,11 @@ function Skeleton() {
   return (
     <div className="space-y-6">
       <div className="flex gap-2">
-        {[1,2,3,4].map(i => <div key={i} className="h-9 w-28 bg-secondary rounded-lg animate-pulse" />)}
+        {[1,2,3,4].map(i => <div key={i} className="h-9 w-28 bg-secondary rounded-xl animate-pulse" />)}
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="bg-card border border-border rounded-xl p-5">
+          <div key={i} className="bg-card border border-border/60 rounded-2xl p-5">
             <div className="h-3 bg-secondary rounded w-20 mb-3 animate-pulse" />
             <div className="h-7 bg-secondary rounded w-16 animate-pulse" />
           </div>
@@ -206,7 +206,7 @@ function Skeleton() {
       </div>
       <div className="grid md:grid-cols-2 gap-6">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="bg-card border border-border rounded-xl p-5 h-56 animate-pulse" />
+          <div key={i} className="bg-card border border-border/60 rounded-2xl p-5 h-56 animate-pulse" />
         ))}
       </div>
     </div>
@@ -304,9 +304,9 @@ function EstadisticasContent() {
                   onClick={() => setTab(t.id)}
                   title={`${t.label} (tecla ${i + 1})`}
                   className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200",
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-200 active:scale-95",
                     isActive
-                      ? "bg-card shadow-sm border border-border/60 text-foreground"
+                      ? "bg-card shadow-sm border border-border/60 text-foreground font-semibold"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                   )}
                 >
@@ -453,21 +453,37 @@ function DiscografiaTab({ stats }: { stats: AllStats["discografia"] }) {
 
       {stats.recentSongs.length > 0 && (
         <SectionCard title="Canciones recientes">
-          <div className="divide-y divide-border -mx-5 -mb-5">
+          <div className="divide-y divide-border/50 -mx-5 -mb-5">
             {stats.recentSongs.map((s) => (
               <a
                 key={s.id}
                 href={`/discografia?song=${s.id}`}
-                className="flex items-center gap-3 px-5 py-3 hover:bg-secondary/50 transition-colors group"
+                className="flex items-center gap-3 px-5 py-3 hover:bg-secondary/50 transition-all active:scale-[0.99] group"
               >
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <Disc3 className="h-4 w-4 text-primary" />
+                {/* Cover art or fallback */}
+                <div className="w-9 h-9 rounded-xl overflow-hidden bg-primary/10 flex items-center justify-center flex-shrink-0 border border-border/50">
+                  {s.cover_art_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={s.cover_art_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <Disc3 className="h-4 w-4 text-primary group-hover:scale-110 transition-transform" />
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{s.title}</p>
-                  <p className="text-xs text-muted-foreground">{s.year}{s.genre ? ` · ${s.genre}` : ""}</p>
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    <span className="text-xs text-muted-foreground">{s.year}{s.genre ? ` · ${s.genre}` : ""}</span>
+                    {s.bpm && (
+                      <span className="flex items-center gap-0.5 text-[10px] text-blue-400/80 font-mono tabular-nums">
+                        <Zap className="h-2.5 w-2.5" />{s.bpm}
+                      </span>
+                    )}
+                    {s.key_signature && (
+                      <span className="text-[10px] text-purple-400/80 font-medium">♪ {s.key_signature}</span>
+                    )}
+                  </div>
                 </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
               </a>
             ))}
           </div>
@@ -648,7 +664,7 @@ function CollabsTab({ stats }: { stats: AllStats["collabs"] }) {
                 </div>
               )}
               {stats.withDeadline > 0 && (
-                <p className="text-[11px] text-muted-foreground border-t border-border pt-2">
+                <p className="text-[11px] text-muted-foreground border-t border-border/60 pt-2">
                   {stats.withDeadline}/{stats.total} tienen deadline
                 </p>
               )}
@@ -779,7 +795,7 @@ function ResumenTab({ stats }: { stats: AllStats }) {
           .sort((a, b) => a.year - b.year);
         const maxCount = Math.max(...recent.map(y => y.count), 1);
         return (
-          <div className="bg-card border border-border rounded-xl p-5">
+          <div className="bg-card border border-border/60 rounded-2xl p-5">
             <h2 className="text-xs font-semibold mb-4 text-muted-foreground uppercase tracking-wide">
               Ritmo de producción anual
             </h2>
@@ -930,7 +946,7 @@ function ResumenTab({ stats }: { stats: AllStats }) {
       {(bestYear || topGenre || topArtist) && (
         <div className={cn("grid gap-4", bestYear && topGenre && topArtist ? "md:grid-cols-3" : "md:grid-cols-2")}>
           {bestYear && (
-            <div className="bg-card border border-border rounded-xl p-5">
+            <div className="bg-card border border-border/60 rounded-2xl p-5">
               <p className="text-xs text-muted-foreground mb-3 flex items-center gap-1.5">
                 <Award className="h-3.5 w-3.5" />
                 Año más productivo
@@ -943,7 +959,7 @@ function ResumenTab({ stats }: { stats: AllStats }) {
             </div>
           )}
           {topGenre && (
-            <div className="bg-card border border-border rounded-xl p-5">
+            <div className="bg-card border border-border/60 rounded-2xl p-5">
               <p className="text-xs text-muted-foreground mb-3 flex items-center gap-1.5">
                 <Music2 className="h-3.5 w-3.5" />
                 Género principal
@@ -956,7 +972,7 @@ function ResumenTab({ stats }: { stats: AllStats }) {
             </div>
           )}
           {topArtist && (
-            <div className="bg-card border border-border rounded-xl p-5">
+            <div className="bg-card border border-border/60 rounded-2xl p-5">
               <p className="text-xs text-muted-foreground mb-3 flex items-center gap-1.5">
                 <Users2 className="h-3.5 w-3.5" />
                 Artista frecuente
@@ -1090,7 +1106,7 @@ function ResumenTab({ stats }: { stats: AllStats }) {
                 <div
                   key={a.label}
                   className={cn(
-                    "flex flex-col items-center gap-2 p-3 rounded-xl border text-center transition-all duration-300",
+                    "flex flex-col items-center gap-2 p-3 rounded-2xl border text-center transition-all duration-300",
                     a.earned
                       ? "border-primary/40 bg-primary/5"
                       : "border-border bg-secondary/40"
@@ -1244,7 +1260,7 @@ function RedesTab({ links, loading }: { links: SocialLinkWithLatestStat[]; loadi
       <div className="space-y-6">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[1,2,3,4].map(i => (
-            <div key={i} className="bg-card border border-border rounded-xl p-5 animate-pulse">
+            <div key={i} className="bg-card border border-border/60 rounded-2xl p-5 animate-pulse">
               <div className="h-3 bg-secondary rounded w-20 mb-3" />
               <div className="h-7 bg-secondary rounded w-16" />
             </div>
@@ -1259,7 +1275,7 @@ function RedesTab({ links, loading }: { links: SocialLinkWithLatestStat[]; loadi
       <div className="text-center py-20 text-muted-foreground">
         <Share2 className="h-12 w-12 mx-auto mb-3 opacity-20" />
         <p className="text-sm">No hay redes sociales configuradas</p>
-        <a href="/redes" className="inline-flex items-center gap-1 mt-3 text-xs text-primary hover:underline">
+        <a href="/redes" className="inline-flex items-center gap-1 mt-3 text-xs text-primary hover:underline transition-all active:scale-95">
           Configurar redes <ChevronRight className="h-3 w-3" />
         </a>
       </div>
@@ -1396,7 +1412,7 @@ function RedesTab({ links, loading }: { links: SocialLinkWithLatestStat[]; loadi
             const prev = link.previous_stat;
             return (
               <a key={link.id} href="/redes"
-                className="flex items-start gap-3 p-4 rounded-xl border border-border bg-secondary/30 hover:bg-secondary/60 transition-colors">
+                className="flex items-start gap-3 p-4 rounded-2xl border border-border/60 bg-secondary/30 hover:bg-secondary/60 hover:-translate-y-0.5 hover:shadow-sm transition-all active:scale-[0.99]">
                 <span className={`w-3 h-3 rounded-full flex-shrink-0 mt-1 ${meta?.color ?? "bg-muted-foreground"}`} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 mb-2">

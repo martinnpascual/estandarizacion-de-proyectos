@@ -123,38 +123,43 @@ export default function DriveBrowser({ fileType, onSelect, onClose }: Props) {
   const Icon  = fileType === "image" ? ImageIcon : Music;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-card border border-border rounded-xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="relative w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
+        {/* Glow ring */}
+        <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-[#4285f4]/20 via-transparent to-[#4285f4]/10 pointer-events-none" />
+        <div className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl max-h-[85vh] flex flex-col shadow-2xl shadow-black/40">
 
         {/* ── Header ─────────────────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <h2 className="text-sm font-semibold flex items-center gap-2">
-            <Folder className="h-4 w-4 text-[#4285f4]" />
-            Google Drive — {label}
-          </h2>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-[#4285f4]/15 border border-[#4285f4]/20 flex items-center justify-center flex-shrink-0">
+              <Folder className="h-4 w-4 text-[#4285f4]" />
+            </div>
+            <h2 className="text-sm font-semibold">Google Drive — {label}</h2>
+          </div>
           <div className="flex items-center gap-1">
             {fileType === "image" && (
               <>
                 <button
                   onClick={() => setViewMode("list")}
-                  className={cn("p-1.5 rounded text-xs", viewMode === "list" ? "bg-secondary" : "hover:bg-secondary/50 text-muted-foreground")}
+                  className={cn("p-1.5 rounded-xl text-xs", viewMode === "list" ? "bg-secondary" : "hover:bg-secondary/50 text-muted-foreground")}
                   title="Vista lista"
                 >
                   ☰
                 </button>
                 <button
                   onClick={() => setViewMode("grid")}
-                  className={cn("p-1.5 rounded text-xs", viewMode === "grid" ? "bg-secondary" : "hover:bg-secondary/50 text-muted-foreground")}
+                  className={cn("p-1.5 rounded-xl text-xs", viewMode === "grid" ? "bg-secondary" : "hover:bg-secondary/50 text-muted-foreground")}
                   title="Vista cuadrícula"
                 >
                   ⊞
                 </button>
               </>
             )}
-            <button onClick={fetchFiles} className="p-1.5 rounded hover:bg-secondary text-muted-foreground" title="Recargar">
+            <button onClick={fetchFiles} className="p-1.5 rounded-xl hover:bg-secondary text-muted-foreground" title="Recargar">
               <RefreshCw className="h-3.5 w-3.5" />
             </button>
-            <button onClick={onClose} className="p-1.5 rounded hover:bg-secondary">
+            <button onClick={onClose} className="p-1.5 rounded-xl hover:bg-muted/50 transition-all active:scale-95 text-muted-foreground hover:text-foreground">
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -172,7 +177,7 @@ export default function DriveBrowser({ fileType, onSelect, onClose }: Props) {
             </div>
             <a
               href="/api/auth/google"
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/80 transition-colors"
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:bg-primary/80 transition-all active:scale-95"
             >
               Conectar con Google
             </a>
@@ -180,7 +185,7 @@ export default function DriveBrowser({ fileType, onSelect, onClose }: Props) {
         ) : (
           <>
             {/* ── Search ───────────────────────────────────────────────────────── */}
-            <div className="px-3 py-2.5 border-b border-border">
+            <div className="px-3 py-2.5 border-b border-border/60">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                 <input
@@ -188,7 +193,7 @@ export default function DriveBrowser({ fileType, onSelect, onClose }: Props) {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder={`Buscar ${label.toLowerCase()} en todo el Drive...`}
-                  className="w-full pl-9 pr-3 py-1.5 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  className="w-full pl-9 pr-3 py-1.5 bg-background border border-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                 />
                 {search && (
                   <button
@@ -203,7 +208,7 @@ export default function DriveBrowser({ fileType, onSelect, onClose }: Props) {
 
             {/* ── Breadcrumb ───────────────────────────────────────────────────── */}
             {!search && (
-              <div className="flex items-center gap-1 px-3 py-1.5 text-xs text-muted-foreground border-b border-border bg-secondary/20 flex-wrap">
+              <div className="flex items-center gap-1 px-3 py-1.5 text-xs text-muted-foreground border-b border-border/60 bg-secondary/20 flex-wrap">
                 {breadcrumbs.map((crumb, i) => (
                   <span key={i} className="flex items-center gap-1">
                     {i === 0 && <Home className="h-3 w-3" />}
@@ -211,7 +216,7 @@ export default function DriveBrowser({ fileType, onSelect, onClose }: Props) {
                       <>
                         <button
                           onClick={() => navigateTo(i)}
-                          className="hover:text-foreground hover:underline transition-colors"
+                          className="hover:text-foreground hover:underline transition-all active:scale-95"
                         >
                           {crumb.name}
                         </button>
@@ -225,7 +230,7 @@ export default function DriveBrowser({ fileType, onSelect, onClose }: Props) {
                 {breadcrumbs.length > 1 && (
                   <button
                     onClick={() => navigateTo(breadcrumbs.length - 2)}
-                    className="ml-auto flex items-center gap-1 hover:text-foreground transition-colors"
+                    className="ml-auto flex items-center gap-1 hover:text-foreground transition-all active:scale-95"
                   >
                     <ArrowLeft className="h-3 w-3" /> Atrás
                   </button>
@@ -264,7 +269,7 @@ export default function DriveBrowser({ fileType, onSelect, onClose }: Props) {
                       <button
                         key={file.id}
                         onClick={() => enterFolder(file)}
-                        className="flex flex-col items-center gap-1.5 p-2 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer text-center"
+                        className="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-secondary/50 transition-all active:scale-95 cursor-pointer text-center"
                       >
                         <Folder className="h-10 w-10 text-[#4285f4]" />
                         <span className="text-[11px] text-muted-foreground line-clamp-2 leading-tight">
@@ -275,7 +280,7 @@ export default function DriveBrowser({ fileType, onSelect, onClose }: Props) {
                       <button
                         key={file.id}
                         onClick={() => onSelect(file)}
-                        className="group relative rounded-lg overflow-hidden border-2 border-transparent hover:border-primary/60 transition-all cursor-pointer aspect-square bg-secondary/30"
+                        className="group relative rounded-xl overflow-hidden border-2 border-transparent hover:border-primary/60 transition-all cursor-pointer aspect-square bg-secondary/30"
                         title={file.name}
                       >
                         {file.thumbnailLink ? (
@@ -302,12 +307,12 @@ export default function DriveBrowser({ fileType, onSelect, onClose }: Props) {
                 </div>
               ) : (
                 /* ── List view ───────────────────────────────────────────────── */
-                <div className="divide-y divide-border">
+                <div className="divide-y divide-border/50">
                   {files.map((file) =>
                     file.isFolder ? (
                       <div
                         key={file.id}
-                        className="flex items-center gap-3 px-4 py-3 hover:bg-secondary/30 cursor-pointer transition-colors group"
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-secondary/30 cursor-pointer transition-all active:scale-[0.99] group"
                         onClick={() => enterFolder(file)}
                       >
                         <Folder className="h-4 w-4 text-[#4285f4] flex-shrink-0" />
@@ -315,16 +320,16 @@ export default function DriveBrowser({ fileType, onSelect, onClose }: Props) {
                           <p className="text-sm font-medium truncate">{file.name}</p>
                           <p className="text-xs text-muted-foreground">Carpeta</p>
                         </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
                       </div>
                     ) : (
                       <div
                         key={file.id}
-                        className="flex items-center gap-3 px-4 py-3 hover:bg-secondary/30 cursor-pointer transition-colors group"
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-secondary/30 cursor-pointer transition-all active:scale-[0.99] group"
                         onClick={() => onSelect(file)}
                       >
                         {/* Thumbnail or icon */}
-                        <div className="w-9 h-9 rounded-lg overflow-hidden bg-secondary flex-shrink-0 flex items-center justify-center">
+                        <div className="w-9 h-9 rounded-xl overflow-hidden bg-secondary flex-shrink-0 flex items-center justify-center">
                           {fileType === "image" && file.thumbnailLink ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
@@ -333,7 +338,7 @@ export default function DriveBrowser({ fileType, onSelect, onClose }: Props) {
                               className="w-full h-full object-cover"
                             />
                           ) : (
-                            <Icon className="h-4 w-4 text-muted-foreground" />
+                            <Icon className="h-4 w-4 text-muted-foreground group-hover:scale-110 transition-transform" />
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -353,7 +358,7 @@ export default function DriveBrowser({ fileType, onSelect, onClose }: Props) {
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
-                            className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-secondary text-muted-foreground transition-all"
+                            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-xl hover:bg-secondary text-muted-foreground transition-all active:scale-95"
                             title="Ver en Drive"
                           >
                             <ExternalLink className="h-3.5 w-3.5" />
@@ -367,7 +372,7 @@ export default function DriveBrowser({ fileType, onSelect, onClose }: Props) {
             </div>
 
             {/* ── Footer ───────────────────────────────────────────────────────── */}
-            <div className="px-4 py-2.5 border-t border-border text-xs text-muted-foreground flex items-center justify-between">
+            <div className="px-4 py-2.5 border-t border-border/60 text-xs text-muted-foreground flex items-center justify-between">
               <span>
                 {files.filter((f) => !f.isFolder).length} archivo
                 {files.filter((f) => !f.isFolder).length !== 1 ? "s" : ""}{" "}
@@ -378,6 +383,7 @@ export default function DriveBrowser({ fileType, onSelect, onClose }: Props) {
             </div>
           </>
         )}
+        </div>
       </div>
     </div>
   );

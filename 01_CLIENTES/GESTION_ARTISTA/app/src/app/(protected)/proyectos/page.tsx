@@ -146,8 +146,16 @@ export default function ProyectosPage() {
   const [typeFilter, setTypeFilter] = useState<"todos" | ProjectType>("todos");
   const [statusFilter, setStatusFilter] = useState<"todos" | ProjectStatus>("todos");
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<"updated" | "target_date" | "az">("updated");
-  const [viewMode, setViewMode] = useState<"list" | "board">("list");
+  const [sortBy, setSortBy] = useState<"updated" | "target_date" | "az">(() =>
+    typeof window !== "undefined"
+      ? (localStorage.getItem("proyectos-sort") as "updated" | "target_date" | "az") || "updated"
+      : "updated"
+  );
+  const [viewMode, setViewMode] = useState<"list" | "board">(() =>
+    typeof window !== "undefined"
+      ? (localStorage.getItem("proyectos-view-mode") as "list" | "board") || "list"
+      : "list"
+  );
   const [noDateFilter, setNoDateFilter] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -180,6 +188,10 @@ export default function ProyectosPage() {
   // Drag-and-drop state for tracklist reordering
   const draggedTrackId = useRef<string | null>(null);
   const [dragOverTrackId, setDragOverTrackId] = useState<string | null>(null);
+
+  // Persist view mode + sort to localStorage
+  useEffect(() => { localStorage.setItem("proyectos-view-mode", viewMode); }, [viewMode]);
+  useEffect(() => { localStorage.setItem("proyectos-sort", sortBy); }, [sortBy]);
 
   // Auto-focus and Escape handler for project form, track picker, and expanded row
   useEffect(() => {
@@ -601,58 +613,62 @@ export default function ProyectosPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <FolderOpen className="h-6 w-6 text-purple-400" />
-            Proyectos
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Ideas y proyectos musicales
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* View toggle */}
-          <div className="flex items-center rounded-lg border border-border p-0.5 gap-0.5">
+      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card">
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/8 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-purple-500/6 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/30 to-purple-600/10 border border-purple-500/20 flex items-center justify-center flex-shrink-0">
+              <FolderOpen className="h-5 w-5 text-purple-400" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold leading-tight">Proyectos</h1>
+              <p className="text-muted-foreground text-xs mt-0.5">Ideas y proyectos musicales</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* View toggle */}
+            <div className="flex items-center rounded-xl border border-border/60 p-0.5 gap-0.5 bg-card/50">
+              <button
+                onClick={() => setViewMode("list")}
+                className={cn(
+                  "p-1.5 rounded-xl transition-all active:scale-95",
+                  viewMode === "list" ? "bg-secondary text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                )}
+                title="Vista lista"
+              >
+                <List className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => setViewMode("board")}
+                className={cn(
+                  "p-1.5 rounded-xl transition-all active:scale-95",
+                  viewMode === "board" ? "bg-secondary text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                )}
+                title="Vista tablero"
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            {projects.length > 0 && (
+              <button
+                onClick={handleExportCSV}
+                title="Exportar como CSV (E)"
+                className="flex items-center gap-2 px-3 py-2 border border-border/60 rounded-xl hover:bg-secondary/60 transition-all active:scale-95 text-sm text-muted-foreground hover:text-foreground"
+              >
+                <Download className="h-4 w-4" />
+                <span className="hidden sm:inline">Exportar</span>
+              </button>
+            )}
             <button
-              onClick={() => setViewMode("list")}
-              className={cn(
-                "p-1.5 rounded-md transition-colors",
-                viewMode === "list" ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground"
-              )}
-              title="Vista lista"
+              onClick={() => openCreate()}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-500/90 hover:bg-purple-500 text-white rounded-xl transition-all active:scale-95 text-sm font-semibold shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30"
             >
-              <List className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={() => setViewMode("board")}
-              className={cn(
-                "p-1.5 rounded-md transition-colors",
-                viewMode === "board" ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground"
-              )}
-              title="Vista tablero"
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
+              <Plus className="h-4 w-4" />
+              Nuevo proyecto
+              <kbd className="hidden md:inline-flex ml-1 text-[9px] bg-white/20 px-1 py-0.5 rounded font-mono">N</kbd>
             </button>
           </div>
-          {projects.length > 0 && (
-            <button
-              onClick={handleExportCSV}
-              title="Exportar como CSV"
-              className="flex items-center gap-2 px-3 py-2 border border-border rounded-lg hover:bg-secondary transition-colors text-sm text-muted-foreground hover:text-foreground"
-            >
-              <Download className="h-4 w-4" />
-              <span className="hidden sm:inline">Exportar</span>
-            </button>
-          )}
-          <button
-            onClick={() => openCreate()}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/80 transition-colors text-sm font-medium"
-          >
-            <Plus className="h-4 w-4" />
-            Nuevo proyecto
-            <kbd className="hidden md:inline-flex ml-1 text-[9px] bg-primary/20 px-1 py-0.5 rounded font-mono">N</kbd>
-          </button>
         </div>
       </div>
 
@@ -669,9 +685,9 @@ export default function ProyectosPage() {
                 key={t.value}
                 onClick={() => setTypeFilter(t.value)}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors",
+                  "flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all active:scale-95",
                   typeFilter === t.value
-                    ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+                    ? "bg-purple-500/20 text-purple-400 border border-purple-500/30 font-semibold"
                     : "bg-secondary text-muted-foreground hover:text-foreground"
                 )}
               >
@@ -690,7 +706,7 @@ export default function ProyectosPage() {
                 onClick={() => setNoDateFilter(v => !v)}
                 title="Proyectos sin fecha objetivo"
                 className={cn(
-                  "flex items-center gap-1.5 text-xs px-2.5 py-2 rounded-lg border transition-colors flex-shrink-0 whitespace-nowrap",
+                  "flex items-center gap-1.5 text-xs px-2.5 py-2 rounded-xl border transition-all active:scale-95 flex-shrink-0 whitespace-nowrap",
                   noDateFilter
                     ? "bg-orange-500/15 border-orange-500/30 text-orange-400"
                     : "bg-secondary border-0 text-muted-foreground hover:text-foreground"
@@ -713,7 +729,7 @@ export default function ProyectosPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Buscar… (/) por nombre"
-              className="w-40 bg-secondary border border-border rounded-lg pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary/50 focus:w-52 transition-all"
+              className="w-40 bg-secondary border border-border/60 rounded-xl pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary/50 focus:w-52 transition-all"
             />
             {searchQuery && (
               <button onClick={() => setSearchQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
@@ -724,7 +740,7 @@ export default function ProyectosPage() {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-            className="flex items-center gap-1.5 text-xs bg-secondary border border-border rounded-lg px-2 py-1.5 text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
+            className="flex items-center gap-1.5 text-xs bg-secondary border border-border/60 rounded-xl px-2 py-1.5 text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
           >
             <option value="updated">Recientes</option>
             <option value="az">A → Z</option>
@@ -746,9 +762,9 @@ export default function ProyectosPage() {
             <button
               onClick={() => setStatusFilter("todos")}
               className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors",
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-all active:scale-95",
                 statusFilter === "todos"
-                  ? "bg-secondary border border-border text-foreground"
+                  ? "bg-secondary border border-border/60 text-foreground"
                   : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
               )}
             >
@@ -763,7 +779,7 @@ export default function ProyectosPage() {
                   key={s.value}
                   onClick={() => setStatusFilter(isActive ? "todos" : s.value)}
                   className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap border transition-colors",
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap border transition-all active:scale-95",
                     isActive
                       ? cn(STATUS_COLORS[s.value], "border-transparent")
                       : "border-border text-muted-foreground hover:text-foreground bg-secondary"
@@ -835,10 +851,10 @@ export default function ProyectosPage() {
         return (
           <button
             onClick={() => setStatusFilter("listo")}
-            className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-green-500/10 border border-green-500/30 hover:bg-green-500/15 transition-colors w-full"
+            className="flex items-center justify-between px-4 py-2.5 rounded-2xl bg-green-500/10 border border-green-500/30 hover:bg-green-500/15 hover:-translate-y-0.5 hover:shadow-sm transition-all w-full group"
           >
             <div className="flex items-center gap-2">
-              <ChevronRight className="h-4 w-4 text-green-400 flex-shrink-0" />
+              <ChevronRight className="h-4 w-4 text-green-400 flex-shrink-0 group-hover:translate-x-0.5 transition-transform" />
               <p className="text-sm font-medium text-green-400">
                 {listoCount} proyecto{listoCount !== 1 ? "s" : ""} listo{listoCount !== 1 ? "s" : ""} para publicar
               </p>
@@ -895,7 +911,7 @@ export default function ProyectosPage() {
                       ))}
                       <button
                         onClick={() => openCreate(status.value)}
-                        className="w-full py-2 border border-dashed border-border/60 rounded-xl text-[11px] text-muted-foreground/50 hover:text-muted-foreground hover:border-border transition-colors flex items-center justify-center gap-1"
+                        className="w-full py-2 border border-dashed border-border/60 rounded-2xl text-[11px] text-muted-foreground/50 hover:text-muted-foreground hover:border-border transition-all active:scale-[0.99] flex items-center justify-center gap-1"
                       >
                         <Plus className="h-3 w-3" />
                         Agregar
@@ -912,11 +928,11 @@ export default function ProyectosPage() {
       {/* Lista */}
       {viewMode === "list" && <div className="space-y-3">
         {loading ? (
-          <div className="bg-card rounded-xl border border-border flex items-center justify-center py-16">
+          <div className="bg-card rounded-2xl border border-border/60 flex items-center justify-center py-16">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : error ? (
-          <div className="bg-card rounded-xl border border-border flex flex-col items-center justify-center py-16 text-center px-4">
+          <div className="bg-card rounded-2xl border border-border/60 flex flex-col items-center justify-center py-16 text-center px-4">
             <p className="text-sm text-red-500">{error}</p>
           </div>
         ) : projects.length === 0 ? (
@@ -948,14 +964,14 @@ export default function ProyectosPage() {
             </p>
             <button
               onClick={() => openCreate()}
-              className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400 text-sm font-medium hover:bg-purple-500/20 transition-colors"
+              className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400 text-sm font-medium hover:bg-purple-500/20 transition-all active:scale-95"
             >
               <Plus className="h-4 w-4" />
               Crear primer proyecto
             </button>
           </div>
         ) : displayedProjects.length === 0 ? (
-          <div className="bg-card rounded-xl border border-border flex flex-col items-center justify-center py-16 text-center px-4">
+          <div className="bg-card rounded-2xl border border-border/60 flex flex-col items-center justify-center py-16 text-center px-4">
             {noDateFilter ? (
               <>
                 <CalendarClock className="h-10 w-10 text-green-400/40 mb-4" />
@@ -984,10 +1000,13 @@ export default function ProyectosPage() {
           </div>
         ) : (
           displayedProjects.map((project) => (
-            <div key={project.id} className="bg-card rounded-xl border border-border overflow-hidden">
+            <div key={project.id} className="bg-card rounded-2xl border border-border/60 overflow-hidden">
               {/* Header del proyecto */}
-              <div className="flex items-center gap-3 px-4 py-3.5 group">
-                <button onClick={() => toggleExpanded(project)} className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors">
+              <div
+                className="flex items-center gap-3 px-4 py-3.5 group"
+                onDoubleClick={() => openEdit(project)}
+              >
+                <button onClick={() => toggleExpanded(project)} className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-all active:scale-95">
                   {expandedId === project.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                 </button>
 
@@ -997,11 +1016,11 @@ export default function ProyectosPage() {
                   <img
                     src={project.cover_art_url}
                     alt=""
-                    className="w-8 h-8 rounded object-cover flex-shrink-0 border border-border"
+                    className="w-8 h-8 rounded-xl object-cover flex-shrink-0 border border-border/60"
                     onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                   />
                 ) : (
-                  <div className="w-8 h-8 rounded bg-purple-500/10 flex items-center justify-center flex-shrink-0">
+                  <div className="w-8 h-8 rounded-xl bg-purple-500/10 flex items-center justify-center flex-shrink-0">
                     <FolderOpen className="h-3.5 w-3.5 text-purple-400" />
                   </div>
                 )}
@@ -1039,7 +1058,7 @@ export default function ProyectosPage() {
                     }}
                     title={isProjectPlaying(project.id) ? "Pausar" : "Reproducir proyecto"}
                     className={cn(
-                      "hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-medium transition-colors flex-shrink-0",
+                      "hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-medium transition-all active:scale-95 flex-shrink-0",
                       isProjectPlaying(project.id)
                         ? "bg-green-500/15 text-green-400 border-green-500/25"
                         : isProjectLoaded(project.id)
@@ -1078,7 +1097,7 @@ export default function ProyectosPage() {
                   <button
                     onClick={(e) => { e.stopPropagation(); handleAdvanceStatus(project); }}
                     disabled={advancingId === project.id}
-                    className="hidden sm:flex items-center gap-0.5 px-2 py-0.5 rounded-md text-[11px] text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-50 flex-shrink-0"
+                    className="hidden sm:flex items-center gap-0.5 px-2 py-0.5 rounded-xl text-[11px] text-muted-foreground hover:text-foreground hover:bg-secondary transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
                     title={STATUS_NEXT_LABEL[project.status]}
                   >
                     {advancingId === project.id
@@ -1099,7 +1118,7 @@ export default function ProyectosPage() {
                     onClick={(e) => { e.stopPropagation(); handleShareProject(project.id); }}
                     title="Copiar enlace al proyecto"
                     className={cn(
-                      "p-1.5 rounded-lg hover:bg-secondary transition-colors",
+                      "p-1.5 rounded-xl hover:bg-secondary transition-all active:scale-95",
                       copiedProjectId === project.id ? "text-green-400" : "text-muted-foreground hover:text-foreground"
                     )}
                   >
@@ -1107,13 +1126,13 @@ export default function ProyectosPage() {
                       ? <Check className="h-3.5 w-3.5" />
                       : <Copy className="h-3.5 w-3.5" />}
                   </button>
-                  <button onClick={(e) => { e.stopPropagation(); openEdit(project); }} className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
+                  <button onClick={(e) => { e.stopPropagation(); openEdit(project); }} className="p-1.5 rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground transition-all active:scale-95">
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); handleDelete(project); }}
                     disabled={deletingId === project.id}
-                    className="p-1.5 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-colors disabled:opacity-50"
+                    className="p-1.5 rounded-xl hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {deletingId === project.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                   </button>
@@ -1122,7 +1141,7 @@ export default function ProyectosPage() {
 
               {/* Tracklist expandido */}
               {expandedId === project.id && (
-                <div className="border-t border-border">
+                <div className="border-t border-border/60">
                   {loadingTracks === project.id ? (
                     <div className="flex items-center justify-center py-8">
                       <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -1135,7 +1154,7 @@ export default function ProyectosPage() {
                           <p className="text-sm text-muted-foreground">Sin tracks todavía</p>
                         </div>
                       ) : (
-                        <div className="divide-y divide-border">
+                        <div className="divide-y divide-border/50">
                           {(tracks[project.id] ?? []).map((track, idx) => {
                             const audioTrack = trackToAudioTrack(track);
                             const isCurrent = !!audioTrack && player.currentTrack?.id === audioTrack.id;
@@ -1149,7 +1168,7 @@ export default function ProyectosPage() {
                                 onDrop={() => handleDrop(project.id, track.id)}
                                 onDragEnd={handleDragEnd}
                                 className={cn(
-                                  "flex items-center gap-3 px-4 py-2.5 group/track transition-colors",
+                                  "flex items-center gap-3 px-4 py-2.5 group/track transition-all select-none cursor-grab active:cursor-grabbing",
                                   dragOverTrackId === track.id
                                     ? "bg-primary/10 border-l-2 border-primary"
                                     : isCurrent
@@ -1165,7 +1184,7 @@ export default function ProyectosPage() {
                                     onClick={() => isNowPlaying ? player.togglePlay() : handlePlayProject(project.id, track)}
                                     title={isNowPlaying ? "Pausar" : "Reproducir"}
                                     className={cn(
-                                      "w-5 flex-shrink-0 flex items-center justify-center transition-colors",
+                                      "w-5 flex-shrink-0 flex items-center justify-center transition-all active:scale-95",
                                       isCurrent ? "text-green-400" : "text-muted-foreground"
                                     )}
                                   >
@@ -1201,7 +1220,7 @@ export default function ProyectosPage() {
 
                                 <button
                                   onClick={() => handleRemoveTrack(project.id, track.id)}
-                                  className="opacity-0 group-hover/track:opacity-100 p-1 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-all"
+                                  className="opacity-0 group-hover/track:opacity-100 p-1 rounded-xl hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-all"
                                 >
                                   <X className="h-3.5 w-3.5" />
                                 </button>
@@ -1210,7 +1229,7 @@ export default function ProyectosPage() {
                           })}
                         </div>
                       )}
-                      <div className="px-4 py-3 border-t border-border">
+                      <div className="px-4 py-3 border-t border-border/60">
                         <button
                           onClick={() => openPicker(project.id)}
                           className="flex items-center gap-1.5 text-xs text-primary hover:underline"
@@ -1232,19 +1251,28 @@ export default function ProyectosPage() {
 
       {/* Modal formulario proyecto */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-          <div className="bg-card border border-border rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-5 border-b border-border sticky top-0 bg-card z-10">
-              <h2 className="text-base font-semibold">
-                {editingProject ? "Editar proyecto" : "Nuevo proyecto"}
-              </h2>
-              <button onClick={() => setShowForm(false)} className="p-1.5 rounded-lg hover:bg-secondary">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={() => { setShowForm(false); setEditingProject(undefined); }}>
+          <div className="relative w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            {/* Glow ring */}
+            <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-purple-500/20 via-transparent to-purple-600/10 pointer-events-none" />
+          <div className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl max-h-[90vh] overflow-y-auto shadow-2xl shadow-black/40">
+            <div className="flex items-center justify-between p-5 border-b border-border/60 sticky top-0 bg-card/95 backdrop-blur-xl z-10 rounded-t-2xl">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-purple-500/15 border border-purple-500/20 flex items-center justify-center flex-shrink-0">
+                  <FolderOpen className="h-4 w-4 text-purple-400" />
+                </div>
+                <h2 className="text-base font-semibold">
+                  {editingProject ? "Editar proyecto" : "Nuevo proyecto"}
+                </h2>
+              </div>
+              <button onClick={() => { setShowForm(false); setEditingProject(undefined); }} className="p-1.5 rounded-xl hover:bg-muted/50 transition-all active:scale-95 text-muted-foreground hover:text-foreground">
                 <X className="h-4 w-4" />
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-5 space-y-4">
               {formErrors.root && (
-                <p className="text-sm text-red-500 bg-red-500/10 px-3 py-2 rounded-lg">{formErrors.root}</p>
+                <p className="text-sm text-red-500 bg-red-500/10 px-3 py-2 rounded-xl">{formErrors.root}</p>
               )}
               <FormField label="Nombre *" error={formErrors.name}>
                 <input ref={projectNameRef} type="text" value={form.name} onChange={(e) => setField("name", e.target.value)} placeholder="Nombre del proyecto" className={iClass(!!formErrors.name)} />
@@ -1280,16 +1308,17 @@ export default function ProyectosPage() {
                 )}
               </div>
               <FormField label="Fecha objetivo" error={undefined}>
-                <input type="date" value={form.target_date ?? ""} onChange={(e) => setField("target_date", e.target.value || null)} className={iClass(false)} />
+                <input type="date" value={form.target_date ?? ""} onChange={(e) => setField("target_date", e.target.value || null)} className={`${iClass(false)} [color-scheme:dark]`} />
               </FormField>
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setShowForm(false)} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-secondary transition-colors">Cancelar</button>
-                <button type="submit" disabled={submitting} className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/80 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                <button type="button" onClick={() => { setShowForm(false); setEditingProject(undefined); }} className="flex-1 py-2.5 rounded-xl border border-border/60 text-sm font-medium hover:bg-secondary/60 transition-all active:scale-95">Cancelar</button>
+                <button type="submit" disabled={submitting} className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                   {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
                   {editingProject ? "Guardar" : "Crear"}
                 </button>
               </div>
             </form>
+          </div>
           </div>
         </div>
       )}
@@ -1306,12 +1335,20 @@ export default function ProyectosPage() {
         const currentList = pickerTab === "songs" ? filteredSongs : filteredDrafts;
 
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-            <div className="bg-card border border-border rounded-xl w-full max-w-md max-h-[80vh] flex flex-col">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowPicker(false)}>
+            <div className="relative w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+              {/* Glow ring */}
+              <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-primary/20 via-transparent to-purple-500/10 pointer-events-none" />
+            <div className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl max-h-[80vh] flex flex-col shadow-2xl shadow-black/40">
               {/* Header */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                <h3 className="text-sm font-semibold">Agregar track</h3>
-                <button onClick={() => setShowPicker(false)} className="p-1.5 rounded-lg hover:bg-secondary">
+              <div className="flex items-center justify-between px-4 py-3.5 border-b border-border/60">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center flex-shrink-0">
+                    <Music className="h-3.5 w-3.5 text-primary" />
+                  </div>
+                  <h3 className="text-sm font-semibold">Agregar track</h3>
+                </div>
+                <button onClick={() => setShowPicker(false)} className="p-1.5 rounded-xl hover:bg-muted/50 transition-all active:scale-95 text-muted-foreground hover:text-foreground">
                   <X className="h-4 w-4" />
                 </button>
               </div>
@@ -1326,13 +1363,13 @@ export default function ProyectosPage() {
                     onChange={e => setPickerSearch(e.target.value)}
                     placeholder="Buscar por título…"
                     autoFocus
-                    className="w-full pl-9 pr-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className="w-full pl-9 pr-3 py-2 bg-secondary border border-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
                 </div>
               </div>
 
               {/* Tabs */}
-              <div className="flex border-b border-border px-3 gap-1">
+              <div className="flex border-b border-border/60 px-3 gap-1">
                 {(["songs", "drafts"] as const).map((tab) => {
                   const count = tab === "songs" ? filteredSongs.length : filteredDrafts.length;
                   return (
@@ -1340,7 +1377,7 @@ export default function ProyectosPage() {
                       key={tab}
                       onClick={() => setPickerTab(tab)}
                       className={cn(
-                        "py-2 px-3 text-sm font-medium transition-colors border-b-2 -mb-px",
+                        "py-2 px-3 text-sm font-medium transition-all active:scale-95 border-b-2 -mb-px",
                         pickerTab === tab
                           ? "text-primary border-primary"
                           : "text-muted-foreground border-transparent hover:text-foreground"
@@ -1372,13 +1409,13 @@ export default function ProyectosPage() {
                         key={item.id}
                         onClick={() => handleAddTrack(item, isSong ? "song" : "draft")}
                         disabled={addingTrack}
-                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-secondary/50 transition-colors text-left disabled:opacity-50 group"
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-secondary/50 transition-all active:scale-[0.99] text-left disabled:opacity-50 disabled:cursor-not-allowed group"
                       >
                         <div className={cn(
-                          "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0",
+                          "w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0",
                           isSong ? "bg-primary/10" : "bg-blue-400/10"
                         )}>
-                          <Music className={cn("h-3.5 w-3.5", isSong ? "text-primary" : "text-blue-400")} />
+                          <Music className={cn("h-3.5 w-3.5 group-hover:scale-110 transition-transform", isSong ? "text-primary" : "text-blue-400")} />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm truncate font-medium">{item.title}</p>
@@ -1392,6 +1429,7 @@ export default function ProyectosPage() {
                   })
                 )}
               </div>
+            </div>
             </div>
           </div>
         );
@@ -1443,12 +1481,12 @@ function BoardCard({
     });
   }
   return (
-    <div className="bg-card border border-border rounded-xl p-3 group hover:border-primary/20 transition-colors">
+    <div className="bg-card border border-border/60 rounded-2xl p-3 group hover:border-primary/20 hover:shadow-sm hover:-translate-y-0.5 transition-all">
       {/* Top: cover + name */}
       <div className="flex items-start gap-2 mb-2">
         {project.cover_art_url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={project.cover_art_url} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0 border border-border" />
+          <img src={project.cover_art_url} alt="" className="w-8 h-8 rounded-xl object-cover flex-shrink-0 border border-border/60" />
         ) : (
           <div className="w-8 h-8 rounded bg-purple-500/10 flex items-center justify-center flex-shrink-0">
             <FolderOpen className="h-3.5 w-3.5 text-purple-400" />
@@ -1486,11 +1524,11 @@ function BoardCard({
       )}
 
       {/* Actions row */}
-      <div className="flex items-center gap-1 pt-1.5 border-t border-border">
+      <div className="flex items-center gap-1 pt-1.5 border-t border-border/60">
         <button
           onClick={handleCopyLink}
           className={cn(
-            "p-1 rounded transition-colors",
+            "p-1 rounded-xl transition-all active:scale-95",
             linkCopied ? "text-green-400" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
           )}
           title="Copiar enlace"
@@ -1499,7 +1537,7 @@ function BoardCard({
         </button>
         <button
           onClick={() => onEdit(project)}
-          className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+          className="p-1 rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground transition-all active:scale-95"
           title="Editar"
         >
           <Pencil className="h-3 w-3" />
@@ -1507,7 +1545,7 @@ function BoardCard({
         <button
           onClick={() => onDelete(project)}
           disabled={deletingId === project.id}
-          className="p-1 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors disabled:opacity-50"
+          className="p-1 rounded-xl hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           title="Eliminar"
         >
           {deletingId === project.id
@@ -1518,7 +1556,7 @@ function BoardCard({
           <button
             onClick={() => onAdvance(project)}
             disabled={advancingId === project.id}
-            className="ml-auto flex items-center gap-0.5 text-[10px] font-medium text-muted-foreground hover:text-primary px-1.5 py-0.5 rounded hover:bg-primary/10 transition-colors disabled:opacity-50"
+            className="ml-auto flex items-center gap-0.5 text-[10px] font-medium text-muted-foreground hover:text-primary px-1.5 py-0.5 rounded-xl hover:bg-primary/10 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             title={STATUS_NEXT_LABEL[project.status]}
           >
             {advancingId === project.id
@@ -1538,7 +1576,7 @@ function BoardCard({
 function FormField({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <label className="block text-xs font-medium text-muted-foreground">{label}</label>
+      <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</label>
       {children}
       {error && <p className="text-xs text-red-500">{error}</p>}
     </div>
@@ -1546,5 +1584,5 @@ function FormField({ label, error, children }: { label: string; error?: string; 
 }
 
 function iClass(hasError: boolean) {
-  return `w-full px-3 py-2.5 bg-background border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 ${hasError ? "border-red-500" : "border-border"}`;
+  return `w-full px-3 py-2.5 bg-background border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 transition-shadow ${hasError ? "border-red-500" : "border-border/60"}`;
 }

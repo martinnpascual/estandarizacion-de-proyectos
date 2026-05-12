@@ -79,14 +79,19 @@ export default function DriveFilePicker({ onSelect, onClose }: Props) {
   }, [fetchFiles]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-      <div className="bg-card border border-border rounded-xl w-full max-w-lg max-h-[80vh] flex flex-col">
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <h2 className="text-base font-semibold flex items-center gap-2">
-            <FolderOpen className="h-4 w-4 text-green-400" />
-            Google Drive — Archivos de audio
-          </h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="relative w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+        {/* Glow ring */}
+        <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-green-500/20 via-transparent to-emerald-500/10 pointer-events-none" />
+        <div className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl max-h-[80vh] flex flex-col shadow-2xl shadow-black/40">
+        <div className="flex items-center justify-between p-4 border-b border-border/60">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-green-500/15 border border-green-500/20 flex items-center justify-center flex-shrink-0">
+              <FolderOpen className="h-4 w-4 text-green-400" />
+            </div>
+            <h2 className="text-base font-semibold">Google Drive — Archivos de audio</h2>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-xl hover:bg-muted/50 transition-all active:scale-95 text-muted-foreground hover:text-foreground">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -102,14 +107,14 @@ export default function DriveFilePicker({ onSelect, onClose }: Props) {
             </div>
             <a
               href="/api/auth/google"
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/80 transition-colors"
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:bg-primary/80 transition-all active:scale-95"
             >
               Conectar con Google
             </a>
           </div>
         ) : (
           <>
-            <div className="p-3 border-b border-border">
+            <div className="p-3 border-b border-border/60">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                 <input
@@ -117,7 +122,7 @@ export default function DriveFilePicker({ onSelect, onClose }: Props) {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Buscar archivos..."
-                  className="w-full pl-9 pr-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  className="w-full pl-9 pr-3 py-2 bg-background border border-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                 />
               </div>
             </div>
@@ -142,14 +147,14 @@ export default function DriveFilePicker({ onSelect, onClose }: Props) {
                   </p>
                 </div>
               ) : (
-                <div className="divide-y divide-border">
+                <div className="divide-y divide-border/50">
                   {files.map((file) => (
                     <div
                       key={file.id}
-                      className="flex items-center gap-3 px-4 py-3 hover:bg-secondary/30 cursor-pointer transition-colors group"
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-secondary/30 cursor-pointer transition-all active:scale-[0.99] group"
                       onClick={() => onSelect(file)}
                     >
-                      <Music className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <Music className="h-4 w-4 text-muted-foreground flex-shrink-0 group-hover:scale-110 transition-transform" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{file.name}</p>
                         <p className="text-xs text-muted-foreground">
@@ -167,7 +172,7 @@ export default function DriveFilePicker({ onSelect, onClose }: Props) {
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-secondary text-muted-foreground transition-all"
+                          className="opacity-0 group-hover:opacity-100 p-1 rounded-xl hover:bg-secondary text-muted-foreground transition-all active:scale-95"
                           title="Ver en Drive"
                         >
                           <ExternalLink className="h-3.5 w-3.5" />
@@ -180,6 +185,7 @@ export default function DriveFilePicker({ onSelect, onClose }: Props) {
             </div>
           </>
         )}
+        </div>
       </div>
     </div>
   );

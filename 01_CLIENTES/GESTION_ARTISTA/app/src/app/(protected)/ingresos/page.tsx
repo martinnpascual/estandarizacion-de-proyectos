@@ -12,6 +12,7 @@ import type { RoyaltyPayment } from "@/types/database";
 import type { RoyaltyPaymentFormData } from "@/lib/schemas";
 import { RoyaltyPaymentSchema } from "@/lib/schemas";
 import { useToast } from "@/components/ui/ToastProvider";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { PageTransition, StaggerList, StaggerItem, AnimatedCounter } from "@/components/ui/MotionWrapper";
 import { RoyaltyRowSkeleton, ChartSkeleton } from "@/components/ui/Skeletons";
 import {
@@ -23,6 +24,9 @@ import {
   X,
   ChevronDown,
   BarChart3,
+  Loader2,
+  Download,
+  Pencil,
 } from "lucide-react";
 import {
   AreaChart,
@@ -76,7 +80,7 @@ interface RoyaltyFormProps {
   initial?: Partial<RoyaltyPaymentFormData>;
 }
 
-function RoyaltyForm({ onClose, onSave, initial }: RoyaltyFormProps) {
+function RoyaltyForm({ onClose, onSave, initial, isEditing }: RoyaltyFormProps & { isEditing?: boolean }) {
   const [form, setForm] = useState<RoyaltyPaymentFormData>({
     source: initial?.source ?? "spotify",
     amount: initial?.amount ?? 0,
@@ -87,6 +91,12 @@ function RoyaltyForm({ onClose, onSave, initial }: RoyaltyFormProps) {
   });
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [onClose]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,108 +119,142 @@ function RoyaltyForm({ onClose, onSave, initial }: RoyaltyFormProps) {
   };
 
   const field = (key: keyof RoyaltyPaymentFormData) =>
-    `border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 w-full ${errors[key] ? "border-red-400" : "border-border"}`;
+    `border border-border/60 rounded-xl px-3 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-colors w-full ${errors[key] ? "border-red-400" : ""}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <form
-        onSubmit={handleSubmit}
-        className="bg-card border rounded-xl shadow-xl w-full max-w-md p-6 space-y-4"
-      >
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-lg">Registrar ingreso</h2>
-          <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div className="relative w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+        {/* Glow ring */}
+        <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-green-500/20 via-transparent to-emerald-500/10 pointer-events-none" />
 
-        {/* Source */}
-        <div>
-          <label className="text-sm font-medium block mb-1">Plataforma / Fuente</label>
-          <select
-            className={field("source")}
-            value={form.source}
-            onChange={(e) => setForm((f) => ({ ...f, source: e.target.value as any }))}
-          >
-            {SOURCES.map((s) => (
-              <option key={s} value={s}>{SOURCE_LABELS[s]}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Amount + Currency */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-sm font-medium block mb-1">Monto</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              className={field("amount")}
-              value={form.amount || ""}
-              onChange={(e) => setForm((f) => ({ ...f, amount: parseFloat(e.target.value) || 0 }))}
-              placeholder="0.00"
-            />
-            {errors.amount && <p className="text-red-500 text-xs mt-1">{errors.amount}</p>}
-          </div>
-          <div>
-            <label className="text-sm font-medium block mb-1">Moneda</label>
-            <select
-              className={field("currency")}
-              value={form.currency}
-              onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))}
+        <form
+          onSubmit={handleSubmit}
+          className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl shadow-2xl w-full p-6 space-y-4"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-green-500/15 border border-green-500/20 flex items-center justify-center">
+                <DollarSign className="h-4 w-4 text-green-400" />
+              </div>
+              <h2 className="font-semibold text-base">{isEditing ? "Editar ingreso" : "Registrar ingreso"}</h2>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-muted-foreground hover:text-foreground transition-all active:scale-95 p-1.5 rounded-xl hover:bg-muted/50"
             >
-              <option value="USD">USD</option>
-              <option value="EUR">EUR</option>
-              <option value="ARS">ARS</option>
-              <option value="MXN">MXN</option>
-              <option value="CLP">CLP</option>
-              <option value="COP">COP</option>
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Source */}
+          <div>
+            <label className="text-xs font-medium text-muted-foreground block mb-1.5 uppercase tracking-wide">
+              Plataforma / Fuente
+            </label>
+            <select
+              className={field("source")}
+              value={form.source}
+              onChange={(e) => setForm((f) => ({ ...f, source: e.target.value as any }))}
+            >
+              {SOURCES.map((s) => (
+                <option key={s} value={s}>{SOURCE_LABELS[s]}</option>
+              ))}
             </select>
           </div>
-        </div>
 
-        {/* Period */}
-        <div>
-          <label className="text-sm font-medium block mb-1">Período (mes)</label>
-          <input
-            type="month"
-            className={field("period_month")}
-            value={form.period_month}
-            onChange={(e) => setForm((f) => ({ ...f, period_month: e.target.value }))}
-          />
-          {errors.period_month && <p className="text-red-500 text-xs mt-1">{errors.period_month}</p>}
-        </div>
+          {/* Amount + Currency */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground block mb-1.5 uppercase tracking-wide">
+                Monto *
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className={`${field("amount")} pl-6`}
+                  value={form.amount || ""}
+                  onChange={(e) => setForm((f) => ({ ...f, amount: parseFloat(e.target.value) || 0 }))}
+                  placeholder="0.00"
+                  autoFocus
+                />
+              </div>
+              {errors.amount && <p className="text-red-400 text-xs mt-1">{errors.amount}</p>}
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground block mb-1.5 uppercase tracking-wide">
+                Moneda
+              </label>
+              <select
+                className={field("currency")}
+                value={form.currency}
+                onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))}
+              >
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+                <option value="ARS">ARS</option>
+                <option value="MXN">MXN</option>
+                <option value="CLP">CLP</option>
+                <option value="COP">COP</option>
+              </select>
+            </div>
+          </div>
 
-        {/* Notes */}
-        <div>
-          <label className="text-sm font-medium block mb-1">Notas (opcional)</label>
-          <textarea
-            rows={2}
-            className={field("notes")}
-            value={form.notes ?? ""}
-            onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value || null }))}
-            placeholder="Descripción, canción, álbum..."
-          />
-        </div>
+          {/* Period */}
+          <div>
+            <label className="text-xs font-medium text-muted-foreground block mb-1.5 uppercase tracking-wide">
+              Período (mes) *
+            </label>
+            <input
+              type="month"
+              className={`${field("period_month")} [color-scheme:dark]`}
+              value={form.period_month}
+              onChange={(e) => setForm((f) => ({ ...f, period_month: e.target.value }))}
+            />
+            {errors.period_month && <p className="text-red-400 text-xs mt-1">{errors.period_month}</p>}
+          </div>
 
-        <div className="flex gap-3 pt-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 border rounded-lg px-4 py-2 text-sm hover:bg-muted transition-colors"
-          >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            disabled={saving}
-            className="flex-1 bg-primary text-primary-foreground rounded-lg px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
-          >
-            {saving ? "Guardando..." : "Guardar"}
-          </button>
-        </div>
-      </form>
+          {/* Notes */}
+          <div>
+            <label className="text-xs font-medium text-muted-foreground block mb-1.5 uppercase tracking-wide">
+              Notas (opcional)
+            </label>
+            <textarea
+              rows={2}
+              className={field("notes")}
+              value={form.notes ?? ""}
+              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value || null }))}
+              placeholder="Descripción, canción, álbum..."
+            />
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 border border-border/60 rounded-xl px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all active:scale-95"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 bg-primary text-primary-foreground rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {saving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : isEditing ? "Actualizar ingreso" : "Guardar ingreso"}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
@@ -227,9 +271,19 @@ export default function IngresosPage() {
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR);
-  const [selectedSource, setSelectedSource] = useState<string>("todos");
+  const [editingPayment, setEditingPayment] = useState<RoyaltyPayment | null>(null);
+  const [selectedYear, setSelectedYear] = useState<number>(() =>
+    typeof window !== "undefined"
+      ? parseInt(localStorage.getItem("ingresos-year") ?? String(CURRENT_YEAR), 10) || CURRENT_YEAR
+      : CURRENT_YEAR
+  );
+  const [selectedSource, setSelectedSource] = useState<string>(() =>
+    typeof window !== "undefined"
+      ? localStorage.getItem("ingresos-source") || "todos"
+      : "todos"
+  );
   const { error: toastError, success: toastSuccess } = useToast();
+  const { confirm, ConfirmDialog } = useConfirm();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -252,6 +306,47 @@ export default function IngresosPage() {
   }, [selectedYear, selectedSource]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { localStorage.setItem("ingresos-year", String(selectedYear)); }, [selectedYear]);
+  useEffect(() => { localStorage.setItem("ingresos-source", selectedSource); }, [selectedSource]);
+
+  // ── CSV export ───────────────────────────────────────────────────────────────
+  function handleExportCSV() {
+    if (payments.length === 0) return;
+    const headers = ["Plataforma", "Monto", "Moneda", "Período", "Notas"];
+    const rows = payments.map((p) => [
+      SOURCE_LABELS[p.source] ?? p.source,
+      Number(p.amount).toFixed(2),
+      p.currency,
+      p.period_month ?? "",
+      p.notes ?? "",
+    ]);
+    const csv = [headers, ...rows].map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ingresos_${selectedYear}${selectedSource !== "todos" ? `_${selectedSource}` : ""}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ── Keyboard shortcuts: N → new income, E → export CSV, Escape → close ──────
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT") return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "Escape") {
+        if (editingPayment) { setEditingPayment(null); return; }
+        if (showForm) { setShowForm(false); return; }
+      }
+      if (e.key === "n" || e.key === "N") { e.preventDefault(); setShowForm(true); }
+      if (e.key === "e" || e.key === "E") { e.preventDefault(); handleExportCSV(); }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [payments, selectedYear, selectedSource, showForm, editingPayment]);
 
   const handleCreate = async (data: RoyaltyPaymentFormData) => {
     const { error } = await createRoyaltyPayment(data);
@@ -260,8 +355,18 @@ export default function IngresosPage() {
     load();
   };
 
+  const handleUpdate = async (data: RoyaltyPaymentFormData) => {
+    if (!editingPayment) return;
+    const { error } = await updateRoyaltyPayment(editingPayment.id, data);
+    if (error) { toastError(error); return; }
+    toastSuccess("Ingreso actualizado");
+    setEditingPayment(null);
+    load();
+  };
+
   const handleDelete = async (id: string) => {
-    if (!confirm("¿Eliminar este ingreso?")) return;
+    const ok = await confirm({ title: "¿Eliminar este ingreso?", message: "Esta acción no se puede deshacer.", confirmLabel: "Eliminar", variant: "danger" });
+    if (!ok) return;
     const { error } = await deleteRoyaltyPayment(id);
     if (error) { toastError(error); return; }
     toastSuccess("Ingreso eliminado");
@@ -280,26 +385,49 @@ export default function IngresosPage() {
     <PageTransition className="min-h-screen">
       <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Ingresos & Royalties</h1>
-            <p className="text-muted-foreground text-sm mt-0.5">
-              Registrá y analizá tus ganancias por plataforma
-            </p>
+        <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card">
+          <div className="absolute inset-0 bg-gradient-to-br from-green-500/8 via-transparent to-transparent pointer-events-none" />
+          <div className="absolute -top-10 -right-10 w-40 h-40 bg-green-500/6 rounded-full blur-3xl pointer-events-none" />
+          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-5">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500/30 to-emerald-500/10 border border-green-500/20 flex items-center justify-center flex-shrink-0">
+                <DollarSign className="h-5 w-5 text-green-400" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold tracking-tight">Ingresos & Royalties</h1>
+                <p className="text-muted-foreground text-xs mt-0.5">
+                  Registrá y analizá tus ganancias por plataforma
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {payments.length > 0 && (
+                <button
+                  onClick={handleExportCSV}
+                  title="Exportar ingresos a CSV (E)"
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border/60 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all active:scale-95"
+                >
+                  <Download className="h-4 w-4" />
+                  <span className="hidden sm:inline">Exportar</span>
+                </button>
+              )}
+              <button
+                onClick={() => setShowForm(true)}
+                title="Nuevo ingreso (N)"
+                className="flex items-center gap-2 bg-green-500/90 hover:bg-green-500 text-white rounded-xl px-4 py-2 text-sm font-semibold transition-all active:scale-95 shadow-lg shadow-green-500/20 hover:shadow-green-500/30"
+              >
+                <Plus className="h-4 w-4" /> Nuevo ingreso
+                <kbd className="hidden md:inline-flex ml-1 text-[9px] bg-white/20 px-1 py-0.5 rounded font-mono">N</kbd>
+              </button>
+            </div>
           </div>
-          <button
-            onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 bg-primary text-primary-foreground rounded-lg px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors"
-          >
-            <Plus className="h-4 w-4" /> Nuevo ingreso
-          </button>
         </div>
 
         {/* Summary Cards */}
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="rounded-lg border bg-card p-5 animate-pulse space-y-3">
+              <div key={i} className="rounded-2xl border border-border/60 bg-card/90 p-5 animate-pulse space-y-3">
                 <div className="h-4 w-28 bg-muted rounded" />
                 <div className="h-8 w-24 bg-muted rounded" />
               </div>
@@ -307,29 +435,35 @@ export default function IngresosPage() {
           </div>
         ) : summary ? (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="rounded-lg border bg-card p-5">
-              <div className="flex items-center gap-2 text-muted-foreground text-sm mb-2">
-                <DollarSign className="h-4 w-4" /> Total acumulado
+            <div className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl p-5 relative overflow-hidden group hover:border-green-500/30 hover:-translate-y-0.5 hover:shadow-md transition-all">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/5 rounded-full -translate-y-8 translate-x-8 group-hover:bg-green-500/10 transition-colors" />
+              <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium uppercase tracking-wide mb-2">
+                <DollarSign className="h-3.5 w-3.5 text-green-400 group-hover:scale-110 transition-transform" /> Total acumulado
               </div>
-              <div className="text-2xl font-bold">
+              <div className="text-2xl font-bold tabular-nums">
                 <AnimatedCounter value={summary.total_all_time} prefix="$" decimals={2} />
               </div>
+              <p className="text-xs text-muted-foreground/50 mt-1">Todos los tiempos</p>
             </div>
-            <div className="rounded-lg border bg-card p-5">
-              <div className="flex items-center gap-2 text-muted-foreground text-sm mb-2">
-                <TrendingUp className="h-4 w-4" /> Este año
+            <div className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl p-5 relative overflow-hidden group hover:border-green-500/30 hover:-translate-y-0.5 hover:shadow-md transition-all">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/5 rounded-full -translate-y-8 translate-x-8 group-hover:bg-green-500/10 transition-colors" />
+              <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium uppercase tracking-wide mb-2">
+                <TrendingUp className="h-3.5 w-3.5 text-green-400 group-hover:scale-110 transition-transform" /> Este año
               </div>
-              <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+              <div className="text-2xl font-bold text-green-400 tabular-nums">
                 <AnimatedCounter value={summary.total_this_year} prefix="$" decimals={2} />
               </div>
+              <p className="text-xs text-muted-foreground/50 mt-1">{new Date().getFullYear()}</p>
             </div>
-            <div className="rounded-lg border bg-card p-5">
-              <div className="flex items-center gap-2 text-muted-foreground text-sm mb-2">
-                <BarChart3 className="h-4 w-4" /> Mes anterior
+            <div className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl p-5 relative overflow-hidden group hover:border-green-500/30 hover:-translate-y-0.5 hover:shadow-md transition-all">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/5 rounded-full -translate-y-8 translate-x-8 group-hover:bg-green-500/10 transition-colors" />
+              <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium uppercase tracking-wide mb-2">
+                <BarChart3 className="h-3.5 w-3.5 group-hover:scale-110 transition-transform" /> Mes anterior
               </div>
-              <div className="text-2xl font-bold">
+              <div className="text-2xl font-bold tabular-nums">
                 <AnimatedCounter value={summary.total_last_month} prefix="$" decimals={2} />
               </div>
+              <p className="text-xs text-muted-foreground/50 mt-1">Último mes completo</p>
             </div>
           </div>
         ) : null}
@@ -338,7 +472,7 @@ export default function IngresosPage() {
         {!loading && summary && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Area Chart - Monthly */}
-            <div className="rounded-lg border bg-card p-5">
+            <div className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl p-5">
               <h3 className="font-semibold mb-4">Ingresos por mes</h3>
               {summary.by_month.length > 0 ? (
                 <ResponsiveContainer width="100%" height={220}>
@@ -349,10 +483,27 @@ export default function IngresosPage() {
                         <stop offset="95%" stopColor="#6366F1" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="period_month" tickFormatter={monthLabel} tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `$${v}`} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
+                    <XAxis
+                      dataKey="period_month"
+                      tickFormatter={monthLabel}
+                      tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                      tickFormatter={(v) => `$${v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v}`}
+                      axisLine={false}
+                      tickLine={false}
+                    />
                     <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "16px",
+                        fontSize: 12,
+                      }}
                       formatter={(v: unknown) => [`$${Number(v).toFixed(2)}`, "Ingresos"]}
                       labelFormatter={(label: unknown) => monthLabel(String(label))}
                     />
@@ -373,7 +524,7 @@ export default function IngresosPage() {
             </div>
 
             {/* Pie Chart - By Source */}
-            <div className="rounded-lg border bg-card p-5">
+            <div className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl p-5">
               <h3 className="font-semibold mb-4">Distribución por plataforma</h3>
               {summary.by_source.length > 0 ? (
                 <ResponsiveContainer width="100%" height={220}>
@@ -397,7 +548,15 @@ export default function IngresosPage() {
                         />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(v: unknown) => `$${Number(v).toFixed(2)}`} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "16px",
+                        fontSize: 12,
+                      }}
+                      formatter={(v: unknown) => `$${Number(v).toFixed(2)}`}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
@@ -411,14 +570,14 @@ export default function IngresosPage() {
 
         {/* Filters */}
         <div className="flex flex-wrap gap-3 items-center">
-          <div className="flex gap-1 bg-muted rounded-lg p-1">
+          <div className="flex gap-1 bg-secondary/40 rounded-xl p-1">
             {YEARS.map((y) => (
               <button
                 key={y}
                 onClick={() => setSelectedYear(y)}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-all active:scale-95 ${
                   selectedYear === y
-                    ? "bg-background shadow text-foreground"
+                    ? "bg-card shadow-sm border border-border/60 text-foreground font-semibold"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -429,7 +588,7 @@ export default function IngresosPage() {
           <select
             value={selectedSource}
             onChange={(e) => setSelectedSource(e.target.value)}
-            className="border rounded-lg px-3 py-1.5 text-sm bg-background"
+            className="border border-border/60 rounded-xl px-3 py-1.5 text-sm bg-card"
           >
             <option value="todos">Todas las plataformas</option>
             {SOURCES.map((s) => (
@@ -439,7 +598,7 @@ export default function IngresosPage() {
         </div>
 
         {/* Payments List */}
-        <div className="rounded-lg border bg-card overflow-hidden">
+        <div className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl overflow-hidden">
           <div className="px-4 py-3 border-b bg-muted/30 flex items-center justify-between">
             <span className="font-medium text-sm">{payments.length} registro{payments.length !== 1 ? "s" : ""}</span>
           </div>
@@ -474,7 +633,7 @@ export default function IngresosPage() {
               </p>
               <button
                 onClick={() => setShowForm(true)}
-                className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400 text-sm font-medium hover:bg-green-500/20 transition-colors"
+                className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-green-500/10 border border-green-500/30 text-green-400 text-sm font-medium hover:bg-green-500/20 transition-all active:scale-95"
               >
                 <Plus className="h-4 w-4" />
                 Registrar primer ingreso
@@ -484,25 +643,35 @@ export default function IngresosPage() {
             <StaggerList>
               {payments.map((p) => (
                 <StaggerItem key={p.id}>
-                  <div className="flex items-center gap-4 px-4 py-3 border-b last:border-0 hover:bg-muted/30 transition-colors group">
+                  <div
+                    className="flex items-center gap-4 px-4 py-3 border-b last:border-0 hover:bg-muted/30 transition-all group cursor-pointer"
+                    onDoubleClick={() => setEditingPayment(p)}
+                  >
                     <div
-                      className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 text-white text-xs font-bold"
+                      className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-white text-xs font-bold"
                       style={{ backgroundColor: SOURCE_COLORS[p.source] ?? "#6366F1" }}
                     >
                       {(SOURCE_LABELS[p.source] ?? p.source).slice(0, 2).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm">{SOURCE_LABELS[p.source] ?? p.source}</div>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="font-medium text-sm truncate">{SOURCE_LABELS[p.source] ?? p.source}</div>
+                      <div className="text-xs text-muted-foreground truncate">
                         {p.period_month} {p.notes ? `· ${p.notes}` : ""}
                       </div>
                     </div>
-                    <div className="font-semibold text-green-600 dark:text-green-400">
+                    <div className="font-semibold text-green-400 font-mono tabular-nums text-sm shrink-0">
                       {formatCurrency(Number(p.amount), p.currency)}
                     </div>
                     <button
-                      onClick={() => handleDelete(p.id)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-500 p-1"
+                      onClick={(e) => { e.stopPropagation(); setEditingPayment(p); }}
+                      className="opacity-0 group-hover:opacity-100 transition-all active:scale-95 text-muted-foreground hover:text-foreground p-1.5 rounded-xl hover:bg-muted/50"
+                      title="Editar ingreso"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }}
+                      className="opacity-0 group-hover:opacity-100 transition-all active:scale-95 text-muted-foreground hover:text-red-400 p-1.5 rounded-xl hover:bg-red-500/10 disabled:cursor-not-allowed"
                       title="Eliminar"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -518,6 +687,24 @@ export default function IngresosPage() {
       {showForm && (
         <RoyaltyForm onClose={() => setShowForm(false)} onSave={handleCreate} />
       )}
+
+      {editingPayment && (
+        <RoyaltyForm
+          isEditing
+          onClose={() => setEditingPayment(null)}
+          onSave={handleUpdate}
+          initial={{
+            source: editingPayment.source as any,
+            amount: Number(editingPayment.amount),
+            currency: editingPayment.currency,
+            period_month: editingPayment.period_month ?? new Date().toISOString().slice(0, 7),
+            song_id: editingPayment.song_id ?? null,
+            notes: editingPayment.notes ?? null,
+          }}
+        />
+      )}
+
+      {ConfirmDialog}
     </PageTransition>
   );
 }

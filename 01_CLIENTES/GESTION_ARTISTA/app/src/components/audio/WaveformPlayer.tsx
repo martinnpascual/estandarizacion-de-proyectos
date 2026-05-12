@@ -130,14 +130,14 @@ export default function WaveformPlayer({
 
   if (error) {
     return (
-      <div className={cn("flex items-center justify-center h-16 rounded-lg bg-secondary text-muted-foreground text-sm", className)}>
+      <div className={cn("flex items-center justify-center h-16 rounded-xl bg-secondary text-muted-foreground text-sm", className)}>
         {error}
       </div>
     );
   }
 
   return (
-    <div className={cn("rounded-xl bg-secondary/50 p-3 space-y-2", className)}>
+    <div className={cn("rounded-2xl bg-secondary/50 p-3 space-y-2", className)}>
       {/* Waveform canvas */}
       <div className="relative">
         {isLoading && (
@@ -155,7 +155,7 @@ export default function WaveformPlayer({
           onClick={togglePlay}
           disabled={isLoading}
           className={cn(
-            "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-all",
+            "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-all active:scale-95",
             "bg-primary text-primary-foreground hover:bg-primary/80 disabled:opacity-40"
           )}
         >
@@ -178,7 +178,7 @@ export default function WaveformPlayer({
         </div>
 
         {/* Volume */}
-        <button onClick={toggleMute} className="flex-shrink-0 p-1 text-muted-foreground hover:text-foreground transition-colors">
+        <button onClick={toggleMute} className="flex-shrink-0 p-1 text-muted-foreground hover:text-foreground transition-all active:scale-95">
           {muted || volume === 0 ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
         </button>
         <input

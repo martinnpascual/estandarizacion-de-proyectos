@@ -6,6 +6,7 @@ import type { Goal } from "@/types/database";
 import type { GoalFormData } from "@/lib/schemas";
 import { GoalSchema } from "@/lib/schemas";
 import { useToast } from "@/components/ui/ToastProvider";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { PageTransition, StaggerList, StaggerItem, AnimatedCounter } from "@/components/ui/MotionWrapper";
 import { GoalCardSkeleton } from "@/components/ui/Skeletons";
 import {
@@ -18,6 +19,9 @@ import {
   Trophy,
   TrendingUp,
   Zap,
+  Loader2,
+  Pencil,
+  Download,
 } from "lucide-react";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -57,7 +61,7 @@ interface GoalFormProps {
   initial?: Partial<GoalFormData>;
 }
 
-function GoalForm({ onClose, onSave, initial }: GoalFormProps) {
+function GoalForm({ onClose, onSave, initial, isEditing }: GoalFormProps & { isEditing?: boolean }) {
   const [form, setForm] = useState<GoalFormData>({
     title: initial?.title ?? "",
     category: initial?.category ?? "otro",
@@ -68,6 +72,12 @@ function GoalForm({ onClose, onSave, initial }: GoalFormProps) {
   });
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [onClose]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,105 +98,139 @@ function GoalForm({ onClose, onSave, initial }: GoalFormProps) {
   };
 
   const field = (key: string) =>
-    `border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 w-full ${errors[key] ? "border-red-400" : "border-border"}`;
+    `border rounded-xl px-3 py-2.5 text-sm bg-background/80 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-colors w-full ${errors[key] ? "border-red-400" : "border-border/60"}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <form onSubmit={handleSubmit} className="bg-card border rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-lg">Nueva meta</h2>
-          <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div className="relative w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+        {/* Glow ring */}
+        <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-primary/20 via-transparent to-violet-500/10 pointer-events-none" />
 
-        <div>
-          <label className="text-sm font-medium block mb-1">Título</label>
-          <input
-            type="text"
-            className={field("title")}
-            value={form.title}
-            onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-            placeholder="Ej: 10,000 seguidores en Spotify"
-          />
-          {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
-        </div>
-
-        <div>
-          <label className="text-sm font-medium block mb-1">Categoría</label>
-          <select
-            className={field("category")}
-            value={form.category}
-            onChange={(e) => setForm((f) => ({ ...f, category: e.target.value as any }))}
-          >
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-sm font-medium block mb-1">Valor objetivo</label>
-            <input
-              type="number"
-              min="1"
-              className={field("target_value")}
-              value={form.target_value || ""}
-              onChange={(e) => setForm((f) => ({ ...f, target_value: parseFloat(e.target.value) || 0 }))}
-            />
-            {errors.target_value && <p className="text-red-500 text-xs mt-1">{errors.target_value}</p>}
+        <form
+          onSubmit={handleSubmit}
+          className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl shadow-2xl w-full p-6 space-y-4"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center">
+                <Target className="h-4 w-4 text-primary" />
+              </div>
+              <h2 className="font-semibold text-base">{isEditing ? "Editar meta" : "Nueva meta"}</h2>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-muted-foreground hover:text-foreground transition-all active:scale-95 p-1.5 rounded-xl hover:bg-muted/50"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
+
           <div>
-            <label className="text-sm font-medium block mb-1">Progreso actual</label>
+            <label className="text-xs font-medium text-muted-foreground block mb-1.5 uppercase tracking-wide">
+              Título *
+            </label>
             <input
-              type="number"
-              min="0"
-              className={field("current_value")}
-              value={form.current_value || ""}
-              onChange={(e) => setForm((f) => ({ ...f, current_value: parseFloat(e.target.value) || 0 }))}
+              type="text"
+              className={field("title")}
+              value={form.title}
+              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              placeholder="Ej: 10,000 seguidores en Spotify"
+              autoFocus
+            />
+            {errors.title && <p className="text-red-400 text-xs mt-1">{errors.title}</p>}
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-muted-foreground block mb-1.5 uppercase tracking-wide">
+              Categoría
+            </label>
+            <select
+              className={field("category")}
+              value={form.category}
+              onChange={(e) => setForm((f) => ({ ...f, category: e.target.value as any }))}
+            >
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground block mb-1.5 uppercase tracking-wide">
+                Valor objetivo *
+              </label>
+              <input
+                type="number"
+                min="1"
+                className={field("target_value")}
+                value={form.target_value || ""}
+                onChange={(e) => setForm((f) => ({ ...f, target_value: parseFloat(e.target.value) || 0 }))}
+              />
+              {errors.target_value && <p className="text-red-400 text-xs mt-1">{errors.target_value}</p>}
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground block mb-1.5 uppercase tracking-wide">
+                Progreso actual
+              </label>
+              <input
+                type="number"
+                min="0"
+                className={field("current_value")}
+                value={form.current_value || ""}
+                onChange={(e) => setForm((f) => ({ ...f, current_value: parseFloat(e.target.value) || 0 }))}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-muted-foreground block mb-1.5 uppercase tracking-wide">
+              Fecha objetivo (opcional)
+            </label>
+            <input
+              type="date"
+              className={`${field("target_date")} [color-scheme:dark]`}
+              value={form.target_date ?? ""}
+              onChange={(e) => setForm((f) => ({ ...f, target_date: e.target.value || null }))}
             />
           </div>
-        </div>
 
-        <div>
-          <label className="text-sm font-medium block mb-1">Fecha objetivo (opcional)</label>
-          <input
-            type="date"
-            className={field("target_date")}
-            value={form.target_date ?? ""}
-            onChange={(e) => setForm((f) => ({ ...f, target_date: e.target.value || null }))}
-          />
-        </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground block mb-1.5 uppercase tracking-wide">
+              Notas (opcional)
+            </label>
+            <textarea
+              rows={2}
+              className={field("notes")}
+              value={form.notes ?? ""}
+              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value || null }))}
+              placeholder="Contexto, estrategia..."
+            />
+          </div>
 
-        <div>
-          <label className="text-sm font-medium block mb-1">Notas (opcional)</label>
-          <textarea
-            rows={2}
-            className={field("notes")}
-            value={form.notes ?? ""}
-            onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value || null }))}
-            placeholder="Contexto, estrategia..."
-          />
-        </div>
-
-        <div className="flex gap-3 pt-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 border rounded-lg px-4 py-2 text-sm hover:bg-muted transition-colors"
-          >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            disabled={saving}
-            className="flex-1 bg-primary text-primary-foreground rounded-lg px-4 py-2 text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
-          >
-            {saving ? "Guardando..." : "Guardar meta"}
-          </button>
-        </div>
-      </form>
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 border border-border/60 rounded-xl px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all active:scale-95"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 bg-primary text-primary-foreground rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 flex items-center justify-center gap-2"
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : isEditing ? "Actualizar meta" : "Guardar meta"}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
@@ -197,9 +241,10 @@ interface GoalCardProps {
   onToggle: (id: string, is_completed: boolean) => void;
   onDelete: (id: string) => void;
   onUpdateProgress: (id: string, current_value: number) => void;
+  onEdit: (goal: Goal) => void;
 }
 
-function GoalCard({ goal, onToggle, onDelete, onUpdateProgress }: GoalCardProps) {
+function GoalCard({ goal, onToggle, onDelete, onUpdateProgress, onEdit }: GoalCardProps) {
   const percent = Math.min(100, Math.round((goal.current_value / goal.target_value) * 100));
   const [editing, setEditing] = useState(false);
   const [tempValue, setTempValue] = useState(String(goal.current_value));
@@ -215,89 +260,111 @@ function GoalCard({ goal, onToggle, onDelete, onUpdateProgress }: GoalCardProps)
     : null;
 
   return (
-    <div className={`rounded-lg border bg-card p-5 space-y-3 transition-all ${goal.is_completed ? "opacity-60" : ""}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white shrink-0 ${CATEGORY_COLORS[goal.category]}`}>
-            {CATEGORY_ICONS[goal.category]}
-          </div>
-          <div className="min-w-0">
-            <p className={`font-medium text-sm leading-snug ${goal.is_completed ? "line-through text-muted-foreground" : ""}`}>
-              {goal.title}
-            </p>
-            <p className="text-xs text-muted-foreground">{CATEGORY_LABELS[goal.category]}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <button
-            onClick={() => onToggle(goal.id, !goal.is_completed)}
-            className="text-muted-foreground hover:text-green-500 transition-colors p-1"
-            title={goal.is_completed ? "Marcar como pendiente" : "Marcar como completada"}
-          >
-            {goal.is_completed ? (
-              <CheckCircle2 className="h-5 w-5 text-green-500" />
-            ) : (
-              <Circle className="h-5 w-5" />
-            )}
-          </button>
-          <button
-            onClick={() => onDelete(goal.id)}
-            className="text-muted-foreground hover:text-red-500 transition-colors p-1"
-            title="Eliminar"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
+    <div className={`relative overflow-hidden rounded-2xl border border-border/60 bg-card transition-all group ${goal.is_completed ? "opacity-60" : "hover:shadow-lg hover:shadow-black/10 hover:border-border/80 hover:-translate-y-0.5"}`}>
+      {/* Category accent bar */}
+      <div className={`absolute left-0 top-0 bottom-0 w-1 ${CATEGORY_COLORS[goal.category]} opacity-70`} />
 
-      {/* Progress bar */}
-      <div>
-        <div className="flex justify-between text-xs text-muted-foreground mb-1">
-          <span>Progreso</span>
-          <span className="font-medium text-foreground">{percent}%</span>
-        </div>
-        <div className="h-2 rounded-full bg-muted overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all duration-700 ${
-              percent >= 100 ? "bg-green-500" : CATEGORY_COLORS[goal.category]
-            }`}
-            style={{ width: `${percent}%` }}
-          />
-        </div>
-        <div className="flex justify-between text-xs text-muted-foreground mt-1">
-          {editing ? (
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                className="border rounded px-2 py-0.5 text-xs w-24 bg-background"
-                value={tempValue}
-                onChange={(e) => setTempValue(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && saveProgress()}
-                autoFocus
-              />
-              <button onClick={saveProgress} className="text-primary text-xs">OK</button>
-              <button onClick={() => setEditing(false)} className="text-muted-foreground text-xs">✕</button>
+      <div className="pl-4 pr-4 pt-4 pb-3 space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-2.5 flex-1 min-w-0">
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-white shrink-0 group-hover:scale-110 transition-transform ${CATEGORY_COLORS[goal.category]}`}>
+              {CATEGORY_ICONS[goal.category]}
             </div>
-          ) : (
+            <div className="min-w-0">
+              <p className={`font-semibold text-sm leading-snug ${goal.is_completed ? "line-through text-muted-foreground" : ""}`}>
+                {goal.title}
+              </p>
+              <p className="text-[11px] text-muted-foreground">{CATEGORY_LABELS[goal.category]}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-0.5 shrink-0">
             <button
-              onClick={() => setEditing(true)}
-              className="hover:text-primary transition-colors"
-              title="Editar progreso"
+              onClick={() => onToggle(goal.id, !goal.is_completed)}
+              className="text-muted-foreground hover:text-green-500 transition-all active:scale-95 p-1"
+              title={goal.is_completed ? "Marcar como pendiente" : "Marcar como completada"}
             >
-              {goal.current_value.toLocaleString()} / {goal.target_value.toLocaleString()}
+              {goal.is_completed ? (
+                <CheckCircle2 className="h-5 w-5 text-green-500" />
+              ) : (
+                <Circle className="h-5 w-5" />
+              )}
             </button>
-          )}
-          {daysLeft !== null && (
-            <span className={daysLeft < 0 ? "text-red-500" : daysLeft < 30 ? "text-amber-500" : ""}>
-              {daysLeft < 0 ? `Vencida hace ${Math.abs(daysLeft)}d` : `${daysLeft}d restantes`}
-            </span>
-          )}
+            <button
+              onClick={() => onEdit(goal)}
+              className="text-muted-foreground hover:text-foreground transition-all active:scale-95 p-1 opacity-0 group-hover:opacity-100"
+              title="Editar meta"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => onDelete(goal.id)}
+              className="text-muted-foreground hover:text-red-500 transition-all active:scale-95 p-1"
+              title="Eliminar"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
         </div>
-      </div>
 
-      {goal.notes && (
-        <p className="text-xs text-muted-foreground border-t pt-2">{goal.notes}</p>
-      )}
+        {/* Progress bar */}
+        <div>
+          <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
+            <span>Progreso</span>
+            <span className={`font-bold tabular-nums ${percent >= 100 ? "text-green-400" : percent >= 75 ? "text-primary" : "text-foreground"}`}>
+              {percent}%
+            </span>
+          </div>
+          <div className="h-2.5 rounded-full bg-muted overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-700 ${
+                percent >= 100 ? "bg-green-500" : CATEGORY_COLORS[goal.category]
+              }`}
+              style={{ width: `${percent}%` }}
+            />
+          </div>
+          <div className="flex justify-between text-xs text-muted-foreground mt-1.5">
+            {editing ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  className="border border-border/60 rounded-xl px-2 py-0.5 text-xs w-24 bg-background"
+                  value={tempValue}
+                  onChange={(e) => setTempValue(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && saveProgress()}
+                  autoFocus
+                />
+                <button onClick={saveProgress} className="text-primary text-xs font-medium">OK</button>
+                <button onClick={() => setEditing(false)} className="text-muted-foreground text-xs">✕</button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setEditing(true)}
+                className="hover:text-primary transition-all active:scale-95 tabular-nums"
+                title="Editar progreso"
+              >
+                {goal.current_value.toLocaleString()} / {goal.target_value.toLocaleString()}
+              </button>
+            )}
+            {daysLeft !== null && (
+              <span className={`flex-shrink-0 px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                daysLeft < 0
+                  ? "bg-red-500/15 text-red-400"
+                  : daysLeft < 7
+                  ? "bg-orange-500/15 text-orange-400"
+                  : daysLeft < 30
+                  ? "bg-amber-500/15 text-amber-400"
+                  : "bg-secondary text-muted-foreground"
+              }`}>
+                {daysLeft < 0 ? `Vencida hace ${Math.abs(daysLeft)}d` : `${daysLeft}d restantes`}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {goal.notes && (
+          <p className="text-xs text-muted-foreground border-t border-border/50 pt-2.5">{goal.notes}</p>
+        )}
+      </div>
     </div>
   );
 }
@@ -307,9 +374,17 @@ export default function MetasPage() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [filter, setFilter] = useState<"activas" | "completadas" | "todas">("activas");
-  const [categoryFilter, setCategoryFilter] = useState("todos");
+  const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
+  const [filter, setFilter] = useState<"activas" | "completadas" | "todas">(() =>
+    typeof window !== "undefined"
+      ? (localStorage.getItem("metas-filter") as "activas" | "completadas" | "todas") || "activas"
+      : "activas"
+  );
+  const [categoryFilter, setCategoryFilter] = useState(() =>
+    typeof window !== "undefined" ? localStorage.getItem("metas-category") || "todos" : "todos"
+  );
   const { error: toastError, success: toastSuccess } = useToast();
+  const { confirm, ConfirmDialog } = useConfirm();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -328,6 +403,28 @@ export default function MetasPage() {
   }, [categoryFilter]);
 
   useEffect(() => { load(); }, [load]);
+
+  // ── Persist filter state ─────────────────────────────────────────────────────
+  useEffect(() => { localStorage.setItem("metas-filter", filter); }, [filter]);
+  useEffect(() => { localStorage.setItem("metas-category", categoryFilter); }, [categoryFilter]);
+
+  // ── Keyboard shortcuts ───────────────────────────────────────────────────────
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT") return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if ((e.key === "n" || e.key === "N") && !showForm && !editingGoal) { e.preventDefault(); setShowForm(true); }
+      if ((e.key === "e" || e.key === "E") && !showForm && !editingGoal) { e.preventDefault(); handleExportCSV(); }
+      if (e.key === "Escape") {
+        if (editingGoal) { setEditingGoal(null); return; }
+        if (showForm) setShowForm(false);
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showForm, editingGoal, goals, filter]);
 
   const displayedGoals = goals.filter((g) => {
     if (filter === "activas") return !g.is_completed;
@@ -351,6 +448,15 @@ export default function MetasPage() {
     load();
   };
 
+  const handleUpdate = async (data: GoalFormData) => {
+    if (!editingGoal) return;
+    const { error } = await updateGoal(editingGoal.id, data);
+    if (error) { toastError(error); return; }
+    toastSuccess("Meta actualizada");
+    setEditingGoal(null);
+    load();
+  };
+
   const handleToggle = async (id: string, is_completed: boolean) => {
     setGoals((prev) =>
       prev.map((g) => (g.id === id ? { ...g, is_completed } : g))
@@ -365,7 +471,8 @@ export default function MetasPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("¿Eliminar esta meta?")) return;
+    const ok = await confirm({ title: "¿Eliminar esta meta?", message: "Esta acción no se puede deshacer.", confirmLabel: "Eliminar", variant: "danger" });
+    if (!ok) return;
     setGoals((prev) => prev.filter((g) => g.id !== id));
     const { error } = await deleteGoal(id);
     if (error) { toastError(error); load(); return; }
@@ -378,41 +485,90 @@ export default function MetasPage() {
     if (error) toastError(error);
   };
 
+  const handleExportCSV = () => {
+    if (!goals.length) return;
+    const rows = [
+      ["Título", "Categoría", "Valor actual", "Valor objetivo", "Progreso (%)", "Estado", "Fecha límite", "Notas"],
+      ...goals.map((g) => [
+        g.title,
+        CATEGORY_LABELS[g.category] ?? g.category,
+        String(g.current_value),
+        String(g.target_value),
+        String(Math.min(100, Math.round((g.current_value / g.target_value) * 100))),
+        g.is_completed ? "Completada" : "Activa",
+        g.target_date ?? "",
+        (g.notes ?? "").replace(/\n/g, " "),
+      ]),
+    ];
+    const csv = "﻿" + rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `metas_${filter}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toastSuccess("CSV exportado");
+  };
+
   return (
     <PageTransition className="min-h-screen">
       <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Metas & Objetivos</h1>
-            <p className="text-muted-foreground text-sm mt-0.5">
-              Definí y seguí tus metas artísticas
-            </p>
+        <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-transparent to-transparent pointer-events-none" />
+          <div className="absolute -top-10 -right-10 w-40 h-40 bg-primary/6 rounded-full blur-3xl pointer-events-none" />
+          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-5">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/30 to-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
+                <Target className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold tracking-tight">Metas & Objetivos</h1>
+                <p className="text-muted-foreground text-xs mt-0.5">
+                  Definí y seguí tus metas artísticas
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {goals.length > 0 && (
+                <button
+                  onClick={handleExportCSV}
+                  title="Exportar metas a CSV (E)"
+                  className="flex items-center gap-1.5 px-3 py-2 border border-border/60 rounded-xl hover:bg-secondary/60 transition-all active:scale-95 text-sm text-muted-foreground hover:text-foreground"
+                >
+                  <Download className="h-4 w-4" />
+                  <span className="hidden sm:inline">Exportar</span>
+                </button>
+              )}
+              <button
+                onClick={() => setShowForm(true)}
+                title="Nueva meta (N)"
+                className="flex items-center gap-2 bg-primary text-primary-foreground rounded-xl px-4 py-2 text-sm font-semibold hover:bg-primary/90 transition-all active:scale-95 shadow-[0_0_16px_hsl(var(--primary)/0.25)]"
+              >
+                <Plus className="h-4 w-4" /> Nueva meta
+                <kbd className="hidden md:inline-flex ml-1 text-[9px] bg-primary-foreground/20 px-1 py-0.5 rounded font-mono">N</kbd>
+              </button>
+            </div>
           </div>
-          <button
-            onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 bg-primary text-primary-foreground rounded-lg px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors"
-          >
-            <Plus className="h-4 w-4" /> Nueva meta
-          </button>
         </div>
 
         {/* Summary */}
         <div className="grid grid-cols-3 gap-4">
-          <div className="rounded-lg border bg-card p-4 text-center">
-            <div className="text-2xl font-bold text-primary">
+          <div className="rounded-2xl border border-border/60 bg-card/90 p-4 text-center hover:-translate-y-0.5 hover:shadow-sm transition-all">
+            <div className="text-2xl font-bold text-primary tabular-nums">
               <AnimatedCounter value={activeCount} />
             </div>
             <div className="text-xs text-muted-foreground mt-1">Activas</div>
           </div>
-          <div className="rounded-lg border bg-card p-4 text-center">
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+          <div className="rounded-2xl border border-border/60 bg-card/90 p-4 text-center hover:-translate-y-0.5 hover:shadow-sm transition-all">
+            <div className="text-2xl font-bold text-green-400 tabular-nums">
               <AnimatedCounter value={doneCount} />
             </div>
             <div className="text-xs text-muted-foreground mt-1">Completadas</div>
           </div>
-          <div className="rounded-lg border bg-card p-4 text-center">
-            <div className="text-2xl font-bold">
+          <div className="rounded-2xl border border-border/60 bg-card/90 p-4 text-center hover:-translate-y-0.5 hover:shadow-sm transition-all">
+            <div className="text-2xl font-bold tabular-nums">
               <AnimatedCounter value={avgProgress} suffix="%" />
             </div>
             <div className="text-xs text-muted-foreground mt-1">Progreso prom.</div>
@@ -421,25 +577,32 @@ export default function MetasPage() {
 
         {/* Filters */}
         <div className="flex flex-wrap gap-3 items-center">
-          <div className="flex gap-1 bg-muted rounded-lg p-1">
-            {(["activas", "completadas", "todas"] as const).map((f) => (
+          <div className="flex gap-1 bg-secondary/40 rounded-xl p-1">
+            {([
+              { id: "activas",     label: "Activas",     count: activeCount },
+              { id: "completadas", label: "Completadas", count: doneCount },
+              { id: "todas",       label: "Todas",       count: goals.length },
+            ] as const).map(({ id: f, label, count }) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors capitalize ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all active:scale-95 ${
                   filter === f
-                    ? "bg-background shadow text-foreground"
+                    ? "bg-card shadow-sm border border-border/60 text-foreground font-semibold"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {f}
+                {label}
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full tabular-nums ${
+                  filter === f ? "bg-primary/15 text-primary" : "bg-secondary text-muted-foreground"
+                }`}>{count}</span>
               </button>
             ))}
           </div>
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="border rounded-lg px-3 py-1.5 text-sm bg-background"
+            className="border border-border/60 rounded-xl px-3 py-1.5 text-sm bg-card"
           >
             <option value="todos">Todas las categorías</option>
             {CATEGORIES.map((c) => (
@@ -464,7 +627,7 @@ export default function MetasPage() {
             </div>
             <button
               onClick={() => setShowForm(true)}
-              className="text-primary text-sm hover:underline"
+              className="text-primary text-sm hover:underline transition-all active:scale-95"
             >
               Crear meta
             </button>
@@ -478,6 +641,7 @@ export default function MetasPage() {
                   onToggle={handleToggle}
                   onDelete={handleDelete}
                   onUpdateProgress={handleUpdateProgress}
+                  onEdit={setEditingGoal}
                 />
               </StaggerItem>
             ))}
@@ -488,6 +652,24 @@ export default function MetasPage() {
       {showForm && (
         <GoalForm onClose={() => setShowForm(false)} onSave={handleCreate} />
       )}
+
+      {editingGoal && (
+        <GoalForm
+          isEditing
+          onClose={() => setEditingGoal(null)}
+          onSave={handleUpdate}
+          initial={{
+            title: editingGoal.title,
+            category: editingGoal.category,
+            target_value: editingGoal.target_value,
+            current_value: editingGoal.current_value,
+            target_date: editingGoal.target_date ?? null,
+            notes: editingGoal.notes ?? null,
+          }}
+        />
+      )}
+
+      {ConfirmDialog}
     </PageTransition>
   );
 }

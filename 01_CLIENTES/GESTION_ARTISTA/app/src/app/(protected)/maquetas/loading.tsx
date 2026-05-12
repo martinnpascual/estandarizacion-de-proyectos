@@ -6,7 +6,7 @@ export default function MaquetasLoading() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="space-y-2">
-          <div className="skeleton h-7 w-36 rounded-lg" />
+          <div className="skeleton h-7 w-36 rounded-xl" />
           <div className="skeleton h-4 w-52 rounded" />
         </div>
         <div className="skeleton h-9 w-40 rounded-xl" />

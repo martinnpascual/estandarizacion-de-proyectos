@@ -13,6 +13,7 @@ import {
 import { cn } from "@/lib/utils";
 import { updateSongLyrics } from "@/lib/actions/songs";
 import { updateDraftLyrics } from "@/lib/actions/drafts";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 interface Props {
   type: "song" | "draft";
@@ -69,6 +70,7 @@ export default function LyricsPanel({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const isDirty = draft !== lyrics;
+  const { confirm: confirmDialog, ConfirmDialog } = useConfirm();
 
   // Focus textarea when entering edit mode
   useEffect(() => {
@@ -79,11 +81,11 @@ export default function LyricsPanel({
 
   // Keyboard: Escape closes (unless editing dirty), Ctrl+S saves
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
+    async function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
         if (mode === "edit" && isDirty) {
-          // confirm discard
-          if (confirm("¿Descartar cambios?")) {
+          const ok = await confirmDialog({ title: "¿Descartar cambios?", confirmLabel: "Descartar" });
+          if (ok) {
             setDraft(lyrics);
             setMode(lyrics ? "view" : "edit");
           }
@@ -137,7 +139,8 @@ export default function LyricsPanel({
   }
 
   async function handleClear() {
-    if (!confirm("¿Eliminar la letra de esta canción?")) return;
+    const ok = await confirmDialog({ title: "¿Eliminar la letra?", message: "Se eliminará la letra de esta canción.", confirmLabel: "Eliminar", variant: "danger" });
+    if (!ok) return;
     setSaving(true);
     const result = type === "song"
       ? await updateSongLyrics(id, null)
@@ -159,21 +162,24 @@ export default function LyricsPanel({
       {/* Backdrop */}
       <div
         className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
-        onClick={() => {
+        onClick={() => void (async () => {
           if (mode === "edit" && isDirty) {
-            if (!confirm("¿Descartar cambios?")) return;
+            const ok = await confirmDialog({ title: "¿Descartar cambios?", confirmLabel: "Descartar" });
+            if (!ok) return;
           }
           onClose();
-        }}
+        })()}
       />
 
       {/* Panel */}
-      <div className="fixed right-0 top-0 z-50 h-full w-full max-w-md bg-card border-l border-border shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
+      <div className="fixed right-0 top-0 z-50 h-full w-full max-w-md bg-card border-l border-border/60 shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border/60 flex-shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
-            <FileText className="h-4 w-4 text-primary flex-shrink-0" />
+            <div className="w-7 h-7 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center flex-shrink-0">
+              <FileText className="h-3.5 w-3.5 text-primary" />
+            </div>
             <div className="min-w-0">
               <p className="text-sm font-semibold truncate">{title}</p>
               {artist && (
@@ -184,12 +190,12 @@ export default function LyricsPanel({
           <div className="flex items-center gap-1 flex-shrink-0">
             {/* View / Edit toggle */}
             {lyrics && (
-              <div className="flex items-center border border-border rounded-lg overflow-hidden mr-1">
+              <div className="flex items-center border border-border/60 rounded-xl overflow-hidden mr-1">
                 <button
                   onClick={() => setMode("view")}
                   title="Vista previa"
                   className={cn(
-                    "px-2 py-1.5 text-xs transition-colors flex items-center gap-1",
+                    "px-2 py-1.5 text-xs transition-all active:scale-95 flex items-center gap-1",
                     mode === "view"
                       ? "bg-secondary text-foreground"
                       : "text-muted-foreground hover:text-foreground"
@@ -202,7 +208,7 @@ export default function LyricsPanel({
                   onClick={() => { setDraft(lyrics); setMode("edit"); }}
                   title="Editar letra"
                   className={cn(
-                    "px-2 py-1.5 text-xs transition-colors border-l border-border flex items-center gap-1",
+                    "px-2 py-1.5 text-xs transition-all active:scale-95 border-l border-border/60 flex items-center gap-1",
                     mode === "edit"
                       ? "bg-secondary text-foreground"
                       : "text-muted-foreground hover:text-foreground"
@@ -219,7 +225,7 @@ export default function LyricsPanel({
                 onClick={handleCopy}
                 title="Copiar letra"
                 className={cn(
-                  "p-1.5 rounded-lg transition-colors",
+                  "p-1.5 rounded-xl transition-all active:scale-95",
                   copied ? "bg-green-500/15 text-green-400" : "hover:bg-secondary text-muted-foreground"
                 )}
               >
@@ -232,7 +238,7 @@ export default function LyricsPanel({
                 onClick={handleClear}
                 title="Eliminar letra"
                 disabled={saving}
-                className="p-1.5 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-colors disabled:opacity-50"
+                className="p-1.5 rounded-xl hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Trash2 className="h-4 w-4" />
               </button>
@@ -240,7 +246,7 @@ export default function LyricsPanel({
             {/* Close */}
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground transition-colors"
+              className="p-1.5 rounded-xl hover:bg-secondary text-muted-foreground transition-all active:scale-95"
             >
               <X className="h-4 w-4" />
             </button>
@@ -249,7 +255,7 @@ export default function LyricsPanel({
 
         {/* Stats bar (visible in view mode with content) */}
         {mode === "view" && lyrics && (
-          <div className="flex items-center gap-3 px-5 py-2 bg-secondary/30 border-b border-border text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-3 px-5 py-2 bg-secondary/30 border-b border-border/60 text-[11px] text-muted-foreground">
             <span className="flex items-center gap-1">
               <AlignLeft className="h-3 w-3" />
               {verses.length} {verses.length === 1 ? "estrofa" : "estrofas"}
@@ -310,7 +316,7 @@ export default function LyricsPanel({
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 placeholder={"[Verso 1]\nEscribí aquí la primera estrofa...\n\n[Estribillo]\nY aquí el estribillo..."}
-                className="flex-1 resize-none bg-secondary/30 border border-border rounded-xl p-4 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary/50 font-['Georgia',serif] placeholder:text-muted-foreground/40 placeholder:font-sans min-h-[300px]"
+                className="flex-1 resize-none bg-secondary/30 border border-border/60 rounded-xl p-4 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary/50 font-['Georgia',serif] placeholder:text-muted-foreground/40 placeholder:font-sans min-h-[300px]"
                 spellCheck
               />
               {/* Stats */}
@@ -323,7 +329,7 @@ export default function LyricsPanel({
               </div>
               {/* Error */}
               {error && (
-                <p className="text-xs text-red-500 bg-red-500/10 px-3 py-2 rounded-lg">
+                <p className="text-xs text-red-500 bg-red-500/10 px-3 py-2 rounded-xl">
                   {error}
                 </p>
               )}
@@ -332,7 +338,7 @@ export default function LyricsPanel({
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/80 transition-colors disabled:opacity-50"
+                  className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {saving
                     ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Guardando…</>
@@ -342,7 +348,7 @@ export default function LyricsPanel({
                   <button
                     onClick={handleDiscard}
                     disabled={saving}
-                    className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-2 border border-border/60 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-all active:scale-95"
                   >
                     <RotateCcw className="h-3.5 w-3.5" />
                     Descartar
@@ -351,19 +357,21 @@ export default function LyricsPanel({
                 {lyrics && !isDirty && (
                   <button
                     onClick={() => setMode("view")}
-                    className="px-3 py-2 border border-border rounded-lg text-sm text-muted-foreground hover:bg-secondary transition-colors"
+                    className="px-3 py-2 border border-border/60 rounded-xl text-sm text-muted-foreground hover:bg-secondary transition-all active:scale-95"
                   >
                     Cancelar
                   </button>
                 )}
                 <span className="ml-auto text-[10px] text-muted-foreground/60">
-                  Ctrl+S para guardar
+                  ⌘S / Ctrl+S para guardar
                 </span>
               </div>
             </div>
           )}
         </div>
       </div>
+
+      {ConfirmDialog}
     </>
   );
 }

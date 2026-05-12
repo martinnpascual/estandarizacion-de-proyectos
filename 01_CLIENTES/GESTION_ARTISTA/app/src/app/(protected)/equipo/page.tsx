@@ -75,9 +75,17 @@ export default function EquipoPage() {
   const [revokingId, setRevokingId] = useState<string | null>(null);
   const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState<UserRole | "todos">("todos");
+  const [roleFilter, setRoleFilter] = useState<UserRole | "todos">(() =>
+    typeof window !== "undefined"
+      ? (localStorage.getItem("equipo-role-filter") as UserRole | "todos") || "todos"
+      : "todos"
+  );
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
-  const [memberSort, setMemberSort] = useState<"name" | "recent">("recent");
+  const [memberSort, setMemberSort] = useState<"name" | "recent">(() =>
+    typeof window !== "undefined"
+      ? (localStorage.getItem("equipo-member-sort") as "name" | "recent") || "recent"
+      : "recent"
+  );
   const emailRef = useRef<HTMLInputElement>(null);
 
   // Auto-focus email input; Escape closes form; N = nueva invitación
@@ -114,9 +122,9 @@ export default function EquipoPage() {
     return { label: `Válida por ${daysLeft}d`, isExpiring: false };
   }
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { load(); }, []);
+  useEffect(() => { localStorage.setItem("equipo-role-filter", roleFilter); }, [roleFilter]);
+  useEffect(() => { localStorage.setItem("equipo-member-sort", memberSort); }, [memberSort]);
 
   async function load() {
     setLoading(true);
@@ -185,27 +193,36 @@ export default function EquipoPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <UserCog className="h-6 w-6 text-cyan-400" />
-            Equipo
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Gestión de miembros y roles del equipo
-          </p>
+      {/* Header */}
+      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card">
+        <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/8 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/30 to-cyan-600/10 border border-cyan-500/20 flex items-center justify-center flex-shrink-0">
+              <UserCog className="h-5 w-5 text-cyan-400" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight">Equipo</h1>
+              <p className="text-muted-foreground text-xs mt-0.5">
+                Gestión de miembros y roles del equipo
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              setInviteForm({ email: "", role: "productor" });
+              setInviteErrors({});
+              setShowInviteForm(true);
+            }}
+            title="Invitar miembro (N)"
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-all active:scale-95 text-sm font-semibold shadow-[0_0_16px_hsl(var(--primary)/0.2)]"
+          >
+            <Plus className="h-4 w-4" />
+            Invitar miembro
+            <kbd className="hidden md:inline-flex ml-1 text-[9px] bg-primary-foreground/20 px-1 py-0.5 rounded font-mono">N</kbd>
+          </button>
         </div>
-        <button
-          onClick={() => {
-            setInviteForm({ email: "", role: "productor" });
-            setInviteErrors({});
-            setShowInviteForm(true);
-          }}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/80 transition-colors text-sm font-medium"
-        >
-          <Plus className="h-4 w-4" />
-          Invitar miembro
-        </button>
       </div>
 
       {/* Roles info */}
@@ -220,9 +237,9 @@ export default function EquipoPage() {
                 key={role}
                 onClick={isClickable ? () => setRoleFilter(isFiltered ? "todos" : role) : undefined}
                 className={cn(
-                  "bg-card rounded-xl border p-4 transition-colors",
+                  "bg-card rounded-2xl border p-4 transition-all",
                   meta.borderColor,
-                  isClickable && "cursor-pointer hover:bg-secondary/40",
+                  isClickable && "cursor-pointer hover:bg-secondary/40 hover:-translate-y-0.5 hover:shadow-sm",
                   isFiltered && "ring-1 ring-primary/30"
                 )}
               >
@@ -290,9 +307,9 @@ export default function EquipoPage() {
               <button
                 onClick={() => setRoleFilter("todos")}
                 className={cn(
-                  "flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full border transition-colors",
+                  "flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full border transition-all active:scale-95",
                   roleFilter === "todos"
-                    ? "bg-primary/10 border-primary/30 text-primary font-medium"
+                    ? "bg-primary/10 border-primary/30 text-primary font-semibold"
                     : "border-border text-muted-foreground hover:text-foreground bg-secondary"
                 )}
               >
@@ -307,9 +324,9 @@ export default function EquipoPage() {
                     key={role}
                     onClick={() => setRoleFilter(roleFilter === role ? "todos" : role)}
                     className={cn(
-                      "flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full border transition-colors",
+                      "flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full border transition-all active:scale-95",
                       roleFilter === role
-                        ? cn(meta.color, meta.borderColor, "font-medium")
+                        ? cn(meta.color, meta.borderColor, "font-semibold")
                         : "border-border text-muted-foreground hover:text-foreground bg-secondary"
                     )}
                   >
@@ -330,7 +347,7 @@ export default function EquipoPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Buscar miembro…"
-                className="w-full pl-9 pr-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                className="w-full pl-9 pr-3 py-2 bg-secondary border border-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
               />
             </div>
           )}
@@ -338,8 +355,8 @@ export default function EquipoPage() {
       )}
 
       {/* Miembros */}
-      <div className="bg-card rounded-xl border border-border overflow-hidden">
-        <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-3">
+      <div className="bg-card rounded-2xl border border-border/60 overflow-hidden">
+        <div className="px-4 py-3 border-b border-border/60 flex items-center justify-between gap-3">
           <h2 className="text-sm font-semibold">
             Miembros actuales
             {members.length > 0 && (
@@ -354,7 +371,7 @@ export default function EquipoPage() {
                 <select
                   value={memberSort}
                   onChange={(e) => setMemberSort(e.target.value as "name" | "recent")}
-                  className="pl-6 pr-2 py-1 text-xs bg-secondary border-0 rounded-lg text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer appearance-none"
+                  className="pl-6 pr-2 py-1 text-xs bg-secondary border-0 rounded-xl text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer appearance-none"
                 >
                   <option value="recent">Más reciente</option>
                   <option value="name">A-Z</option>
@@ -382,7 +399,7 @@ export default function EquipoPage() {
                   });
                 }}
                 title="Copiar todos los emails visibles"
-                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded hover:bg-secondary"
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-all active:scale-95 px-2 py-1 rounded-xl hover:bg-secondary"
               >
                 {allCopied
                   ? <><Check className="h-3.5 w-3.5 text-green-400" /><span className="text-green-400">¡Copiado!</span></>
@@ -429,7 +446,7 @@ export default function EquipoPage() {
                   {(searchQuery.trim() || roleFilter !== "todos") && (
                     <button
                       onClick={() => { setSearchQuery(""); setRoleFilter("todos"); }}
-                      className="text-xs text-primary hover:underline"
+                      className="text-xs text-primary hover:underline transition-all active:scale-95"
                     >
                       Quitar filtros
                     </button>
@@ -439,7 +456,7 @@ export default function EquipoPage() {
             }
 
             return (
-              <div className="divide-y divide-border">
+              <div className="divide-y divide-border/50">
                 {filtered.map((member) => {
                   const meta = ROLE_META[member.role];
                   const isCurrentUser = member.id === user?.id;
@@ -480,7 +497,7 @@ export default function EquipoPage() {
                             <button
                               onClick={() => handleCopyEmail(member.id, member.email!)}
                               title="Copiar email"
-                              className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-secondary text-muted-foreground transition-all flex-shrink-0"
+                              className="p-0.5 rounded-xl opacity-0 group-hover:opacity-100 hover:bg-secondary text-muted-foreground transition-all active:scale-95 flex-shrink-0"
                             >
                               {copiedEmail === member.id
                                 ? <Check className="h-3 w-3 text-green-400" />
@@ -500,7 +517,7 @@ export default function EquipoPage() {
                             }
                             disabled={updatingRoleId === member.id}
                             className={cn(
-                              "appearance-none pl-2 pr-6 py-1 rounded-full text-[11px] font-medium border cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary/50 disabled:opacity-50",
+                              "appearance-none pl-2 pr-6 py-1 rounded-full text-[11px] font-medium border cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50 disabled:cursor-not-allowed",
                               meta.color,
                               "border-transparent"
                             )}
@@ -561,7 +578,7 @@ export default function EquipoPage() {
         if (expired.length > 0) parts.push(`${expired.length} expirada${expired.length !== 1 ? "s" : ""}`);
         if (soonCount > 0) parts.push(`${soonCount} expira${soonCount !== 1 ? "n" : ""} pronto`);
         return (
-          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-orange-500/10 border border-orange-500/30">
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-orange-500/10 border border-orange-500/30">
             <AlertTriangle className="h-4 w-4 text-orange-400 flex-shrink-0" />
             <p className="text-sm font-medium text-orange-400">
               Invitaciones pendientes: {parts.join(" · ")} — revisá las invitaciones abajo
@@ -572,8 +589,8 @@ export default function EquipoPage() {
 
       {/* Invitaciones pendientes */}
       {invitations.length > 0 && (
-        <div className="bg-card rounded-xl border border-border overflow-hidden">
-          <div className="px-4 py-3 border-b border-border">
+        <div className="bg-card rounded-2xl border border-border/60 overflow-hidden">
+          <div className="px-4 py-3 border-b border-border/60">
             <h2 className="text-sm font-semibold">
               Invitaciones pendientes
               <span className="ml-1.5 text-xs text-muted-foreground">
@@ -581,7 +598,7 @@ export default function EquipoPage() {
               </span>
             </h2>
           </div>
-          <div className="divide-y divide-border">
+          <div className="divide-y divide-border/50">
             {invitations.map((inv) => {
               const meta = ROLE_META[inv.role];
               return (
@@ -613,7 +630,7 @@ export default function EquipoPage() {
                   <button
                     onClick={() => handleRevoke(inv)}
                     disabled={revokingId === inv.id}
-                    className="p-1.5 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-50"
+                    className="p-1.5 rounded-xl hover:bg-red-500/10 text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Revocar invitación"
                   >
                     {revokingId === inv.id ? (
@@ -633,20 +650,30 @@ export default function EquipoPage() {
 
       {/* Modal invitar */}
       {showInviteForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-          <div className="bg-card border border-border rounded-xl w-full max-w-sm">
-            <div className="flex items-center justify-between p-5 border-b border-border">
-              <h2 className="text-base font-semibold">Invitar al equipo</h2>
-              <button onClick={() => setShowInviteForm(false)} className="p-1.5 rounded-lg hover:bg-secondary">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={() => setShowInviteForm(false)}
+        >
+          <div className="relative w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-primary/20 via-transparent to-violet-500/10 pointer-events-none" />
+            <div className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl shadow-2xl shadow-black/40">
+            <div className="flex items-center justify-between p-5 border-b border-border/60">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center flex-shrink-0">
+                  <Users className="h-4 w-4 text-primary" />
+                </div>
+                <h2 className="text-base font-semibold">Invitar al equipo</h2>
+              </div>
+              <button onClick={() => setShowInviteForm(false)} className="p-1.5 rounded-xl hover:bg-muted/50 transition-all active:scale-95 text-muted-foreground hover:text-foreground">
                 <X className="h-4 w-4" />
               </button>
             </div>
             <form onSubmit={handleInvite} className="p-5 space-y-4">
               {inviteErrors.root && (
-                <p className="text-sm text-red-500 bg-red-500/10 px-3 py-2 rounded-lg">{inviteErrors.root}</p>
+                <p className="text-sm text-red-500 bg-red-500/10 px-3 py-2 rounded-xl">{inviteErrors.root}</p>
               )}
               <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-muted-foreground">Email *</label>
+                <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide">Email *</label>
                 <input
                   ref={emailRef}
                   type="email"
@@ -656,29 +683,30 @@ export default function EquipoPage() {
                     setInviteErrors((p) => ({ ...p, email: undefined }));
                   }}
                   placeholder="productor@email.com"
-                  className={`w-full px-3 py-2.5 bg-background border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 ${inviteErrors.email ? "border-red-500" : "border-border"}`}
+                  className={`w-full px-3 py-2.5 bg-background border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 ${inviteErrors.email ? "border-red-500" : "border-border/60"}`}
                 />
                 {inviteErrors.email && <p className="text-xs text-red-500">{inviteErrors.email}</p>}
               </div>
               <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-muted-foreground">Rol *</label>
+                <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide">Rol *</label>
                 <select
                   value={inviteForm.role}
                   onChange={(e) => setInviteForm((p) => ({ ...p, role: e.target.value as "productor" | "manager" }))}
-                  className="w-full px-3 py-2.5 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  className="w-full px-3 py-2.5 bg-background border border-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                 >
                   <option value="productor">Productor</option>
                   <option value="manager">Manager</option>
                 </select>
               </div>
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setShowInviteForm(false)} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-secondary transition-colors">Cancelar</button>
-                <button type="submit" disabled={submitting} className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/80 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                <button type="button" onClick={() => setShowInviteForm(false)} className="flex-1 py-2.5 rounded-xl border border-border/60 text-sm font-semibold hover:bg-secondary/60 transition-all active:scale-95">Cancelar</button>
+                <button type="submit" disabled={submitting} className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                   {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
                   Invitar
                 </button>
               </div>
             </form>
+            </div>
           </div>
         </div>
       )}

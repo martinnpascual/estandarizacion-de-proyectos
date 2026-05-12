@@ -192,7 +192,7 @@ export default function DraftKanbanBoard({
           >
             {/* Column header */}
             <div className={cn(
-              "flex items-center justify-between px-3 py-2.5 rounded-t-xl border transition-colors",
+              "flex items-center justify-between px-3 py-2.5 rounded-t-2xl border transition-colors",
               col.bg,
               isDropTarget && col.border
             )}>
@@ -217,7 +217,7 @@ export default function DraftKanbanBoard({
 
             {/* Drop zone body */}
             <div className={cn(
-              "flex-1 rounded-b-xl border border-t-0 p-2 space-y-2 min-h-[120px] transition-all duration-150",
+              "flex-1 rounded-b-2xl border border-t-0 p-2 space-y-2 min-h-[120px] transition-all duration-150",
               isDropTarget
                 ? cn("border-2", col.border, "bg-secondary/40")
                 : "border-border/60 bg-secondary/10",
@@ -225,7 +225,7 @@ export default function DraftKanbanBoard({
               {/* Empty state or drop hint */}
               {colDrafts.length === 0 ? (
                 <div className={cn(
-                  "flex flex-col items-center justify-center h-20 gap-1 rounded-lg border-2 border-dashed transition-colors",
+                  "flex flex-col items-center justify-center h-20 gap-1 rounded-2xl border-2 border-dashed transition-colors",
                   isDropTarget
                     ? cn(col.border, "opacity-100")
                     : "border-transparent opacity-30"
@@ -262,7 +262,7 @@ export default function DraftKanbanBoard({
                   {/* Drop hint at bottom when items exist */}
                   {isDropTarget && !isDraggingFromHere && (
                     <div className={cn(
-                      "h-10 rounded-lg border-2 border-dashed flex items-center justify-center",
+                      "h-10 rounded-2xl border-2 border-dashed flex items-center justify-center",
                       col.border
                     )}>
                       <span className={cn("text-[10px] font-medium", col.color)}>Soltar aquí</span>
@@ -318,7 +318,7 @@ function DraftCard({
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       className={cn(
-        "relative bg-card border border-border/60 rounded-xl overflow-hidden group transition-all duration-150 select-none",
+        "relative bg-card border border-border/60 rounded-2xl overflow-hidden group transition-all duration-150 select-none",
         isDragging && "opacity-40 scale-95 shadow-xl",
         !isDragging && cn(
           "cursor-grab active:cursor-grabbing",
@@ -396,7 +396,7 @@ function DraftCard({
                 }
               }}
               className={cn(
-                "p-1.5 rounded-lg transition-all",
+                "p-1.5 rounded-xl transition-all active:scale-95",
                 isPlaying
                   ? cn("text-white shadow-sm", col.dot.replace("bg-", "bg-").replace("-400", "-500/80"))
                   : "text-muted-foreground/60 hover:text-foreground hover:bg-secondary/60"
@@ -409,7 +409,7 @@ function DraftCard({
           <button
             onClick={onToggleVersions}
             className={cn(
-              "p-1.5 rounded-lg transition-all",
+              "p-1.5 rounded-xl transition-all active:scale-95",
               versionsOpen
                 ? "text-primary bg-primary/10"
                 : "text-muted-foreground/60 hover:text-foreground hover:bg-secondary/60"
@@ -421,7 +421,7 @@ function DraftCard({
           <button
             onClick={handleCopyLink}
             className={cn(
-              "p-1.5 rounded-lg transition-all",
+              "p-1.5 rounded-xl transition-all active:scale-95",
               linkCopied
                 ? "text-green-400 bg-green-400/10"
                 : "text-muted-foreground/60 hover:text-foreground hover:bg-secondary/60"
@@ -432,14 +432,14 @@ function DraftCard({
           </button>
           <button
             onClick={onEdit}
-            className="p-1.5 rounded-lg text-muted-foreground/60 hover:text-foreground hover:bg-secondary/60 transition-all"
+            className="p-1.5 rounded-xl text-muted-foreground/60 hover:text-foreground hover:bg-secondary/60 transition-all active:scale-95"
             title="Editar"
           >
             <Pencil className="h-3 w-3" />
           </button>
           <button
             onClick={onDelete}
-            className="p-1.5 rounded-lg text-muted-foreground/60 hover:text-red-400 hover:bg-red-500/10 transition-all"
+            className="p-1.5 rounded-xl text-muted-foreground/60 hover:text-red-400 hover:bg-red-500/10 transition-all active:scale-95"
             title="Eliminar"
           >
             <Trash2 className="h-3 w-3" />
@@ -450,7 +450,7 @@ function DraftCard({
         {col.status === "lista_para_publicar" ? (
           <button
             onClick={onPublish}
-            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-green-500/15 border border-green-500/30 text-green-400 text-[10px] font-semibold hover:bg-green-500/25 transition-all"
+            className="flex items-center gap-1 px-2 py-1 rounded-xl bg-green-500/15 border border-green-500/30 text-green-400 text-[10px] font-semibold hover:bg-green-500/25 transition-all active:scale-95"
           >
             <Upload className="h-3 w-3" />
             Publicar
@@ -461,7 +461,7 @@ function DraftCard({
             disabled={isAdvancing}
             title={`Mover a ${translateDraftStatus(STATUS_NEXT[draft.status]!)}`}
             className={cn(
-              "flex items-center gap-0.5 px-2 py-1 rounded-lg text-[10px] font-medium transition-all disabled:opacity-50",
+              "flex items-center gap-0.5 px-2 py-1 rounded-xl text-[10px] font-medium transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed",
               col.color,
               col.bg.split(" ")[0],
               "hover:opacity-80"

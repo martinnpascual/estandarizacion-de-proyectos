@@ -4,7 +4,7 @@ import {
   X, Play, Pause, Music, ExternalLink, Clock, Tag, Users,
   Disc3, Calendar, FileAudio, Link as LinkIcon, Copy, Check,
   Share2, Keyboard, AlertCircle, FileText, ArrowDownToLine,
-  Globe, Lock, Loader2,
+  Globe, Lock, Loader2, Zap,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -41,12 +41,14 @@ const PLATFORM_CONFIG: {
 
 /** Completeness score calculation (0-100) */
 function calcCompleteness(song: Song) {
+  const hasAudio = !!(song.drive_file_id || song.drive_file_url);
   const checks = [
-    { label: "Audio",       ok: !!(song.drive_file_id || song.drive_file_url) },
+    { label: "Audio",       ok: hasAudio },
     { label: "Portada",     ok: !!song.cover_art_url },
     { label: "Letra",       ok: !!song.lyrics },
     { label: "Género",      ok: !!song.genre },
     { label: "Duración",    ok: !!song.duration_seconds },
+    { label: "BPM/Key",     ok: !!(song.bpm && song.key_signature) || !hasAudio },
     { label: "Spotify",     ok: !!song.spotify_url },
     { label: "YouTube",     ok: !!song.youtube_url },
     { label: "Tags",        ok: !!(song.tags?.length) },
@@ -98,6 +100,8 @@ export default function SongDetailPanel({ song, onClose, onEdit, onOpenLyrics, m
       const m = Math.floor(song.duration_seconds / 60), s = song.duration_seconds % 60;
       parts.push(`Duración: ${m}:${String(s).padStart(2, "0")}`);
     }
+    if (song.bpm) parts.push(`BPM: ${song.bpm}`);
+    if (song.key_signature) parts.push(`Tonalidad: ${song.key_signature}`);
     if (song.spotify_url) parts.push(`Spotify: ${song.spotify_url}`);
     if (song.youtube_url) parts.push(`YouTube: ${song.youtube_url}`);
     // Deep-link so team members can open this song directly
@@ -154,7 +158,7 @@ export default function SongDetailPanel({ song, onClose, onEdit, onOpenLyrics, m
               disabled={togglingPublic}
               title={isPublic ? "Canción pública — clic para hacer privada" : "Canción privada — clic para publicar en EPK"}
               className={cn(
-                "flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors",
+                "flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-all active:scale-95",
                 isPublic
                   ? "bg-green-500/15 text-green-400 hover:bg-red-500/15 hover:text-red-400"
                   : "bg-secondary text-muted-foreground hover:bg-green-500/15 hover:text-green-400"
@@ -169,7 +173,7 @@ export default function SongDetailPanel({ song, onClose, onEdit, onOpenLyrics, m
             <Link
               href={`/discografia/${song.id}`}
               title="Abrir página completa"
-              className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground transition-colors"
+              className="p-1.5 rounded-xl hover:bg-secondary text-muted-foreground transition-all active:scale-95"
             >
               <ExternalLink className="h-4 w-4" />
             </Link>
@@ -178,7 +182,7 @@ export default function SongDetailPanel({ song, onClose, onEdit, onOpenLyrics, m
               onClick={handleShareLink}
               title="Copiar enlace directo"
               className={cn(
-                "p-1.5 rounded-lg transition-colors",
+                "p-1.5 rounded-xl transition-all active:scale-95",
                 linkCopied
                   ? "bg-blue-500/15 text-blue-400"
                   : "hover:bg-secondary text-muted-foreground"
@@ -191,7 +195,7 @@ export default function SongDetailPanel({ song, onClose, onEdit, onOpenLyrics, m
               onClick={handleCopy}
               title="Copiar info de la canción"
               className={cn(
-                "p-1.5 rounded-lg transition-colors",
+                "p-1.5 rounded-xl transition-all active:scale-95",
                 copied
                   ? "bg-green-500/15 text-green-400"
                   : "hover:bg-secondary text-muted-foreground"
@@ -204,7 +208,7 @@ export default function SongDetailPanel({ song, onClose, onEdit, onOpenLyrics, m
               onClick={() => setShowShortcuts(s => !s)}
               title="Atajos de teclado"
               className={cn(
-                "p-1.5 rounded-lg transition-colors",
+                "p-1.5 rounded-xl transition-all active:scale-95",
                 showShortcuts
                   ? "bg-secondary text-foreground"
                   : "hover:bg-secondary text-muted-foreground"
@@ -214,13 +218,13 @@ export default function SongDetailPanel({ song, onClose, onEdit, onOpenLyrics, m
             </button>
             <button
               onClick={onEdit}
-              className="text-xs px-3 py-1.5 rounded-lg border border-border hover:bg-secondary transition-colors"
+              className="text-xs px-3 py-1.5 rounded-xl border border-border/60 hover:bg-secondary/60 transition-all active:scale-95"
             >
               Editar
             </button>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground transition-colors"
+              className="p-1.5 rounded-xl hover:bg-secondary text-muted-foreground transition-all active:scale-95"
             >
               <X className="h-4 w-4" />
             </button>
@@ -229,14 +233,14 @@ export default function SongDetailPanel({ song, onClose, onEdit, onOpenLyrics, m
 
         {/* Keyboard shortcuts */}
         {showShortcuts && (
-          <div className="border-b border-border bg-secondary/30 px-5 py-3 flex flex-wrap gap-x-4 gap-y-1.5">
+          <div className="border-b border-border/60 bg-secondary/30 px-5 py-3 flex flex-wrap gap-x-4 gap-y-1.5">
             {[
               ["P", song.drive_file_url ? "Reproducir / Pausar" : "Reproducir (sin archivo)"],
               ["E", "Editar canción"],
               ["Esc", "Cerrar panel"],
             ].map(([key, desc]) => (
               <span key={key} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                <kbd className="px-1.5 py-0.5 rounded bg-background border border-border text-[10px] font-mono leading-none">
+                <kbd className="px-1.5 py-0.5 rounded bg-background border border-border/60 text-[10px] font-mono leading-none">
                   {key}
                 </kbd>
                 {desc}
@@ -281,7 +285,7 @@ export default function SongDetailPanel({ song, onClose, onEdit, onOpenLyrics, m
                 onClick={handlePlay}
                 title={isPlaying ? "Pausar" : "Reproducir"}
                 className={cn(
-                  "absolute bottom-4 right-4 z-20 w-12 h-12 rounded-full flex items-center justify-center transition-all",
+                  "absolute bottom-4 right-4 z-20 w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-95",
                   isPlaying
                     ? "bg-primary text-primary-foreground scale-105 shadow-[0_0_24px_hsl(var(--primary)/0.6)]"
                     : "bg-card/90 backdrop-blur-sm hover:bg-primary hover:text-primary-foreground text-foreground shadow-xl"
@@ -328,6 +332,17 @@ export default function SongDetailPanel({ song, onClose, onEdit, onOpenLyrics, m
                 <span className="flex items-center gap-1.5 text-xs bg-secondary px-2.5 py-1 rounded-full">
                   <Clock className="h-3 w-3 text-muted-foreground" />
                   {formatTime(song.duration_seconds)}
+                </span>
+              )}
+              {song.bpm && (
+                <span className="flex items-center gap-1.5 text-xs bg-blue-500/10 text-blue-400 px-2.5 py-1 rounded-full font-mono tabular-nums" title="BPM">
+                  <Zap className="h-3 w-3" />
+                  {song.bpm} BPM
+                </span>
+              )}
+              {song.key_signature && (
+                <span className="flex items-center gap-1.5 text-xs bg-purple-500/10 text-purple-400 px-2.5 py-1 rounded-full font-medium" title="Tonalidad">
+                  ♪ {song.key_signature}
                 </span>
               )}
               <span
@@ -400,7 +415,7 @@ export default function SongDetailPanel({ song, onClose, onEdit, onOpenLyrics, m
                       target="_blank"
                       rel="noopener noreferrer"
                       className={cn(
-                        "flex items-center justify-between px-3 py-2.5 rounded-lg border border-border hover:border-transparent transition-all group",
+                        "flex items-center justify-between px-3 py-2.5 rounded-2xl border border-border/60 hover:border-transparent hover:-translate-y-0.5 hover:shadow-sm transition-all group",
                         bg
                       )}
                     >
@@ -432,10 +447,10 @@ export default function SongDetailPanel({ song, onClose, onEdit, onOpenLyrics, m
                     download={song.drive_file_id ? song.title : undefined}
                     target={song.drive_file_id ? undefined : "_blank"}
                     rel="noopener noreferrer"
-                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/80 transition-colors group"
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/80 transition-all active:scale-95 group"
                   >
                     <ArrowDownToLine className="h-4 w-4" />
-                    <span className="text-sm font-medium">Descargar</span>
+                    <span className="text-sm font-semibold">Descargar</span>
                   </a>
                   {/* Ver en Drive */}
                   {song.drive_file_url && (
@@ -443,18 +458,29 @@ export default function SongDetailPanel({ song, onClose, onEdit, onOpenLyrics, m
                       href={song.drive_file_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center justify-center px-3 py-2.5 rounded-lg border border-border bg-secondary/50 hover:bg-secondary transition-colors"
+                      className="flex items-center justify-center px-3 py-2.5 rounded-xl border border-border/60 bg-secondary/50 hover:bg-secondary transition-all active:scale-95"
                       title="Abrir en Drive"
                     >
                       <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
                     </a>
                   )}
                 </div>
+
+                {/* Analizar BPM CTA — solo si tiene audio pero le falta BPM/key */}
+                {!song.bpm && !song.key_signature && (
+                  <Link
+                    href="/analizar"
+                    className="flex items-center gap-2 mt-2 px-3 py-2 rounded-2xl bg-violet-500/10 border border-violet-500/20 text-violet-400 hover:bg-violet-500/15 transition-all active:scale-95 text-xs font-medium"
+                  >
+                    <Zap className="h-3.5 w-3.5 flex-shrink-0" />
+                    <span>Detectar BPM y tonalidad automáticamente</span>
+                  </Link>
+                )}
               </div>
             )}
 
             {/* Letra */}
-            <div className="pt-2 border-t border-border">
+            <div className="pt-2 border-t border-border/60">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-1.5">
                   <FileText className="h-3.5 w-3.5 text-muted-foreground" />
@@ -472,7 +498,7 @@ export default function SongDetailPanel({ song, onClose, onEdit, onOpenLyrics, m
               {song.lyrics ? (
                 <div
                   onClick={onOpenLyrics}
-                  className="relative bg-secondary/40 rounded-lg px-3 py-2.5 cursor-pointer hover:bg-secondary/60 transition-colors group"
+                  className="relative bg-secondary/40 rounded-2xl px-3 py-2.5 cursor-pointer hover:bg-secondary/60 hover:-translate-y-0.5 hover:shadow-sm transition-all group"
                 >
                   <p className="text-xs text-foreground/80 line-clamp-4 whitespace-pre-wrap font-['Georgia',serif] leading-relaxed">
                     {song.lyrics}
@@ -483,7 +509,7 @@ export default function SongDetailPanel({ song, onClose, onEdit, onOpenLyrics, m
               ) : (
                 <button
                   onClick={onOpenLyrics}
-                  className="w-full flex items-center justify-center gap-2 py-4 rounded-lg border border-dashed border-border hover:border-primary/40 hover:bg-primary/5 transition-colors text-muted-foreground hover:text-primary text-xs"
+                  className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl border border-dashed border-border/60 hover:border-primary/40 hover:bg-primary/5 transition-all active:scale-95 text-muted-foreground hover:text-primary text-xs"
                 >
                   <FileText className="h-4 w-4" />
                   Agregar letra
@@ -492,7 +518,7 @@ export default function SongDetailPanel({ song, onClose, onEdit, onOpenLyrics, m
             </div>
 
             {/* Metadata completeness progress bar */}
-            <div className="pt-2 border-t border-border">
+            <div className="pt-2 border-t border-border/60">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                   Completitud
@@ -547,7 +573,7 @@ export default function SongDetailPanel({ song, onClose, onEdit, onOpenLyrics, m
         className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="fixed right-0 top-0 z-50 h-full w-full max-w-sm border-l border-border shadow-2xl animate-in slide-in-from-right duration-200">
+      <div className="fixed right-0 top-0 z-50 h-full w-full max-w-sm border-l border-border/60 shadow-2xl animate-in slide-in-from-right duration-200">
         {panelContent}
       </div>
     </>

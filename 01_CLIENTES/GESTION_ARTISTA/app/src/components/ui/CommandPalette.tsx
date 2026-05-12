@@ -140,6 +140,22 @@ const NAV_ITEMS: PaletteItem[] = [
     keywords: ["agenda", "eventos", "fechas", "citas"],
   },
   {
+    id: "nav-metas",
+    kind: "nav",
+    label: "Metas",
+    icon: TrendingUp,
+    path: "/metas",
+    keywords: ["objetivos", "goals", "targets", "hitos"],
+  },
+  {
+    id: "nav-analizar",
+    kind: "nav",
+    label: "Analizar BPM",
+    icon: BarChart3,
+    path: "/analizar",
+    keywords: ["bpm", "tempo", "análisis", "ia", "audio"],
+  },
+  {
     id: "nav-equipo",
     kind: "nav",
     label: "Equipo",
@@ -154,6 +170,14 @@ const NAV_ITEMS: PaletteItem[] = [
     icon: Share2,
     path: "/redes",
     keywords: ["social", "instagram", "tiktok", "spotify", "redes sociales"],
+  },
+  {
+    id: "nav-notificaciones",
+    kind: "nav",
+    label: "Notificaciones",
+    icon: Briefcase,
+    path: "/notificaciones",
+    keywords: ["alertas", "avisos", "pendientes", "vencidos"],
   },
   {
     id: "nav-papelera",
@@ -245,6 +269,24 @@ const CREATE_ITEMS: PaletteItem[] = [
     path: "/setlists?action=create",
     category: "Setlists",
     keywords: ["lista", "show", "concierto"],
+  },
+  {
+    id: "create-evento",
+    kind: "create",
+    label: "Nuevo evento",
+    icon: Calendar,
+    path: "/calendario?new=1",
+    category: "Calendario",
+    keywords: ["fecha", "show", "concierto", "sesión", "lanzamiento"],
+  },
+  {
+    id: "create-meta",
+    kind: "create",
+    label: "Nueva meta",
+    icon: TrendingUp,
+    path: "/metas?new=1",
+    category: "Metas",
+    keywords: ["objetivo", "goal", "target"],
   },
 ];
 
@@ -359,7 +401,7 @@ function PaletteRow({ item, isActive, onClick }: PaletteRowProps) {
       type="button"
       onClick={onClick}
       className={`
-        w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left
+        w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left
         transition-all duration-100 group
         ${
           isActive
@@ -371,9 +413,9 @@ function PaletteRow({ item, isActive, onClick }: PaletteRowProps) {
       {/* Icon */}
       <span
         className={`
-          flex items-center justify-center w-8 h-8 rounded-lg shrink-0
-          transition-colors duration-100
-          ${isActive ? "bg-white/10" : "bg-white/5 group-hover:bg-white/8"}
+          flex items-center justify-center w-8 h-8 rounded-xl shrink-0
+          transition-all duration-100 group-hover:scale-110
+          ${isActive ? "bg-white/10 scale-110" : "bg-white/5 group-hover:bg-white/8"}
           ${kindColor[item.kind]}
         `}
       >
@@ -627,7 +669,7 @@ export default function CommandPalette() {
                   setQuery("");
                   inputRef.current?.focus();
                 }}
-                className="shrink-0 text-white/30 hover:text-white/60 transition-colors"
+                className="shrink-0 text-white/30 hover:text-white/60 transition-all active:scale-95"
                 aria-label="Limpiar búsqueda"
               >
                 <X size={14} />

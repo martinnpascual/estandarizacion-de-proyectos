@@ -7,7 +7,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Music, Disc3, Clock, ExternalLink, Globe, Lock, Play, Loader2 } from "lucide-react";
+import { ArrowLeft, Music, Disc3, Clock, ExternalLink, Globe, Lock, Play, Loader2, Zap } from "lucide-react";
 import { getSongsByYear } from "@/lib/actions/songs";
 import { useAudioPlayerContext } from "@/components/audio/AudioPlayer";
 import { formatTime } from "@/lib/utils";
@@ -52,6 +52,43 @@ export default function TimelinePage() {
     });
   }, []);
 
+  // Keyboard shortcuts: Escape = back, ↑↓ = navigate, Enter/P = play selected
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT") return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "Escape") { router.back(); return; }
+      if (songs.length === 0) return;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        const flatSongs = songs.slice().sort((a, b) => b.year - a.year || a.title.localeCompare(b.title));
+        const idx = flatSongs.findIndex((s) => s.id === selectedSong);
+        const next = flatSongs[idx < flatSongs.length - 1 ? idx + 1 : 0];
+        setSelectedSong(next.id);
+        document.getElementById(`timeline-song-${next.id}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        const flatSongs = songs.slice().sort((a, b) => b.year - a.year || a.title.localeCompare(b.title));
+        const idx = flatSongs.findIndex((s) => s.id === selectedSong);
+        const prev = flatSongs[idx <= 0 ? flatSongs.length - 1 : idx - 1];
+        setSelectedSong(prev.id);
+        document.getElementById(`timeline-song-${prev.id}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        return;
+      }
+      if ((e.key === "p" || e.key === "P" || e.key === "Enter") && selectedSong) {
+        e.preventDefault();
+        const song = songs.find((s) => s.id === selectedSong);
+        if (song) handlePlay(song);
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router, selectedSong, songs]);
+
   // Group by year, sorted descending
   const yearGroups: YearGroup[] = (() => {
     const groups: Record<number, Song[]> = {};
@@ -95,23 +132,40 @@ export default function TimelinePage() {
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-16">
       {/* Back */}
-      <button
-        onClick={() => router.back()}
-        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Volver a discografía
-      </button>
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => router.back()}
+          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-all active:scale-95"
+          title="Volver (Esc)"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Volver a discografía
+        </button>
+        <p className="text-xs text-muted-foreground/60 hidden sm:flex items-center gap-2">
+          <kbd className="text-[9px] bg-secondary border border-border/60 px-1 py-0.5 rounded font-mono">↑↓</kbd>
+          navegar ·
+          <kbd className="text-[9px] bg-secondary border border-border/60 px-1 py-0.5 rounded font-mono">Enter</kbd>
+          reproducir ·
+          <kbd className="text-[9px] bg-secondary border border-border/60 px-1 py-0.5 rounded font-mono">Esc</kbd>
+          volver
+        </p>
+      </div>
 
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Disc3 className="h-6 w-6 text-primary" />
-          Timeline de lanzamientos
-        </h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Toda la discografía ordenada cronológicamente
-        </p>
+      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-primary/6 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative flex items-center justify-between px-6 py-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/30 to-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
+              <Disc3 className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold leading-tight">Timeline de lanzamientos</h1>
+              <p className="text-muted-foreground text-xs mt-0.5">Toda la discografía ordenada cronológicamente</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Stats overview */}
@@ -121,9 +175,9 @@ export default function TimelinePage() {
           { label: "Años activo", value: yearsActive, icon: <Disc3 className="h-4 w-4" /> },
           { label: "Duración total", value: totalHours > 0 ? `${totalHours}h ${totalMins}m` : `${totalMins}m`, icon: <Clock className="h-4 w-4" /> },
         ].map(({ label, value, icon }) => (
-          <div key={label} className="bg-card border border-border rounded-xl p-4 text-center">
+          <div key={label} className="bg-card/90 border border-border/60 rounded-2xl p-4 text-center backdrop-blur-xl">
             <div className="flex items-center justify-center gap-1.5 text-muted-foreground mb-1">{icon}<span className="text-xs">{label}</span></div>
-            <p className="text-xl font-bold">{value}</p>
+            <p className="text-xl font-bold tabular-nums">{value}</p>
           </div>
         ))}
       </div>
@@ -137,7 +191,7 @@ export default function TimelinePage() {
       ) : (
         <div className="relative">
           {/* Vertical line */}
-          <div className="absolute left-[76px] top-0 bottom-0 w-px bg-border" />
+          <div className="absolute left-[76px] top-0 bottom-0 w-px bg-border/60" />
 
           <div className="space-y-10">
             {yearGroups.map((group, groupIdx) => (
@@ -173,18 +227,19 @@ export default function TimelinePage() {
                     return (
                       <div
                         key={song.id}
+                        id={`timeline-song-${song.id}`}
                         onClick={() => setSelectedSong(isSelected ? null : song.id)}
                         className={cn(
-                          "group flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer",
+                          "group flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer active:scale-[0.98]",
                           isPlaying
                             ? "border-primary/40 bg-primary/5"
                             : isSelected
-                              ? "border-border bg-secondary/50"
-                              : "border-transparent hover:border-border hover:bg-secondary/30"
+                              ? "border-border bg-secondary/50 ring-1 ring-primary/20"
+                              : "border-transparent hover:border-border hover:bg-secondary/30 hover:-translate-y-0.5 hover:shadow-sm"
                         )}
                       >
                         {/* Cover art */}
-                        <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-secondary flex-shrink-0 flex items-center justify-center">
+                        <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-secondary flex-shrink-0 flex items-center justify-center">
                           {song.cover_art_url ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={song.cover_art_url} alt={song.title} className="w-full h-full object-cover" />
@@ -205,7 +260,7 @@ export default function TimelinePage() {
                               <Lock className="h-3 w-3 text-muted-foreground/30 flex-shrink-0" />
                             )}
                           </div>
-                          <div className="flex items-center gap-2 mt-0.5">
+                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                             {song.genre && (
                               <span className={cn(
                                 "text-[10px] px-1.5 py-0.5 rounded border font-medium",
@@ -217,6 +272,16 @@ export default function TimelinePage() {
                             {song.duration_seconds && (
                               <span className="text-[11px] text-muted-foreground flex items-center gap-0.5">
                                 <Clock className="h-2.5 w-2.5" />{formatTime(song.duration_seconds)}
+                              </span>
+                            )}
+                            {song.bpm && (
+                              <span className="flex items-center gap-0.5 text-[10px] text-blue-400/70 font-mono tabular-nums" title="BPM">
+                                <Zap className="h-2.5 w-2.5" />{song.bpm}
+                              </span>
+                            )}
+                            {song.key_signature && (
+                              <span className="text-[10px] text-purple-400/70 font-medium" title="Tonalidad">
+                                ♪ {song.key_signature}
                               </span>
                             )}
                             {song.featuring?.length > 0 && (
@@ -240,7 +305,7 @@ export default function TimelinePage() {
                             <button
                               onClick={(e) => { e.stopPropagation(); handlePlay(song); }}
                               className={cn(
-                                "w-7 h-7 rounded-full flex items-center justify-center transition-colors",
+                                "w-7 h-7 rounded-full flex items-center justify-center transition-all active:scale-95",
                                 isPlaying
                                   ? "bg-primary text-primary-foreground"
                                   : "opacity-0 group-hover:opacity-100 bg-secondary hover:bg-primary hover:text-primary-foreground"

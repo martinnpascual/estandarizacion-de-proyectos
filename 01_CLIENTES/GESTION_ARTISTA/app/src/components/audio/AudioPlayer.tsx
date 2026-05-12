@@ -115,14 +115,14 @@ function QueueDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
       <div className="fixed inset-0 z-[45] bg-black/40 md:bg-transparent md:pointer-events-none" onClick={onClose} />
       {/* Panel */}
       <div className={cn(
-        "fixed z-[46] bg-card border border-border shadow-2xl flex flex-col",
+        "fixed z-[46] bg-card border border-border/60 shadow-2xl shadow-black/30 flex flex-col",
         // Mobile: bottom sheet above player
         "bottom-[72px] left-0 right-0 rounded-t-2xl max-h-[60vh]",
         // Desktop: right-side panel above player
-        "md:bottom-[72px] md:right-4 md:left-auto md:w-80 md:rounded-xl md:max-h-[70vh]",
+        "md:bottom-[72px] md:right-4 md:left-auto md:w-80 md:rounded-2xl md:max-h-[70vh]",
       )}>
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border/60 flex-shrink-0">
           <div className="flex items-center gap-2">
             <List className="h-4 w-4 text-primary" />
             <span className="text-sm font-semibold">Cola de reproducción</span>
@@ -131,12 +131,12 @@ function QueueDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
           <div className="flex items-center gap-1">
             {queue.length > 0 && (
               <button onClick={clearQueue}
-                className="text-xs text-muted-foreground hover:text-red-400 px-2 py-1 rounded hover:bg-secondary transition-colors">
+                className="text-xs text-muted-foreground hover:text-red-400 px-2 py-1 rounded-xl hover:bg-secondary transition-all active:scale-95">
                 Limpiar
               </button>
             )}
             <button onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground">
+              className="p-1.5 rounded-xl hover:bg-secondary transition-all active:scale-95 text-muted-foreground hover:text-foreground">
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -156,7 +156,7 @@ function QueueDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
                 return (
                   <li key={track.id}
                     className={cn(
-                      "flex items-center gap-3 px-4 py-2.5 group cursor-pointer transition-colors",
+                      "flex items-center gap-3 px-4 py-2.5 group cursor-pointer transition-all active:scale-[0.99]",
                       isCurrent ? "bg-primary/10" : "hover:bg-secondary/60"
                     )}
                     onClick={() => play(track)}
@@ -184,7 +184,7 @@ function QueueDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
                     )}
                     <button
                       onClick={(e) => { e.stopPropagation(); removeFromQueue(track.id); }}
-                      className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-secondary hover:text-red-400 text-muted-foreground transition-all">
+                      className="p-1 rounded-xl opacity-0 group-hover:opacity-100 hover:bg-secondary hover:text-red-400 text-muted-foreground transition-all active:scale-95">
                       <X className="h-3.5 w-3.5" />
                     </button>
                   </li>
@@ -265,7 +265,7 @@ export default function AudioPlayer() {
         <p className="text-xs text-muted-foreground/40 select-none flex items-center gap-2">
           <Music className="h-3.5 w-3.5" />
           Seleccioná una canción para reproducir ·{" "}
-          <kbd className="bg-secondary/60 px-1.5 rounded border border-border text-[10px]">Espacio</kbd>
+          <kbd className="bg-secondary/60 px-1.5 rounded border border-border/60 text-[10px]">Espacio</kbd>
           {" "}play/pause
         </p>
       </div>
@@ -320,7 +320,7 @@ export default function AudioPlayer() {
           <div className="flex items-center gap-3 px-4 py-2">
             <button onClick={player.togglePlay}
               className={cn(
-                "w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-all",
+                "w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-all active:scale-95",
                 "bg-primary text-primary-foreground hover:bg-primary/80",
                 isPlaying && "shadow-[0_0_12px_hsl(var(--primary)/0.5)]"
               )}>
@@ -336,7 +336,7 @@ export default function AudioPlayer() {
               {formatTime(currentTime)}{duration > 0 ? ` / ${formatTime(duration)}` : ""}
             </span>
             <button onClick={() => setCollapsed(false)} title="Expandir"
-              className="p-1.5 rounded-lg hover:bg-secondary/80 text-muted-foreground transition-colors flex-shrink-0">
+              className="p-1.5 rounded-xl hover:bg-secondary/80 text-muted-foreground transition-all active:scale-95 flex-shrink-0">
               <ChevronUp className="h-3.5 w-3.5" />
             </button>
           </div>
@@ -347,7 +347,7 @@ export default function AudioPlayer() {
             <div className="flex items-center gap-3 w-[220px] min-w-0 flex-shrink-0">
               {/* Cover / Equalizer */}
               <div className={cn(
-                "relative w-10 h-10 rounded-lg flex-shrink-0 overflow-hidden flex items-center justify-center",
+                "relative w-10 h-10 rounded-xl flex-shrink-0 overflow-hidden flex items-center justify-center",
                 "bg-gradient-to-br from-primary/30 to-primary/5 border border-border/60",
                 isPlaying && "shadow-[0_0_12px_hsl(var(--primary)/0.3)]"
               )}>
@@ -388,21 +388,21 @@ export default function AudioPlayer() {
               <div className="flex items-center gap-1">
                 {/* Shuffle */}
                 <button onClick={player.toggleShuffle} title="Shuffle"
-                  className={cn("p-1.5 rounded-lg transition-all hidden md:flex",
+                  className={cn("p-1.5 rounded-xl transition-all active:scale-95 hidden md:flex",
                     shuffle ? "text-primary bg-primary/10 shadow-[0_0_8px_hsl(var(--primary)/0.2)]" : "text-muted-foreground hover:text-foreground hover:bg-secondary/80")}>
                   <Shuffle className="h-3.5 w-3.5" />
                 </button>
 
                 {/* Prev */}
                 <button onClick={player.playPrev} disabled={!hasPrev} title="Anterior (Alt+←)"
-                  className={cn("p-1.5 rounded-lg transition-all",
-                    hasPrev ? "text-muted-foreground hover:text-foreground hover:bg-secondary/80" : "text-muted-foreground/25 cursor-not-allowed")}>
+                  className={cn("p-1.5 rounded-xl transition-all",
+                    hasPrev ? "text-muted-foreground hover:text-foreground hover:bg-secondary/80 active:scale-95" : "text-muted-foreground/25 cursor-not-allowed")}>
                   <SkipBack className="h-4 w-4" />
                 </button>
 
                 {/* -10s */}
                 <button onClick={() => player.seek(Math.max(0, currentTime - 10))} title="Retroceder 10s (←)"
-                  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-all hidden sm:flex items-center justify-center w-7 h-7">
+                  className="p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-all active:scale-95 hidden sm:flex items-center justify-center w-7 h-7">
                   <span className="text-[9px] font-bold tabular-nums">-10</span>
                 </button>
 
@@ -422,20 +422,20 @@ export default function AudioPlayer() {
 
                 {/* +10s */}
                 <button onClick={() => player.seek(Math.min(duration, currentTime + 10))} title="Adelantar 10s (→)"
-                  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-all hidden sm:flex items-center justify-center w-7 h-7">
+                  className="p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-all active:scale-95 hidden sm:flex items-center justify-center w-7 h-7">
                   <span className="text-[9px] font-bold tabular-nums">+10</span>
                 </button>
 
                 {/* Next */}
                 <button onClick={player.playNext} disabled={!hasNext} title="Siguiente (Alt+→)"
-                  className={cn("p-1.5 rounded-lg transition-all",
-                    hasNext ? "text-muted-foreground hover:text-foreground hover:bg-secondary/80" : "text-muted-foreground/25 cursor-not-allowed")}>
+                  className={cn("p-1.5 rounded-xl transition-all",
+                    hasNext ? "text-muted-foreground hover:text-foreground hover:bg-secondary/80 active:scale-95" : "text-muted-foreground/25 cursor-not-allowed")}>
                   <SkipForward className="h-4 w-4" />
                 </button>
 
                 {/* Loop */}
                 <button onClick={player.cycleLoop} title="Modo repetición"
-                  className={cn("p-1.5 rounded-lg transition-all hidden md:flex",
+                  className={cn("p-1.5 rounded-xl transition-all active:scale-95 hidden md:flex",
                     loop !== "none" ? "text-primary bg-primary/10 shadow-[0_0_8px_hsl(var(--primary)/0.2)]" : "text-muted-foreground hover:text-foreground hover:bg-secondary/80")}>
                   <LoopIcon mode={loop} />
                 </button>
@@ -457,7 +457,7 @@ export default function AudioPlayer() {
               {/* Speed */}
               <button onClick={cycleSpeed} title={`Velocidad: ${playbackRate}x`}
                 className={cn(
-                  "px-2 py-1 rounded-lg text-[10px] font-bold tabular-nums transition-all border",
+                  "px-2 py-1 rounded-xl text-[10px] font-bold tabular-nums transition-all active:scale-95 border",
                   playbackRate !== 1
                     ? "text-primary bg-primary/10 border-primary/20"
                     : "text-muted-foreground border-transparent hover:text-foreground hover:bg-secondary/80 hover:border-border/60"
@@ -467,7 +467,7 @@ export default function AudioPlayer() {
 
               {/* Volume icon */}
               <button onClick={() => player.setVolume(volume > 0 ? 0 : 0.8)} title="Silenciar (M)"
-                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-all">
+                className="p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-all active:scale-95">
                 {volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
               </button>
 
@@ -488,7 +488,7 @@ export default function AudioPlayer() {
               {/* Queue */}
               <button onClick={() => setShowQueue(v => !v)}
                 title={`Cola (Alt+Q)${queue.length > 0 ? ` · ${queue.length} pistas` : ""}`}
-                className={cn("p-1.5 rounded-lg transition-all relative",
+                className={cn("p-1.5 rounded-xl transition-all active:scale-95 relative",
                   showQueue ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-secondary/80")}>
                 <List className="h-4 w-4" />
                 {queue.length > 1 && (
@@ -500,7 +500,7 @@ export default function AudioPlayer() {
 
               {/* Collapse */}
               <button onClick={() => setCollapsed(true)} title="Minimizar"
-                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-all">
+                className="p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-all active:scale-95">
                 <ChevronDown className="h-4 w-4" />
               </button>
             </div>

@@ -83,7 +83,7 @@ export default function NotificationBell() {
         ref={btnRef}
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "relative p-2 rounded-lg transition-colors",
+          "relative p-2 rounded-xl transition-all active:scale-95",
           open
             ? "bg-secondary text-foreground"
             : "text-muted-foreground hover:text-foreground hover:bg-secondary"
@@ -107,10 +107,10 @@ export default function NotificationBell() {
       {open && (
         <div
           ref={panelRef}
-          className="absolute bottom-full left-0 mb-2 w-80 bg-card border border-border rounded-xl shadow-xl overflow-hidden z-50"
+          className="absolute bottom-full left-0 mb-2 w-80 bg-card border border-border/60 rounded-2xl shadow-2xl shadow-black/30 overflow-hidden z-50"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
             <div className="flex items-center gap-2">
               <Bell className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="text-sm font-semibold">Notificaciones</span>
@@ -125,13 +125,13 @@ export default function NotificationBell() {
                 onClick={() => fetchNotifs(true)}
                 disabled={refreshing}
                 title="Actualizar"
-                className="p-0.5 rounded hover:bg-secondary text-muted-foreground transition-colors disabled:opacity-40"
+                className="p-0.5 rounded-xl hover:bg-secondary text-muted-foreground transition-all active:scale-95 disabled:opacity-40"
               >
                 <RefreshCw className={cn("h-3 w-3", refreshing && "animate-spin")} />
               </button>
               <button
                 onClick={() => setOpen(false)}
-                className="p-0.5 rounded hover:bg-secondary text-muted-foreground"
+                className="p-0.5 rounded-xl hover:bg-secondary text-muted-foreground transition-all active:scale-95"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -158,7 +158,7 @@ export default function NotificationBell() {
                 <p className="text-xs">Sin notificaciones pendientes</p>
               </div>
             ) : (
-              <div className="divide-y divide-border">
+              <div className="divide-y divide-border/50">
                 {notifs.map((n) => {
                   const cfg = TYPE_CONFIG[n.type];
                   const Icon = cfg.icon;
@@ -167,7 +167,7 @@ export default function NotificationBell() {
                       key={n.id}
                       href={n.href}
                       onClick={() => setOpen(false)}
-                      className="flex items-start gap-3 px-4 py-3 hover:bg-secondary/50 transition-colors group"
+                      className="flex items-start gap-3 px-4 py-3 hover:bg-secondary/50 transition-all active:scale-[0.99] group"
                     >
                       <div
                         className={cn(
@@ -193,7 +193,7 @@ export default function NotificationBell() {
                           ) : null;
                         })()}
                       </div>
-                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 mt-1 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 mt-1 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
                     </Link>
                   );
                 })}
@@ -202,16 +202,16 @@ export default function NotificationBell() {
           </div>
 
           {/* Footer */}
-          <div className="px-4 py-2.5 border-t border-border bg-secondary/20 flex items-center justify-between">
+          <div className="px-4 py-2.5 border-t border-border/60 bg-secondary/20 flex items-center justify-between">
             <p className="text-[10px] text-muted-foreground">
               Próximos 14 días
             </p>
             <Link
               href="/notificaciones"
               onClick={() => setOpen(false)}
-              className="text-[11px] text-primary hover:underline"
+              className="text-[11px] text-primary hover:underline transition-all active:scale-95 inline-flex"
             >
-              Ver todas
+              Ver todas →
             </Link>
           </div>
         </div>

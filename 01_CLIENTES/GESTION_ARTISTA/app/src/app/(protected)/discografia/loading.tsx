@@ -6,7 +6,7 @@ export default function DiscografiaLoading() {
       {/* Header skeleton */}
       <div className="flex items-center justify-between">
         <div className="space-y-2">
-          <div className="skeleton h-7 w-40 rounded-lg" />
+          <div className="skeleton h-7 w-40 rounded-xl" />
           <div className="skeleton h-4 w-56 rounded" />
         </div>
         <div className="skeleton h-9 w-36 rounded-xl" />
@@ -23,7 +23,7 @@ export default function DiscografiaLoading() {
       </div>
 
       {/* Song list */}
-      <div className="rounded-xl border border-border/60 bg-card/80 overflow-hidden">
+      <div className="rounded-2xl border border-border/60 bg-card/80 overflow-hidden">
         {Array.from({ length: 10 }).map((_, i) => (
           <SongRowSkeleton key={i} delay={i * 30} />
         ))}

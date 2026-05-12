@@ -153,7 +153,7 @@ function StatChart({
               <XAxis dataKey="date" tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
               <YAxis tick={{ fontSize: 9 }} tickLine={false} axisLine={false} tickFormatter={formatNumber} />
               <Tooltip
-                contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 11 }}
+                contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 16, fontSize: 11 }}
                 formatter={(v) => [formatNumber(v as number | null | undefined), "Seguidores"]}
               />
               <Line type="monotone" dataKey="seguidores" stroke={chartColor} strokeWidth={2} dot={false} connectNulls />
@@ -169,7 +169,7 @@ function StatChart({
               <XAxis dataKey="date" tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
               <YAxis tick={{ fontSize: 9 }} tickLine={false} axisLine={false} tickFormatter={formatNumber} />
               <Tooltip
-                contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 11 }}
+                contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 16, fontSize: 11 }}
                 formatter={(v) => [formatNumber(v as number | null | undefined), "Reproducciones"]}
               />
               <Line type="monotone" dataKey="reproducciones" stroke={chartColor} strokeWidth={2} dot={false} connectNulls />
@@ -237,7 +237,7 @@ function CombinedOverviewChart({ links }: { links: SocialLinkWithLatestStat[] })
 
   if (loadingCombined) {
     return (
-      <div className="bg-card rounded-xl border border-border p-5 flex items-center justify-center h-36">
+      <div className="bg-card rounded-2xl border border-border/60 p-5 flex items-center justify-center h-36">
         <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
       </div>
     );
@@ -246,7 +246,7 @@ function CombinedOverviewChart({ links }: { links: SocialLinkWithLatestStat[] })
   if (allDates.length < 2 || activePlatforms.length < 2) return null;
 
   return (
-    <div className="bg-card rounded-xl border border-border p-5">
+    <div className="bg-card rounded-2xl border border-border/60 p-5">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
@@ -257,12 +257,12 @@ function CombinedOverviewChart({ links }: { links: SocialLinkWithLatestStat[] })
           </span>
         </div>
         {/* Metric toggle */}
-        <div className="flex items-center gap-0.5 bg-secondary rounded-lg p-0.5">
+        <div className="flex items-center gap-0.5 bg-secondary rounded-xl p-0.5">
           <button
             onClick={() => setMetric("followers")}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-medium transition-all active:scale-95 ${
               metric === "followers"
-                ? "bg-card text-foreground shadow-sm"
+                ? "bg-card text-foreground shadow-sm font-semibold"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -271,9 +271,9 @@ function CombinedOverviewChart({ links }: { links: SocialLinkWithLatestStat[] })
           </button>
           <button
             onClick={() => setMetric("monthly_plays")}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-medium transition-all active:scale-95 ${
               metric === "monthly_plays"
-                ? "bg-card text-foreground shadow-sm"
+                ? "bg-card text-foreground shadow-sm font-semibold"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -292,7 +292,7 @@ function CombinedOverviewChart({ links }: { links: SocialLinkWithLatestStat[] })
             contentStyle={{
               background: "hsl(var(--card))",
               border: "1px solid hsl(var(--border))",
-              borderRadius: 8,
+              borderRadius: 16,
               fontSize: 11,
             }}
             formatter={(v: unknown) => [formatNumber(v as number | null | undefined), ""]}
@@ -354,7 +354,11 @@ export default function RedesPage() {
 
   const [expandedChart, setExpandedChart] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [platformSort, setPlatformSort] = useState<"default" | "followers" | "az">("default");
+  const [platformSort, setPlatformSort] = useState<"default" | "followers" | "az">(() =>
+    typeof window !== "undefined"
+      ? (localStorage.getItem("redes-platform-sort") as "default" | "followers" | "az") || "default"
+      : "default"
+  );
   const urlRef = useRef<HTMLInputElement>(null);
 
   // Batch stats form
@@ -393,6 +397,9 @@ export default function RedesPage() {
     return () => document.removeEventListener("keydown", onKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showLinkForm, showStatForm, expandedChart, showBatchForm]);
+
+  // Persist platform sort
+  useEffect(() => { localStorage.setItem("redes-platform-sort", platformSort); }, [platformSort]);
 
   function handleCopyUrl(id: string, url: string) {
     navigator.clipboard.writeText(url).then(() => {
@@ -579,31 +586,37 @@ export default function RedesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Share2 className="h-6 w-6 text-pink-400" />
-            Redes Sociales
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Todas tus redes y estadísticas en un solo lugar
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+      {/* Header */}
+      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card">
+        <div className="absolute inset-0 bg-gradient-to-br from-pink-500/8 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-pink-500/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500/30 to-pink-600/10 border border-pink-500/20 flex items-center justify-center flex-shrink-0">
+              <Share2 className="h-5 w-5 text-pink-400" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight">Redes Sociales</h1>
+              <p className="text-muted-foreground text-xs mt-0.5">
+                Todas tus redes y estadísticas en un solo lugar
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
           {!loading && links.length > 0 && (
             <>
               <button
                 onClick={openBatchForm}
-                title="Registrar estadísticas de hoy para todas las plataformas"
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                title="Registrar estadísticas de hoy (B)"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border/60 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-all active:scale-95"
               >
                 <ClipboardList className="h-4 w-4" />
                 <span className="hidden sm:inline">Registrar hoy</span>
               </button>
               <button
                 onClick={handleExportCSV}
-                title="Exportar estadísticas a CSV"
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                title="Exportar estadísticas a CSV (E)"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border/60 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-all active:scale-95"
               >
                 <Download className="h-4 w-4" />
                 <span className="hidden sm:inline">Exportar</span>
@@ -614,7 +627,7 @@ export default function RedesPage() {
                   <select
                     value={platformSort}
                     onChange={(e) => setPlatformSort(e.target.value as typeof platformSort)}
-                    className="appearance-none pl-7 pr-6 py-2 rounded-lg border border-border text-xs bg-card text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
+                    className="appearance-none pl-7 pr-6 py-2 rounded-xl border border-border/60 text-xs bg-card text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
                   >
                     <option value="default">Orden original</option>
                     <option value="followers">Más seguidores</option>
@@ -628,12 +641,15 @@ export default function RedesPage() {
           {missingPlatforms.length > 0 && (
             <button
               onClick={openAddLink}
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/80 transition-colors text-sm font-medium"
+              title="Agregar red social (N)"
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-all active:scale-95 text-sm font-semibold shadow-[0_0_16px_hsl(var(--primary)/0.2)]"
             >
               <Plus className="h-4 w-4" />
               Agregar red
+              <kbd className="hidden md:inline-flex ml-1 text-[9px] bg-primary-foreground/20 px-1 py-0.5 rounded font-mono">N</kbd>
             </button>
           )}
+        </div>
         </div>
       </div>
 
@@ -652,13 +668,13 @@ export default function RedesPage() {
         return (
           <button
             onClick={openBatchForm}
-            className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-orange-500/10 border border-orange-500/30 hover:bg-orange-500/15 transition-colors w-full"
+            className="flex items-center justify-between px-4 py-2.5 rounded-2xl bg-orange-500/10 border border-orange-500/30 hover:bg-orange-500/15 hover:-translate-y-0.5 hover:shadow-sm transition-all w-full group"
           >
             <div className="flex items-center gap-2">
               <AlertCircle className="h-4 w-4 text-orange-400 flex-shrink-0" />
               <p className="text-sm font-medium text-orange-400">{label}</p>
             </div>
-            <ChevronRight className="h-4 w-4 text-orange-400 flex-shrink-0" />
+            <ChevronRight className="h-4 w-4 text-orange-400 flex-shrink-0 group-hover:translate-x-0.5 transition-transform" />
           </button>
         );
       })()}
@@ -685,7 +701,7 @@ export default function RedesPage() {
             const prevTotalPlays = links.reduce((sum, l) => sum + (l.previous_stat?.monthly_plays ?? 0), 0);
 
             return totalFollowers > 0 || totalPlays > 0 ? (
-              <div className="flex flex-wrap gap-4 bg-card border border-border rounded-xl px-5 py-4">
+              <div className="flex flex-wrap gap-4 bg-card border border-border/60 rounded-2xl px-5 py-4">
                 {totalFollowers > 0 && (
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -694,7 +710,7 @@ export default function RedesPage() {
                     <div>
                       <p className="text-xs text-muted-foreground">Seguidores totales</p>
                       <div className="flex items-center gap-2">
-                        <p className="text-xl font-bold">{formatNumber(totalFollowers)}</p>
+                        <p className="text-xl font-bold tabular-nums">{formatNumber(totalFollowers)}</p>
                         <TrendBadge current={totalFollowers} previous={prevTotalFollowers} />
                       </div>
                     </div>
@@ -708,7 +724,7 @@ export default function RedesPage() {
                     <div>
                       <p className="text-xs text-muted-foreground">Reproducciones mensuales</p>
                       <div className="flex items-center gap-2">
-                        <p className="text-xl font-bold">{formatNumber(totalPlays)}</p>
+                        <p className="text-xl font-bold tabular-nums">{formatNumber(totalPlays)}</p>
                         <TrendBadge current={totalPlays} previous={prevTotalPlays} />
                       </div>
                     </div>
@@ -729,8 +745,8 @@ export default function RedesPage() {
                 const chartOpen = expandedChart === link.id;
                 return (
                   <div key={link.id} className={cn(
-                    "bg-card rounded-xl border p-5 group hover:border-muted-foreground/30 transition-colors",
-                    isStale(stat?.recorded_at) && stat != null ? "border-orange-500/30" : "border-border"
+                    "bg-card rounded-2xl border p-5 group hover:border-muted-foreground/30 hover:-translate-y-0.5 hover:shadow-md transition-all",
+                    isStale(stat?.recorded_at) && stat != null ? "border-orange-500/30" : "border-border/60"
                   )}>
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-2">
@@ -750,7 +766,7 @@ export default function RedesPage() {
                         <button
                           onClick={() => handleCopyUrl(link.id, link.url)}
                           title="Copiar URL"
-                          className="p-1 rounded hover:bg-secondary text-muted-foreground transition-colors opacity-0 group-hover:opacity-100"
+                          className="p-1 rounded-xl hover:bg-secondary text-muted-foreground transition-all active:scale-95 opacity-0 group-hover:opacity-100"
                         >
                           {copiedId === link.id
                             ? <Check className="h-3.5 w-3.5 text-green-400" />
@@ -760,21 +776,21 @@ export default function RedesPage() {
                           href={link.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="p-1 rounded hover:bg-secondary text-muted-foreground transition-colors"
+                          className="p-1 rounded-xl hover:bg-secondary text-muted-foreground transition-all active:scale-95"
                           title="Abrir"
                         >
                           <ExternalLink className="h-3.5 w-3.5" />
                         </a>
                         <button
                           onClick={() => openEditLink(link)}
-                          className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-all"
+                          className="p-1 rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-all"
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => handleDeleteLink(link.id)}
                           disabled={deletingId === link.id}
-                          className="p-1 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-50"
+                          className="p-1 rounded-xl hover:bg-red-500/10 text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {deletingId === link.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                         </button>
@@ -787,7 +803,7 @@ export default function RedesPage() {
                         <div className="flex-1 min-w-0">
                           <p className="text-xs text-muted-foreground">Seguidores</p>
                           <div className="flex items-center gap-2">
-                            <p className="text-lg font-bold">{formatNumber(stat?.followers)}</p>
+                            <p className="text-lg font-bold tabular-nums">{formatNumber(stat?.followers)}</p>
                             <TrendBadge current={stat?.followers} previous={link.previous_stat?.followers} />
                           </div>
                         </div>
@@ -797,7 +813,7 @@ export default function RedesPage() {
                         <div className="flex-1 min-w-0">
                           <p className="text-xs text-muted-foreground">Reproducciones mensuales</p>
                           <div className="flex items-center gap-2">
-                            <p className="text-lg font-bold">{formatNumber(stat?.monthly_plays)}</p>
+                            <p className="text-lg font-bold tabular-nums">{formatNumber(stat?.monthly_plays)}</p>
                             <TrendBadge current={stat?.monthly_plays} previous={link.previous_stat?.monthly_plays} />
                           </div>
                         </div>
@@ -813,7 +829,7 @@ export default function RedesPage() {
                     {/* Chart toggle */}
                     <button
                       onClick={() => setExpandedChart(chartOpen ? null : link.id)}
-                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mt-3 w-full"
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-all active:scale-95 mt-3 w-full"
                     >
                       <TrendingUp className="h-3.5 w-3.5" />
                       Historial
@@ -824,7 +840,7 @@ export default function RedesPage() {
                       <StatChart linkId={link.id} chartColor={meta.chartColor} />
                     )}
 
-                    <div className="mt-4 pt-3 border-t border-border">
+                    <div className="mt-4 pt-3 border-t border-border/60">
                       {showStatForm === link.id ? (
                         <form onSubmit={(e) => handleSubmitStat(e, link.id)} className="space-y-2">
                           {statErrors.root && <p className="text-xs text-red-500">{statErrors.root}</p>}
@@ -836,7 +852,7 @@ export default function RedesPage() {
                                 placeholder="Seguidores"
                                 value={statForm.followers}
                                 onChange={(e) => setStatForm((p) => ({ ...p, followers: e.target.value }))}
-                                className="w-full px-2 py-1.5 bg-background border border-border rounded text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
+                                className="w-full px-2 py-1.5 bg-background border border-border/60 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/50"
                               />
                               {statErrors.followers && <p className="text-xs text-red-500 mt-0.5">{statErrors.followers}</p>}
                             </div>
@@ -847,14 +863,14 @@ export default function RedesPage() {
                                 placeholder="Reproducc. mensuales"
                                 value={statForm.monthly_plays}
                                 onChange={(e) => setStatForm((p) => ({ ...p, monthly_plays: e.target.value }))}
-                                className="w-full px-2 py-1.5 bg-background border border-border rounded text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
+                                className="w-full px-2 py-1.5 bg-background border border-border/60 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/50"
                               />
                               {statErrors.monthly_plays && <p className="text-xs text-red-500 mt-0.5">{statErrors.monthly_plays}</p>}
                             </div>
                           </div>
                           <div className="flex gap-2">
-                            <button type="button" onClick={() => { setShowStatForm(null); setStatErrors({}); }} className="flex-1 py-1.5 rounded border border-border text-xs hover:bg-secondary transition-colors">Cancelar</button>
-                            <button type="submit" disabled={submittingStat} className="flex-1 py-1.5 rounded bg-primary text-primary-foreground text-xs hover:bg-primary/80 transition-colors disabled:opacity-50 flex items-center justify-center gap-1">
+                            <button type="button" onClick={() => { setShowStatForm(null); setStatErrors({}); }} className="flex-1 py-1.5 rounded-xl border border-border/60 text-xs hover:bg-secondary/60 transition-all active:scale-95">Cancelar</button>
+                            <button type="submit" disabled={submittingStat} className="flex-1 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1">
                               {submittingStat && <Loader2 className="h-3 w-3 animate-spin" />}
                               Guardar
                             </button>
@@ -868,7 +884,7 @@ export default function RedesPage() {
                             setStatErrors({});
                           }}
                           className={cn(
-                            "flex items-center gap-1.5 text-xs transition-colors",
+                            "flex items-center gap-1.5 text-xs transition-all active:scale-95",
                             isStale(stat?.recorded_at)
                               ? "text-orange-400 hover:text-orange-300 font-medium"
                               : "text-muted-foreground hover:text-foreground"
@@ -902,11 +918,11 @@ export default function RedesPage() {
                         setLinkErrors({});
                         setShowLinkForm(true);
                       }}
-                      className="flex items-center gap-3 p-4 bg-card rounded-xl border border-border border-dashed hover:border-muted-foreground/40 hover:bg-secondary/30 transition-colors text-left"
+                      className="flex items-center gap-3 p-4 bg-card rounded-2xl border border-border/60 border-dashed hover:border-muted-foreground/40 hover:bg-secondary/30 hover:-translate-y-0.5 hover:shadow-sm transition-all text-left group"
                     >
                       <span className={`w-3 h-3 rounded-full ${meta.color} flex-shrink-0`} />
                       <span className="text-sm text-muted-foreground">{meta.label}</span>
-                      <Plus className="h-3.5 w-3.5 text-muted-foreground ml-auto" />
+                      <Plus className="h-3.5 w-3.5 text-muted-foreground ml-auto group-hover:rotate-90 transition-transform duration-200" />
                     </button>
                   );
                 })}
@@ -920,14 +936,18 @@ export default function RedesPage() {
 
       {/* Modal: Batch stats recording */}
       {showBatchForm && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60" onClick={() => setShowBatchForm(false)}>
-          <div className="bg-card border border-border rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-5 border-b border-border sticky top-0 bg-card z-10">
-              <div className="flex items-center gap-2">
-                <ClipboardList className="h-4 w-4 text-primary" />
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowBatchForm(false)}>
+          <div className="relative w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-pink-500/20 via-transparent to-primary/10 pointer-events-none" />
+            <div className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl max-h-[90vh] overflow-y-auto shadow-2xl shadow-black/40">
+            <div className="flex items-center justify-between p-5 border-b border-border/60 sticky top-0 bg-card/95 backdrop-blur-xl z-10 rounded-t-2xl">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-pink-500/15 border border-pink-500/20 flex items-center justify-center flex-shrink-0">
+                  <ClipboardList className="h-4 w-4 text-pink-400" />
+                </div>
                 <h2 className="font-semibold text-sm">Registrar estadísticas de hoy</h2>
               </div>
-              <button onClick={() => setShowBatchForm(false)} className="p-1 rounded hover:bg-secondary text-muted-foreground">
+              <button onClick={() => setShowBatchForm(false)} className="p-1.5 rounded-xl hover:bg-muted/50 transition-all active:scale-95 text-muted-foreground hover:text-foreground">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -962,8 +982,8 @@ export default function RedesPage() {
                             [link.id]: { ...prev[link.id], followers: e.target.value }
                           }))}
                           className={cn(
-                            "w-full bg-secondary border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50",
-                            batchErrors[`${link.id}_followers`] ? "border-red-500/50" : "border-border"
+                            "w-full bg-secondary border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50",
+                            batchErrors[`${link.id}_followers`] ? "border-red-500/50" : "border-border/60"
                           )}
                         />
                         {batchErrors[`${link.id}_followers`] && (
@@ -996,8 +1016,8 @@ export default function RedesPage() {
                             [link.id]: { ...prev[link.id], monthly_plays: e.target.value }
                           }))}
                           className={cn(
-                            "w-full bg-secondary border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50",
-                            batchErrors[`${link.id}_plays`] ? "border-red-500/50" : "border-border"
+                            "w-full bg-secondary border rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50",
+                            batchErrors[`${link.id}_plays`] ? "border-red-500/50" : "border-border/60"
                           )}
                         />
                         {batchErrors[`${link.id}_plays`] && (
@@ -1020,18 +1040,18 @@ export default function RedesPage() {
                   </div>
                 );
               })}
-              <div className="flex gap-3 pt-2 border-t border-border">
+              <div className="flex gap-3 pt-2 border-t border-border/60">
                 <button
                   type="button"
                   onClick={() => setShowBatchForm(false)}
-                  className="flex-1 py-2.5 border border-border rounded-lg text-sm hover:bg-secondary transition-colors text-muted-foreground"
+                  className="flex-1 py-2.5 border border-border/60 rounded-xl text-sm hover:bg-secondary/60 transition-all active:scale-95 text-muted-foreground"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={batchSubmitting}
-                  className="flex-1 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/80 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                  className="flex-1 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2"
                 >
                   {batchSubmitting
                     ? <><Loader2 className="h-4 w-4 animate-spin" /> Guardando…</>
@@ -1040,33 +1060,44 @@ export default function RedesPage() {
                 </button>
               </div>
             </form>
+            </div>
           </div>
         </div>
       )}
 
       {/* Modal link */}
       {showLinkForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-          <div className="bg-card border border-border rounded-xl w-full max-w-sm">
-            <div className="flex items-center justify-between p-5 border-b border-border">
-              <h2 className="text-base font-semibold">
-                {editingLink ? "Editar perfil" : "Agregar red social"}
-              </h2>
-              <button onClick={() => setShowLinkForm(false)} className="p-1.5 rounded-lg hover:bg-secondary">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={() => setShowLinkForm(false)}
+        >
+          <div className="relative w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-primary/20 via-transparent to-primary/10 pointer-events-none" />
+            <div className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl shadow-2xl shadow-black/40">
+            <div className="flex items-center justify-between p-5 border-b border-border/60">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center flex-shrink-0">
+                  <Share2 className="h-4 w-4 text-primary" />
+                </div>
+                <h2 className="text-base font-semibold">
+                  {editingLink ? "Editar perfil" : "Agregar red social"}
+                </h2>
+              </div>
+              <button onClick={() => setShowLinkForm(false)} className="p-1.5 rounded-xl hover:bg-muted/50 transition-all active:scale-95 text-muted-foreground hover:text-foreground">
                 <X className="h-4 w-4" />
               </button>
             </div>
             <form onSubmit={handleSubmitLink} className="p-5 space-y-4">
               {linkErrors.root && (
-                <p className="text-sm text-red-500 bg-red-500/10 px-3 py-2 rounded-lg">{linkErrors.root}</p>
+                <p className="text-sm text-red-500 bg-red-500/10 px-3 py-2 rounded-xl">{linkErrors.root}</p>
               )}
               <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-muted-foreground">Plataforma *</label>
+                <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide">Plataforma *</label>
                 <select
                   value={linkForm.platform}
                   onChange={(e) => setLinkForm((p) => ({ ...p, platform: e.target.value as SocialPlatform }))}
                   disabled={!!editingLink}
-                  className="w-full px-3 py-2.5 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-60"
+                  className="w-full px-3 py-2.5 bg-background border border-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-60"
                 >
                   {ALL_PLATFORMS.map((p) => (
                     <option key={p} value={p}>{PLATFORM_META[p].label}</option>
@@ -1074,35 +1105,36 @@ export default function RedesPage() {
                 </select>
               </div>
               <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-muted-foreground">URL *</label>
+                <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide">URL *</label>
                 <input
                   ref={urlRef}
                   type="url"
                   value={linkForm.url}
                   onChange={(e) => setLinkForm((p) => ({ ...p, url: e.target.value }))}
                   placeholder={PLATFORM_META[linkForm.platform].placeholder}
-                  className={`w-full px-3 py-2.5 bg-background border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 ${linkErrors.url ? "border-red-500" : "border-border"}`}
+                  className={`w-full px-3 py-2.5 bg-background border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 ${linkErrors.url ? "border-red-500" : "border-border/60"}`}
                 />
                 {linkErrors.url && <p className="text-xs text-red-500">{linkErrors.url}</p>}
               </div>
               <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-muted-foreground">Usuario (sin @)</label>
+                <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide">Usuario (sin @)</label>
                 <input
                   type="text"
                   value={linkForm.username ?? ""}
                   onChange={(e) => setLinkForm((p) => ({ ...p, username: e.target.value || null }))}
                   placeholder="bertiaka"
-                  className="w-full px-3 py-2.5 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  className="w-full px-3 py-2.5 bg-background border border-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                 />
               </div>
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setShowLinkForm(false)} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-secondary transition-colors">Cancelar</button>
-                <button type="submit" disabled={submittingLink} className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/80 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                <button type="button" onClick={() => setShowLinkForm(false)} className="flex-1 py-2.5 rounded-xl border border-border/60 text-sm font-semibold hover:bg-secondary/60 transition-all active:scale-95">Cancelar</button>
+                <button type="submit" disabled={submittingLink} className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                   {submittingLink && <Loader2 className="h-4 w-4 animate-spin" />}
                   {editingLink ? "Guardar" : "Agregar"}
                 </button>
               </div>
             </form>
+            </div>
           </div>
         </div>
       )}

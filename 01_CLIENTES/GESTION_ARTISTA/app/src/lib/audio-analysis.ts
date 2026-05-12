@@ -79,11 +79,17 @@ function nextPow2(n: number): number {
 
 // ── BPM Detection ─────────────────────────────────────────────────────────────
 
+/** Tiny helper — yields to the event loop so the browser stays responsive */
+function yieldToMain(): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, 0));
+}
+
 /**
  * Detect BPM from an AudioBuffer using autocorrelation on the onset-strength
  * envelope. Targets the 60–180 BPM range common in urban/electronic music.
+ * Async so the two large FFTs yield to the browser between them.
  */
-export function detectBPM(audioBuffer: AudioBuffer): number {
+export async function detectBPM(audioBuffer: AudioBuffer): Promise<number> {
   const sr = audioBuffer.sampleRate;
 
   // Work with a low-sample-rate mono signal (~4 kHz is plenty for beats)
@@ -108,6 +114,8 @@ export function detectBPM(audioBuffer: AudioBuffer): number {
     prevEnergy = energy;
   }
 
+  await yieldToMain(); // yield before the large forward FFT
+
   // Autocorrelation via FFT for speed
   const fftSize = nextPow2(onset.length * 2);
   const re = new Float64Array(fftSize);
@@ -115,6 +123,8 @@ export function detectBPM(audioBuffer: AudioBuffer): number {
   for (let i = 0; i < onset.length; i++) re[i] = onset[i];
 
   fft(re, im);
+
+  await yieldToMain(); // yield between forward and inverse FFT
 
   // Power spectrum
   for (let i = 0; i < fftSize; i++) {
@@ -129,6 +139,8 @@ export function detectBPM(audioBuffer: AudioBuffer): number {
   }
   fft(re, im);
   const acf = re; // autocorrelation function
+
+  await yieldToMain(); // yield after inverse FFT before peak search
 
   // Convert lag range to BPM range [60, 180]
   const fps = dsr / hopSamples;
@@ -190,7 +202,7 @@ function pearson(a: number[], b: number[]): number {
  * Detect key signature from an AudioBuffer.
  * Returns a Spanish key name matching the app's KEY_SIGNATURES list.
  */
-export function detectKey(audioBuffer: AudioBuffer): string {
+export async function detectKey(audioBuffer: AudioBuffer): Promise<string> {
   const sr = audioBuffer.sampleRate;
   const mono = toMono(audioBuffer, 60);
 
@@ -227,6 +239,7 @@ export function detectKey(audioBuffer: AudioBuffer): string {
     }
 
     frames++;
+    if (frames % 30 === 0) await yieldToMain(); // yield every 30 frames to keep browser responsive
     if (frames >= 600) break; // cap at ~56 s (hopSize 4096 / 44100 Hz × 600 ≈ 55.7 s)
   }
 
@@ -258,19 +271,91 @@ export interface AudioAnalysisResult {
 }
 
 /**
- * Run BPM + key analysis on a decoded AudioBuffer.
- * Both algorithms operate synchronously on the PCM data.
+ * Spawn a Web Worker and resolve when it posts back a result.
+ * The worker runs all heavy FFT work off the main thread — the UI
+ * stays fully responsive and Chrome never kills the tab.
  */
-export function analyzeAudioBuffer(audioBuffer: AudioBuffer): AudioAnalysisResult {
-  return {
-    bpm: detectBPM(audioBuffer),
-    key: detectKey(audioBuffer),
-  };
+function analyzeWithWorker(
+  mono: Float32Array,
+  sampleRate: number,
+  onPhase?: (phase: string) => void,
+): Promise<AudioAnalysisResult> {
+  return new Promise<AudioAnalysisResult>((resolve, reject) => {
+    const worker = new Worker("/audio-worker.js");
+
+    worker.onmessage = (e: MessageEvent) => {
+      const { type } = e.data as { type: string; phase?: string; bpm?: number; key?: string; message?: string };
+      if (type === "progress") {
+        onPhase?.(e.data.phase);
+      } else if (type === "result") {
+        worker.terminate();
+        resolve({ bpm: e.data.bpm, key: e.data.key });
+      } else if (type === "error") {
+        worker.terminate();
+        reject(new Error(e.data.message));
+      }
+    };
+
+    worker.onerror = (err) => {
+      worker.terminate();
+      reject(new Error(`Worker error: ${err.message}`));
+    };
+
+    // Transfer the buffer to avoid copying large PCM data
+    worker.postMessage({ type: "analyze", monoData: mono, sampleRate }, [mono.buffer]);
+  });
 }
 
 /**
- * Fetch audio from a URL, decode it, and run analysis.
- * `onPhase` is called with a human-readable status string at each stage.
+ * Run BPM + key analysis on a decoded AudioBuffer using a Web Worker.
+ */
+export async function analyzeAudioBuffer(audioBuffer: AudioBuffer): Promise<AudioAnalysisResult> {
+  const mono = toMono(audioBuffer, 120);
+  return analyzeWithWorker(mono, audioBuffer.sampleRate);
+}
+
+/**
+ * Stream only the first `maxBytes` of a URL.
+ * Avoids downloading huge audio files — 3 MB is ~75-180 s of MP3,
+ * which is more than enough for BPM + key analysis.
+ */
+async function fetchPartialAudio(
+  url: string,
+  maxBytes = 3 * 1024 * 1024, // 3 MB
+): Promise<ArrayBuffer> {
+  const res = await fetch(url, {
+    headers: { Range: `bytes=0-${maxBytes - 1}` },
+  });
+  if (!res.ok && res.status !== 206) {
+    throw new Error(`No se pudo descargar el audio (${res.status})`);
+  }
+  if (!res.body) throw new Error("Sin cuerpo de respuesta");
+
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    total += value.byteLength;
+    if (total >= maxBytes) {
+      await reader.cancel(); // stop the download — we have enough
+      break;
+    }
+  }
+
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) { out.set(chunk, offset); offset += chunk.byteLength; }
+  return out.buffer;
+}
+
+/**
+ * Fetch audio from a URL, decode it, and run analysis via Web Worker.
+ * Only the first 3 MB are downloaded — enough for ~75-180 s of MP3.
+ * The main thread is free throughout — no blocking, no tab crashes.
  */
 export async function analyzeAudioFromUrl(
   url: string,
@@ -278,27 +363,27 @@ export async function analyzeAudioFromUrl(
 ): Promise<AudioAnalysisResult> {
   onPhase?.("Descargando audio…");
 
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`No se pudo descargar el audio (${res.status})`);
-
-  const arrayBuffer = await res.arrayBuffer();
+  const arrayBuffer = await fetchPartialAudio(url);
 
   onPhase?.("Decodificando…");
 
-  const audioCtx = new AudioContext();
-  let audioBuffer: AudioBuffer;
-  try {
-    audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-  } finally {
-    audioCtx.close();
+  // Decode — if the truncated stream is rejected, retry with 8 MB
+  let audioBuffer: AudioBuffer | null = null;
+  for (const buf of [arrayBuffer, null] as (ArrayBuffer | null)[]) {
+    const data = buf ?? (await fetchPartialAudio(url, 8 * 1024 * 1024));
+    const ctx = new AudioContext();
+    try {
+      audioBuffer = await ctx.decodeAudioData(data);
+      break; // success
+    } catch {
+      // try bigger chunk on next iteration
+    } finally {
+      ctx.close();
+    }
   }
+  if (!audioBuffer) throw new Error("No se pudo decodificar el audio");
 
-  onPhase?.("Detectando BPM…");
-  const bpm = detectBPM(audioBuffer);
-
-  onPhase?.("Detectando tonalidad…");
-  const key = detectKey(audioBuffer);
-
-  onPhase?.("Listo");
-  return { bpm, key };
+  // Mix to mono on the main thread (fast), then hand off to worker
+  const mono = toMono(audioBuffer, 120);
+  return analyzeWithWorker(mono, audioBuffer.sampleRate, onPhase);
 }

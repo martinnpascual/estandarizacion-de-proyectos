@@ -173,7 +173,7 @@ export default function LoginPage() {
               {/* Google login */}
               <button
                 onClick={handleGoogleLogin}
-                className="w-full flex items-center justify-center gap-3 px-4 py-2.5 bg-white/5 border border-border/60 rounded-xl hover:bg-white/10 hover:border-border transition-all text-sm font-medium"
+                className="w-full flex items-center justify-center gap-3 px-4 py-2.5 bg-white/5 border border-border/60 rounded-xl hover:bg-white/10 hover:border-border transition-all active:scale-95 text-sm font-medium"
               >
                 <svg className="h-4 w-4 flex-shrink-0" viewBox="0 0 24 24">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
@@ -321,7 +321,7 @@ function SubmitButton({
     <button
       type="submit"
       disabled={loading}
-      className="relative w-full py-2.5 rounded-xl text-sm font-semibold overflow-hidden disabled:opacity-60 transition-all group"
+      className="relative w-full py-2.5 rounded-xl text-sm font-semibold overflow-hidden disabled:opacity-60 transition-all active:scale-95 group"
     >
       {/* gradient background */}
       <span className="absolute inset-0 bg-gradient-to-r from-primary to-primary/80 transition-opacity group-hover:opacity-90" />
@@ -340,7 +340,7 @@ function SubmitButton({
 
 function StatusMessage({ message }: { message: { text: string; error?: boolean } }) {
   return (
-    <p className={`text-center text-xs rounded-lg px-3 py-2 ${
+    <p className={`text-center text-xs rounded-xl px-3 py-2 ${
       message.error
         ? "text-red-400 bg-red-500/10 border border-red-500/20"
         : "text-muted-foreground bg-primary/5 border border-primary/10"

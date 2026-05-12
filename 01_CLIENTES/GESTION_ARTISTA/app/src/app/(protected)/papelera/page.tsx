@@ -39,7 +39,11 @@ function timeAgo(dateStr: string): string {
 export default function PapeleraPage() {
   const [items, setItems] = useState<TrashItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<TrashItemType | "all">("all");
+  const [filter, setFilter] = useState<TrashItemType | "all">(() =>
+    typeof window !== "undefined"
+      ? (localStorage.getItem("papelera-filter") as TrashItemType | "all") || "all"
+      : "all"
+  );
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const toast = useToast();
@@ -53,6 +57,19 @@ export default function PapeleraPage() {
   }, []);
 
   useEffect(() => { loadTrash(); }, [loadTrash]);
+  useEffect(() => { localStorage.setItem("papelera-filter", filter); }, [filter]);
+
+  // Keyboard: R = refresh
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT") return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "r" || e.key === "R") { e.preventDefault(); loadTrash(); }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [loadTrash]);
 
   async function handleRestore(item: TrashItem) {
     setRestoringId(item.id);
@@ -123,32 +140,36 @@ export default function PapeleraPage() {
       {ConfirmDialog}
       <div className="min-h-screen p-6 max-w-4xl mx-auto">
         {/* Header */}
-        <div className="flex items-start justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
-              <Trash2 className="h-5 w-5 text-red-400" />
+        <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card mb-6">
+          <div className="absolute inset-0 bg-gradient-to-br from-red-500/8 via-transparent to-transparent pointer-events-none" />
+          <div className="absolute -top-10 -right-10 w-40 h-40 bg-red-500/6 rounded-full blur-3xl pointer-events-none" />
+          <div className="relative flex items-center justify-between px-6 py-5">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500/30 to-red-600/10 border border-red-500/20 flex items-center justify-center flex-shrink-0">
+                <Trash2 className="h-5 w-5 text-red-400" />
+              </div>
+              <div>
+                <h1 className="text-lg font-bold leading-tight">Papelera</h1>
+                <p className="text-muted-foreground text-xs mt-0.5">
+                  {items.length} elemento{items.length !== 1 ? "s" : ""} eliminado{items.length !== 1 ? "s" : ""}
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-bold">Papelera</h1>
-              <p className="text-sm text-muted-foreground">
-                {items.length} elemento{items.length !== 1 ? "s" : ""} eliminado{items.length !== 1 ? "s" : ""}
-              </p>
-            </div>
-          </div>
 
-          {items.length > 0 && (
-            <button
-              onClick={handleEmptyTrash}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors"
-            >
-              <X className="h-4 w-4" />
-              Vaciar {filter !== "all" ? "selección" : "papelera"}
-            </button>
-          )}
+            {items.length > 0 && (
+              <button
+                onClick={handleEmptyTrash}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all active:scale-95"
+              >
+                <X className="h-4 w-4" />
+                Vaciar {filter !== "all" ? "selección" : "papelera"}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Warning */}
-        <div className="flex items-start gap-3 px-4 py-3 bg-amber-500/5 border border-amber-500/20 rounded-xl mb-6">
+        <div className="flex items-start gap-3 px-4 py-3 bg-amber-500/5 border border-amber-500/20 rounded-2xl mb-6">
           <AlertTriangle className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
           <p className="text-sm text-muted-foreground">
             Los elementos en la papelera pueden ser restaurados en cualquier momento. Al eliminarlos permanentemente no podrán recuperarse.
@@ -159,8 +180,8 @@ export default function PapeleraPage() {
         <div className="flex gap-2 mb-6 flex-wrap">
           <button
             onClick={() => setFilter("all")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              filter === "all" ? "bg-primary text-primary-foreground" : "bg-secondary/50 text-muted-foreground hover:bg-secondary"
+            className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all active:scale-95 ${
+              filter === "all" ? "bg-primary text-primary-foreground font-semibold shadow-sm" : "bg-secondary/50 text-muted-foreground hover:bg-secondary"
             }`}
           >
             Todos ({items.length})
@@ -172,8 +193,8 @@ export default function PapeleraPage() {
               <button
                 key={type}
                 onClick={() => setFilter(type)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  filter === type ? "bg-primary text-primary-foreground" : "bg-secondary/50 text-muted-foreground hover:bg-secondary"
+                className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all active:scale-95 ${
+                  filter === type ? "bg-primary text-primary-foreground font-semibold" : "bg-secondary/50 text-muted-foreground hover:bg-secondary"
                 }`}
               >
                 {cfg.label}s ({count})
@@ -208,7 +229,7 @@ export default function PapeleraPage() {
 
               return (
                 <StaggerItem key={`${item.type}-${item.id}`}>
-                  <div className="flex items-center gap-4 p-4 bg-card/60 border border-border/40 rounded-xl hover:border-border/60 transition-all">
+                  <div className="flex items-center gap-4 p-4 bg-card/60 border border-border/40 rounded-2xl hover:border-border/60 hover:shadow-sm hover:-translate-y-0.5 transition-all">
                     <div className={`w-9 h-9 rounded-xl ${cfg.bg} flex items-center justify-center flex-shrink-0`}>
                       <Icon className={`h-4 w-4 ${cfg.color}`} />
                     </div>
@@ -234,7 +255,7 @@ export default function PapeleraPage() {
                       <button
                         onClick={() => handleRestore(item)}
                         disabled={isRestoring || isDeleting}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-green-500/10 border border-green-500/20 text-green-400 hover:bg-green-500/20 transition-colors disabled:opacity-50"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-green-500/10 border border-green-500/20 text-green-400 hover:bg-green-500/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {isRestoring ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
                         Restaurar
@@ -242,7 +263,7 @@ export default function PapeleraPage() {
                       <button
                         onClick={() => handlePermanentDelete(item)}
                         disabled={isRestoring || isDeleting}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {isDeleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
                         Eliminar

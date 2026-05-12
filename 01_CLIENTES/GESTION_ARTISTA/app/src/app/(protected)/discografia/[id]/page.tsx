@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft, Music, ExternalLink, Clock, Tag, Users,
   Play, Pause, Globe, Lock, Loader2, FileText,
-  ArrowDownToLine, Copy, Check, Share2,
+  ArrowDownToLine, Copy, Check, Share2, Zap,
 } from "lucide-react";
 import { getSongById, updateSongVisibility } from "@/lib/actions/songs";
 import { useAudioPlayerContext } from "@/components/audio/AudioPlayer";
@@ -25,12 +25,14 @@ const PLATFORMS = [
 
 /** Calcula puntuación de completitud de metadata (0-100) */
 function completenessScore(song: Song): { score: number; total: number; missing: string[] } {
+  const hasAudio = !!(song.drive_file_id || song.drive_file_url);
   const checks: { label: string; ok: boolean }[] = [
-    { label: "Audio",        ok: !!(song.drive_file_id || song.drive_file_url) },
+    { label: "Audio",        ok: hasAudio },
     { label: "Portada",      ok: !!song.cover_art_url },
     { label: "Letra",        ok: !!song.lyrics },
     { label: "Género",       ok: !!song.genre },
     { label: "Duración",     ok: !!song.duration_seconds },
+    { label: "BPM/Key",      ok: !!(song.bpm && song.key_signature) || !hasAudio },
     { label: "Spotify",      ok: !!song.spotify_url },
     { label: "YouTube",      ok: !!song.youtube_url },
     { label: "Tags",         ok: !!(song.tags?.length) },
@@ -64,6 +66,27 @@ export default function SongDetailPage() {
     });
   }, [params.id]);
 
+  // ── Keyboard shortcuts ─────────────────────────────────────────────────────
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT") return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (!song) return;
+      if (e.key === "p" || e.key === "P") {
+        e.preventDefault();
+        const audioUrl = song.drive_file_id ? `/api/drive/stream/${song.drive_file_id}` : song.drive_file_url;
+        if (!audioUrl) return;
+        if (isPlaying) { player.pause(); }
+        else { player.play({ id: song.id, title: song.title, artist: song.artist_name, url: audioUrl, duration: song.duration_seconds ?? undefined }); }
+      }
+      if (e.key === "l" || e.key === "L") { e.preventDefault(); setShowLyrics(v => !v); }
+      if (e.key === "Escape" && !showLyrics) { router.back(); }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [song, isPlaying, showLyrics, player, router]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
@@ -77,7 +100,7 @@ export default function SongDetailPage() {
       <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 text-center">
         <Music className="h-16 w-16 text-muted-foreground/30" />
         <p className="text-muted-foreground">Canción no encontrada</p>
-        <button onClick={() => router.back()} className="text-primary hover:underline text-sm">
+        <button onClick={() => router.back()} className="text-primary hover:underline text-sm transition-all active:scale-95">
           Volver
         </button>
       </div>
@@ -128,16 +151,27 @@ export default function SongDetailPage() {
     <>
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Back nav */}
-        <button
-          onClick={() => router.back()}
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Volver a discografía
-        </button>
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => router.back()}
+            title="Volver (Esc)"
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-all active:scale-95"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Volver a discografía
+          </button>
+          <p className="text-xs text-muted-foreground/60 hidden sm:flex items-center gap-2">
+            <kbd className="text-[9px] bg-secondary border border-border/60 px-1 py-0.5 rounded font-mono">P</kbd>
+            reproducir ·
+            <kbd className="text-[9px] bg-secondary border border-border/60 px-1 py-0.5 rounded font-mono">L</kbd>
+            letra ·
+            <kbd className="text-[9px] bg-secondary border border-border/60 px-1 py-0.5 rounded font-mono">Esc</kbd>
+            volver
+          </p>
+        </div>
 
         {/* Hero */}
-        <div className="bg-card border border-border rounded-2xl overflow-hidden">
+        <div className="bg-card border border-border/60 rounded-2xl overflow-hidden shadow-sm">
           <div className="flex flex-col sm:flex-row gap-0">
             {/* Cover art */}
             <div className="relative sm:w-64 sm:h-64 w-full aspect-square flex-shrink-0 bg-secondary flex items-center justify-center">
@@ -175,7 +209,7 @@ export default function SongDetailPage() {
                     disabled={togglingPublic}
                     title={song.is_public ? "Canción pública — clic para hacer privada" : "Canción privada — clic para publicar"}
                     className={cn(
-                      "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors flex-shrink-0 mt-1",
+                      "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all active:scale-95 flex-shrink-0 mt-1",
                       song.is_public
                         ? "bg-green-500/15 text-green-400 hover:bg-red-500/15 hover:text-red-400"
                         : "bg-secondary text-muted-foreground hover:bg-green-500/15 hover:text-green-400"
@@ -212,6 +246,16 @@ export default function SongDetailPage() {
                     <Clock className="h-3 w-3" />{formatTime(song.duration_seconds)}
                   </span>
                 )}
+                {song.bpm && (
+                  <span className="flex items-center gap-1 text-xs bg-blue-500/10 text-blue-400 px-2.5 py-1 rounded-full font-mono" title="BPM">
+                    <Zap className="h-3 w-3" />{song.bpm} BPM
+                  </span>
+                )}
+                {song.key_signature && (
+                  <span className="text-xs bg-purple-500/10 text-purple-400 px-2.5 py-1 rounded-full font-medium" title="Tonalidad">
+                    ♪ {song.key_signature}
+                  </span>
+                )}
                 {song.tags?.map(tag => (
                   <span key={tag} className="text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full">#{tag}</span>
                 ))}
@@ -226,7 +270,7 @@ export default function SongDetailPage() {
                       href={song[p.key] as string}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-opacity hover:opacity-80"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all hover:opacity-80 active:scale-95"
                       style={{ background: p.color, color: p.textColor }}
                     >
                       <ExternalLink className="h-3 w-3" />
@@ -242,7 +286,7 @@ export default function SongDetailPage() {
                   <a
                     href={downloadUrl}
                     download={song.drive_file_id ? song.title : undefined}
-                    className="flex items-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/80 transition-colors"
+                    className="flex items-center gap-2 px-3 py-2 bg-primary/90 hover:bg-primary text-primary-foreground rounded-xl text-sm font-semibold transition-all active:scale-95 shadow-sm shadow-primary/20"
                   >
                     <ArrowDownToLine className="h-4 w-4" />
                     Descargar
@@ -251,7 +295,7 @@ export default function SongDetailPage() {
                 {song.lyrics && (
                   <button
                     onClick={() => setShowLyrics(true)}
-                    className="flex items-center gap-2 px-3 py-2 border border-border rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                    className="flex items-center gap-2 px-3 py-2 border border-border/60 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all active:scale-95"
                   >
                     <FileText className="h-4 w-4" />
                     Ver letra
@@ -259,7 +303,7 @@ export default function SongDetailPage() {
                 )}
                 <button
                   onClick={handleShare}
-                  className="flex items-center gap-2 px-3 py-2 border border-border rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                  className="flex items-center gap-2 px-3 py-2 border border-border/60 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all active:scale-95"
                 >
                   {copied ? <Check className="h-4 w-4 text-green-400" /> : <Share2 className="h-4 w-4" />}
                   {copied ? "Copiado" : "Compartir"}
@@ -267,10 +311,20 @@ export default function SongDetailPage() {
                 {song.is_public && (
                   <a
                     href={`/p/${song.created_by}`}
-                    className="flex items-center gap-2 px-3 py-2 border border-border rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                    className="flex items-center gap-2 px-3 py-2 border border-border/60 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all active:scale-95"
                   >
                     <Globe className="h-4 w-4" />
                     Ver EPK
+                  </a>
+                )}
+                {/* Analizar BPM CTA — solo si tiene audio pero le falta BPM/key */}
+                {audioUrl && !song.bpm && !song.key_signature && (
+                  <a
+                    href="/analizar"
+                    className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-violet-500/10 border border-violet-500/20 text-violet-400 hover:bg-violet-500/15 transition-all active:scale-95 text-sm font-medium"
+                  >
+                    <Zap className="h-4 w-4" />
+                    Detectar BPM
                   </a>
                 )}
               </div>
@@ -279,14 +333,14 @@ export default function SongDetailPage() {
 
           {/* Waveform player */}
           {audioUrl && (
-            <div className="p-4 border-t border-border">
+            <div className="p-4 border-t border-border/60">
               <WaveformPlayer url={audioUrl} height={56} />
             </div>
           )}
         </div>
 
         {/* Metadata completeness card */}
-        <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+        <div className="bg-card border border-border/60 rounded-2xl p-5 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold">Completitud de metadata</h2>
             <span className={cn("text-2xl font-bold tabular-nums", scoreColor)}>{score}%</span>
@@ -310,12 +364,12 @@ export default function SongDetailPage() {
         {/* Lyrics preview */}
         {song.lyrics && (
           <div
-            className="bg-card border border-border rounded-xl p-5 space-y-3 cursor-pointer hover:border-primary/40 transition-colors"
+            className="bg-card border border-border/60 rounded-2xl p-5 space-y-3 cursor-pointer hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-sm transition-all group"
             onClick={() => setShowLyrics(true)}
           >
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold flex items-center gap-2">
-                <FileText className="h-4 w-4 text-primary" />
+                <FileText className="h-4 w-4 text-primary group-hover:scale-110 transition-transform" />
                 Letra
               </h2>
               <span className="text-xs text-primary hover:underline">Ver completa →</span>
@@ -328,14 +382,14 @@ export default function SongDetailPage() {
 
         {/* Featuring */}
         {song.featuring?.length > 0 && (
-          <div className="bg-card border border-border rounded-xl p-5">
+          <div className="bg-card border border-border/60 rounded-2xl p-5">
             <h2 className="text-sm font-semibold flex items-center gap-2 mb-3">
               <Users className="h-4 w-4 text-primary" />
               Colaboraciones
             </h2>
             <div className="flex flex-wrap gap-2">
               {song.featuring.map(feat => (
-                <span key={feat} className="text-sm bg-secondary px-3 py-1.5 rounded-lg">{feat}</span>
+                <span key={feat} className="text-sm bg-secondary px-3 py-1.5 rounded-xl font-medium">{feat}</span>
               ))}
             </div>
           </div>

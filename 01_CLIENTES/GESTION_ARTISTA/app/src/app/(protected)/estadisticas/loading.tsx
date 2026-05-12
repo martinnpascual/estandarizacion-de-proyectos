@@ -5,7 +5,7 @@ export default function EstadisticasLoading() {
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="space-y-2">
-        <div className="skeleton h-7 w-44 rounded-lg" />
+        <div className="skeleton h-7 w-44 rounded-xl" />
         <div className="skeleton h-4 w-64 rounded" />
       </div>
 

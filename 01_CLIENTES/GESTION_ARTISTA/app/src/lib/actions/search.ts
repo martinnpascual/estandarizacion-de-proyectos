@@ -57,6 +57,10 @@ export interface SearchResult {
   title: string;
   subtitle: string | null;
   href: string;
+  /** Only populated for songs */
+  bpm?: number | null;
+  key_signature?: string | null;
+  cover_art_url?: string | null;
 }
 
 export async function globalSearch(query: string): Promise<{
@@ -74,7 +78,7 @@ export async function globalSearch(query: string): Promise<{
     await Promise.all([
       supabase
         .from("songs")
-        .select("id, title, artist_name, year, genre")
+        .select("id, title, artist_name, year, genre, bpm, key_signature, cover_art_url")
         .eq("is_deleted", false)
         .or(`title.ilike.%${q}%,artist_name.ilike.%${q}%,genre.ilike.%${q}%`)
         .limit(5),
@@ -117,6 +121,9 @@ export async function globalSearch(query: string): Promise<{
       title: s.title,
       subtitle: `${s.artist_name} · ${s.year}${s.genre ? ` · ${s.genre}` : ""}`,
       href: `/discografia?song=${s.id}`,
+      bpm: s.bpm ?? null,
+      key_signature: s.key_signature ?? null,
+      cover_art_url: s.cover_art_url ?? null,
     });
   }
 

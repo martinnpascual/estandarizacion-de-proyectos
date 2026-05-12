@@ -252,7 +252,7 @@ function CommandMenuModal({ onClose }: { onClose: () => void }) {
         onClick={() => navigate(result.href)}
         onMouseEnter={() => setActiveIdx(idx)}
         className={cn(
-          "w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors",
+          "w-full flex items-center gap-3 px-4 py-2.5 text-left transition-all",
           idx === activeIdx ? "bg-secondary" : "hover:bg-secondary/50"
         )}
       >
@@ -281,7 +281,7 @@ function CommandMenuModal({ onClose }: { onClose: () => void }) {
         onClick={() => navigate(item.href)}
         onMouseEnter={() => setActiveIdx(idx)}
         className={cn(
-          "w-full flex items-center gap-3 px-4 py-2 text-left transition-colors",
+          "w-full flex items-center gap-3 px-4 py-2 text-left transition-all",
           idx === activeIdx ? "bg-secondary" : "hover:bg-secondary/50"
         )}
       >
@@ -307,7 +307,7 @@ function CommandMenuModal({ onClose }: { onClose: () => void }) {
         onClick={() => navigate(item.href)}
         onMouseEnter={() => setActiveIdx(idx)}
         className={cn(
-          "w-full flex items-center gap-3 px-4 py-2 text-left transition-colors",
+          "w-full flex items-center gap-3 px-4 py-2 text-left transition-all",
           idx === activeIdx ? "bg-secondary" : "hover:bg-secondary/50"
         )}
       >
@@ -359,9 +359,9 @@ function CommandMenuModal({ onClose }: { onClose: () => void }) {
 
       {/* Modal */}
       <div className="fixed top-[10%] left-1/2 -translate-x-1/2 z-[101] w-full max-w-xl px-4">
-        <div className="bg-card border border-border rounded-2xl shadow-2xl overflow-hidden">
+        <div className="bg-card border border-border/60 rounded-2xl shadow-2xl shadow-black/40 overflow-hidden">
           {/* Input */}
-          <div className="flex items-center gap-3 px-4 py-3.5 border-b border-border">
+          <div className="flex items-center gap-3 px-4 py-3.5 border-b border-border/60">
             <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             <input
               ref={inputRef}
@@ -382,7 +382,7 @@ function CommandMenuModal({ onClose }: { onClose: () => void }) {
                   setActiveIdx(0);
                   inputRef.current?.focus();
                 }}
-                className="p-0.5 rounded hover:bg-secondary text-muted-foreground"
+                className="p-0.5 rounded-xl hover:bg-secondary text-muted-foreground"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -421,7 +421,7 @@ function CommandMenuModal({ onClose }: { onClose: () => void }) {
                     <button
                       key={q}
                       onClick={() => navigate(`/buscar?q=${encodeURIComponent(q)}`)}
-                      className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-colors"
+                      className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-all active:scale-95"
                     >
                       <Clock className="h-3 w-3 flex-shrink-0" />
                       {q}
@@ -453,7 +453,7 @@ function CommandMenuModal({ onClose }: { onClose: () => void }) {
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between px-4 py-2 border-t border-border bg-secondary/20">
+          <div className="flex items-center justify-between px-4 py-2 border-t border-border/60 bg-secondary/20">
             <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
               <span className="flex items-center gap-1">
                 <kbd className="bg-secondary px-1 rounded">↑↓</kbd> navegar

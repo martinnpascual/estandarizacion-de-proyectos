@@ -14,6 +14,7 @@ import {
   Calendar,
   Search,
   Pencil,
+  Download,
 } from "lucide-react";
 import {
   getSetlists,
@@ -38,11 +39,11 @@ import type { Setlist, Song } from "@/types/database";
 
 function formatEventDate(dateStr: string | null): string {
   if (!dateStr) return "";
-  return new Date(dateStr).toLocaleDateString("es-AR", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+  const d = new Date(dateStr);
+  const day = d.getDate();
+  const year = d.getFullYear();
+  const month = d.toLocaleDateString("es-AR", { month: "long" });
+  return `${day} de ${month} de ${year}`;
 }
 
 function calcTotalDuration(songs: SetlistSongWithDetails[]): number {
@@ -93,14 +94,53 @@ export default function SetlistsPage() {
   const loadSetlists = useCallback(async () => {
     setLoading(true);
     const result = await getSetlists();
-    if (result.error) toast.error(result.error);
-    else setSetlists(result.data ?? []);
+    if (result.error) {
+      toast.error(result.error);
+    } else {
+      const data = result.data ?? [];
+      setSetlists(data);
+      // Restore last selected setlist from localStorage
+      const savedId = typeof window !== "undefined"
+        ? localStorage.getItem("setlists-selected-id")
+        : null;
+      if (savedId) {
+        const found = data.find((s) => s.id === savedId);
+        if (found) setSelectedSetlist(found);
+      }
+    }
     setLoading(false);
   }, [toast]);
 
+  // Persist selected setlist ID so it's restored on next visit
   useEffect(() => {
-    loadSetlists();
-  }, [loadSetlists]);
+    if (selectedSetlist) {
+      localStorage.setItem("setlists-selected-id", selectedSetlist.id);
+    } else {
+      localStorage.removeItem("setlists-selected-id");
+    }
+  }, [selectedSetlist]);
+
+  // ─── Keyboard shortcuts ─────────────────────────────────────────────────────
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT") return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if ((e.key === "n" || e.key === "N") && !showFormModal && !showSongPicker) {
+        e.preventDefault();
+        setEditingSetlist(undefined);
+        setShowFormModal(true);
+      }
+      if ((e.key === "e" || e.key === "E") && !showFormModal && !showSongPicker) {
+        e.preventDefault();
+        handleExportCSV();
+      }
+      if (e.key === "Escape" && showFormModal) { setShowFormModal(false); }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showFormModal, showSongPicker, selectedSetlist, setlistSongs]);
 
   // ─── Load setlist songs when selection changes ──────────────────────────────
 
@@ -242,6 +282,33 @@ export default function SetlistsPage() {
     }
   }
 
+  // ─── CSV Export ─────────────────────────────────────────────────────────────
+
+  function handleExportCSV() {
+    if (!selectedSetlist || !setlistSongs.length) return;
+    const rows = [
+      ["#", "Título", "Artista", "Duración", "BPM", "Tono", "Tipo"],
+      ...setlistSongs.map((s, i) => {
+        const title = getTrackTitle(s);
+        const artist = s.song?.artist_name ?? s.draft?.artist_name ?? "";
+        const duration = s.song?.duration_seconds ? formatTime(s.song.duration_seconds) : "";
+        const bpm = (s.song?.bpm ?? s.draft?.bpm) ? String(s.song?.bpm ?? s.draft?.bpm) : "";
+        const key = s.song?.key_signature ?? s.draft?.key_signature ?? "";
+        const type = s.song ? "Canción" : s.draft ? "Maqueta" : "—";
+        return [String(i + 1), title, artist, duration, bpm, key, type];
+      }),
+    ];
+    const csv = "﻿" + rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `setlist_${selectedSetlist.name.replace(/\s+/g, "_")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Setlist exportada");
+  }
+
   // ─── Filtered songs for picker ──────────────────────────────────────────────
 
   const alreadyAddedIds = new Set(setlistSongs.map((s) => s.song_id).filter(Boolean));
@@ -275,16 +342,30 @@ export default function SetlistsPage() {
               </p>
             </div>
           </div>
-          <button
-            onClick={() => {
-              setEditingSetlist(undefined);
-              setShowFormModal(true);
-            }}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors text-sm font-semibold shadow-[0_0_16px_hsl(var(--primary)/0.25)]"
-          >
-            <Plus className="h-4 w-4" />
-            Nueva setlist
-          </button>
+          <div className="flex items-center gap-2">
+            {selectedSetlist && setlistSongs.length > 0 && (
+              <button
+                onClick={handleExportCSV}
+                title="Exportar setlist a CSV (E)"
+                className="flex items-center gap-1.5 px-3 py-2 border border-border/60 rounded-xl hover:bg-secondary/60 transition-all active:scale-95 text-sm text-muted-foreground hover:text-foreground"
+              >
+                <Download className="h-4 w-4" />
+                <span className="hidden sm:inline">Exportar</span>
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setEditingSetlist(undefined);
+                setShowFormModal(true);
+              }}
+              title="Nueva setlist (N)"
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-all active:scale-95 text-sm font-semibold shadow-[0_0_16px_hsl(var(--primary)/0.25)]"
+            >
+              <Plus className="h-4 w-4" />
+              Nueva setlist
+              <kbd className="hidden md:inline-flex ml-0.5 text-[9px] bg-primary-foreground/20 px-1 py-0.5 rounded font-mono">N</kbd>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -342,7 +423,7 @@ export default function SetlistsPage() {
                   setEditingSetlist(undefined);
                   setShowFormModal(true);
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/25 text-primary rounded-xl text-sm font-medium hover:bg-primary/20 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/25 text-primary rounded-xl text-sm font-medium hover:bg-primary/20 transition-all active:scale-95"
               >
                 <Plus className="h-4 w-4" />
                 Crear primer setlist
@@ -404,7 +485,7 @@ export default function SetlistsPage() {
                 </div>
                 <button
                   onClick={() => setShowSongPicker(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-500/15 border border-violet-500/20 text-violet-400 text-xs font-semibold hover:bg-violet-500/25 transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-500/15 border border-violet-500/20 text-violet-400 text-xs font-semibold hover:bg-violet-500/25 transition-all active:scale-95"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   Agregar canción
@@ -425,7 +506,7 @@ export default function SetlistsPage() {
                     </p>
                     <button
                       onClick={() => setShowSongPicker(true)}
-                      className="mt-4 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-500/15 border border-violet-500/20 text-violet-400 text-xs font-semibold hover:bg-violet-500/25 transition-colors"
+                      className="mt-4 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-500/15 border border-violet-500/20 text-violet-400 text-xs font-semibold hover:bg-violet-500/25 transition-all active:scale-95"
                     >
                       <Plus className="h-3.5 w-3.5" />
                       Agregar canción
@@ -441,7 +522,7 @@ export default function SetlistsPage() {
                         onDragEnter={() => handleDragEnter(index)}
                         onDragEnd={handleDragEnd}
                         onDragOver={(e) => e.preventDefault()}
-                        className="flex items-center gap-3 px-4 py-3 hover:bg-secondary/20 transition-colors group cursor-grab active:cursor-grabbing"
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-secondary/20 transition-all group cursor-grab active:cursor-grabbing select-none"
                       >
                         {/* Track number + drag handle */}
                         <div className="flex items-center gap-1.5 w-7 flex-shrink-0">
@@ -452,7 +533,7 @@ export default function SetlistsPage() {
                         </div>
 
                         {/* Cover art thumbnail */}
-                        <div className="w-9 h-9 flex-shrink-0 rounded-lg overflow-hidden border border-border/50 bg-gradient-to-br from-violet-500/20 to-violet-800/10 flex items-center justify-center">
+                        <div className="w-9 h-9 flex-shrink-0 rounded-xl overflow-hidden border border-border/50 bg-gradient-to-br from-violet-500/20 to-violet-800/10 flex items-center justify-center">
                           {item.song?.cover_art_url ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
@@ -494,7 +575,7 @@ export default function SetlistsPage() {
                         <button
                           onClick={() => handleRemoveSong(item)}
                           disabled={removingId === item.id}
-                          className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-all disabled:opacity-50 flex-shrink-0"
+                          className="p-1.5 rounded-xl opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
                           title="Quitar de la setlist"
                         >
                           {removingId === item.id ? (
@@ -585,10 +666,10 @@ function SetlistCard({
     <div
       onClick={onClick}
       className={cn(
-        "relative overflow-hidden rounded-2xl border cursor-pointer transition-all group",
+        "relative overflow-hidden rounded-2xl border cursor-pointer transition-all active:scale-[0.99] group",
         isSelected
           ? "border-violet-500/50 bg-violet-500/8 shadow-[0_0_20px_hsl(271,81%,66%/0.1)]"
-          : "border-border/60 bg-card/80 hover:border-violet-500/30 hover:bg-card"
+          : "border-border/60 bg-card/80 hover:border-violet-500/30 hover:bg-card hover:shadow-sm hover:-translate-y-0.5"
       )}
     >
       {isSelected && (
@@ -628,7 +709,7 @@ function SetlistCard({
                 e.stopPropagation();
                 onEdit();
               }}
-              className="p-1 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+              className="p-1 rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground transition-all active:scale-95"
               title="Editar"
             >
               <Pencil className="h-3.5 w-3.5" />
@@ -639,7 +720,7 @@ function SetlistCard({
                 onDelete();
               }}
               disabled={isDeleting}
-              className="p-1 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors disabled:opacity-50"
+              className="p-1 rounded-xl hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               title="Eliminar"
             >
               {isDeleting ? (
@@ -690,6 +771,12 @@ function SetlistFormModal({ setlist, onClose, onSaved }: SetlistFormModalProps) 
   });
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) {
@@ -710,17 +797,16 @@ function SetlistFormModal({ setlist, onClose, onSaved }: SetlistFormModalProps) 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      <div className="relative z-10 w-full max-w-md bg-card border border-border/60 rounded-2xl shadow-2xl shadow-black/40 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="relative w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+        {/* Glow ring */}
+        <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-violet-500/20 via-transparent to-violet-600/10 pointer-events-none" />
+        <div className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl shadow-2xl shadow-black/40 overflow-hidden">
         {/* Modal header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border/50">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border/60">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-violet-500/20 border border-violet-500/20 flex items-center justify-center">
-              <ListMusic className="h-3.5 w-3.5 text-violet-400" />
+            <div className="w-8 h-8 rounded-xl bg-violet-500/15 border border-violet-500/20 flex items-center justify-center flex-shrink-0">
+              <ListMusic className="h-4 w-4 text-violet-400" />
             </div>
             <h2 className="text-base font-semibold">
               {isEditing ? "Editar setlist" : "Nueva setlist"}
@@ -728,7 +814,7 @@ function SetlistFormModal({ setlist, onClose, onSaved }: SetlistFormModalProps) 
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+            className="p-1.5 rounded-xl hover:bg-muted/50 transition-all active:scale-95 text-muted-foreground hover:text-foreground"
           >
             <X className="h-4 w-4" />
           </button>
@@ -788,14 +874,14 @@ function SetlistFormModal({ setlist, onClose, onSaved }: SetlistFormModalProps) 
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2.5 rounded-xl border border-border/60 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors"
+              className="flex-1 px-4 py-2.5 rounded-xl border border-border/60 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all active:scale-95"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={saving || !form.name.trim()}
-              className="flex-1 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {saving ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -807,6 +893,7 @@ function SetlistFormModal({ setlist, onClose, onSaved }: SetlistFormModalProps) 
             </button>
           </div>
         </form>
+        </div>
       </div>
     </div>
   );
@@ -833,24 +920,29 @@ function SongPickerModal({
   onAdd,
   onClose,
 }: SongPickerModalProps) {
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      <div className="relative z-10 w-full max-w-lg bg-card border border-border/60 rounded-2xl shadow-2xl shadow-black/40 overflow-hidden flex flex-col max-h-[80vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="relative w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+        {/* Glow ring */}
+        <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-violet-500/20 via-transparent to-violet-600/10 pointer-events-none" />
+        <div className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl shadow-2xl shadow-black/40 overflow-hidden flex flex-col max-h-[80vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border/50 flex-shrink-0">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border/60 flex-shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-violet-500/20 border border-violet-500/20 flex items-center justify-center">
-              <Music className="h-3.5 w-3.5 text-violet-400" />
+            <div className="w-8 h-8 rounded-xl bg-violet-500/15 border border-violet-500/20 flex items-center justify-center flex-shrink-0">
+              <Music className="h-4 w-4 text-violet-400" />
             </div>
             <h2 className="text-base font-semibold">Agregar canción</h2>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+            className="p-1.5 rounded-xl hover:bg-muted/50 transition-all active:scale-95 text-muted-foreground hover:text-foreground"
           >
             <X className="h-4 w-4" />
           </button>
@@ -892,10 +984,10 @@ function SongPickerModal({
                 key={song.id}
                 onClick={() => onAdd(song)}
                 disabled={addingSongId === song.id}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-secondary/30 transition-colors text-left group disabled:opacity-60"
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-secondary/30 transition-all active:scale-[0.99] text-left group disabled:opacity-60"
               >
                 {/* Cover */}
-                <div className="w-9 h-9 flex-shrink-0 rounded-lg overflow-hidden border border-border/50 bg-gradient-to-br from-violet-500/15 to-violet-800/5 flex items-center justify-center">
+                <div className="w-9 h-9 flex-shrink-0 rounded-xl overflow-hidden border border-border/50 bg-gradient-to-br from-violet-500/15 to-violet-800/5 flex items-center justify-center">
                   {song.cover_art_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -941,6 +1033,7 @@ function SongPickerModal({
               </button>
             ))
           )}
+        </div>
         </div>
       </div>
     </div>

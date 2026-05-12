@@ -61,7 +61,7 @@ function SongPill({ song }: { song: Song }) {
       className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/20 transition-all duration-200 hover:scale-[1.01]"
     >
       {/* Mini cover */}
-      <div className="w-10 h-10 rounded-lg overflow-hidden bg-white/10 flex items-center justify-center flex-shrink-0">
+      <div className="w-10 h-10 rounded-xl overflow-hidden bg-white/10 flex items-center justify-center flex-shrink-0">
         {song.cover_art_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={song.cover_art_url} alt={song.title} className="w-full h-full object-cover" />

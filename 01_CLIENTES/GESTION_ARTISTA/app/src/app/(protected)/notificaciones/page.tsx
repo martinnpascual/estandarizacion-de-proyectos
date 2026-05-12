@@ -40,7 +40,7 @@ const URGENCY_CONFIG: Record<NotifUrgency, {
   urgent:   { label: "Urgente",        border: "border-orange-500/30", badge: "bg-orange-500/15 text-orange-400" },
   soon:     { label: "Pronto",         border: "border-yellow-500/30", badge: "bg-yellow-500/15 text-yellow-500" },
   ready:    { label: "Lista",          border: "border-blue-500/30",   badge: "bg-blue-500/15 text-blue-400" },
-  upcoming: { label: "Próximamente",   border: "border-border",        badge: "bg-secondary text-muted-foreground" },
+  upcoming: { label: "Próximamente",   border: "border-border/60",     badge: "bg-secondary text-muted-foreground" },
 };
 
 type FilterTab = "todos" | NotifType;
@@ -73,8 +73,8 @@ function NotifCard({ notif }: { notif: AppNotification }) {
     <Link
       href={notif.href}
       className={cn(
-        "flex items-start gap-4 p-4 rounded-xl border transition-colors group",
-        "bg-card hover:bg-secondary/40",
+        "flex items-start gap-4 p-4 rounded-2xl border transition-all group active:scale-[0.99]",
+        "bg-card hover:bg-secondary/40 hover:shadow-sm hover:-translate-y-0.5",
         urgency.border,
       )}
     >
@@ -104,7 +104,7 @@ function NotifCard({ notif }: { notif: AppNotification }) {
         )}
       </div>
 
-      <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-2.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+      <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-2.5 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
     </Link>
   );
 }
@@ -114,7 +114,7 @@ function Skeleton() {
   return (
     <div className="space-y-3">
       {[1, 2, 3, 4, 5].map((i) => (
-        <div key={i} className="flex items-start gap-4 p-4 rounded-xl border border-border bg-card animate-pulse">
+        <div key={i} className="flex items-start gap-4 p-4 rounded-2xl border border-border/60 bg-card animate-pulse">
           <div className="w-9 h-9 rounded-full bg-secondary flex-shrink-0" />
           <div className="flex-1 space-y-2">
             <div className="flex justify-between gap-4">
@@ -144,9 +144,17 @@ function NotificacionesContent() {
   const [notifs, setNotifs] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [urgencyFilter, setUrgencyFilter] = useState<NotifUrgency | "all">("all");
+  const [urgencyFilter, setUrgencyFilter] = useState<NotifUrgency | "all">(() =>
+    typeof window !== "undefined"
+      ? (localStorage.getItem("notif-urgency") as NotifUrgency | "all") || "all"
+      : "all"
+  );
   const [searchQuery, setSearchQuery] = useState("");
-  const [sort, setSort] = useState<"asc" | "desc">("asc");
+  const [sort, setSort] = useState<"asc" | "desc">(() =>
+    typeof window !== "undefined"
+      ? (localStorage.getItem("notif-sort") as "asc" | "desc") || "asc"
+      : "asc"
+  );
   const searchRef = useRef<HTMLInputElement>(null);
 
   const rawFilter = searchParams.get("filter") as FilterTab | null;
@@ -171,6 +179,10 @@ function NotificacionesContent() {
   }
 
   useEffect(() => { load(); }, []);
+
+  // Persist filter state
+  useEffect(() => { localStorage.setItem("notif-urgency", urgencyFilter); }, [urgencyFilter]);
+  useEffect(() => { localStorage.setItem("notif-sort", sort); }, [sort]);
 
   // Keyboard shortcuts: R = refresh, / = focus search
   useEffect(() => {
@@ -227,24 +239,38 @@ function NotificacionesContent() {
   return (
     <div className="space-y-6 max-w-2xl">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Bell className="h-6 w-6 text-primary" />
-            Notificaciones
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Eventos, deadlines y maquetas listas — próximos 30 días
-          </p>
+      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card">
+        <div className="absolute inset-0 bg-gradient-to-br from-violet-500/8 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-violet-500/6 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative flex items-center justify-between px-6 py-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500/30 to-violet-600/10 border border-violet-500/20 flex items-center justify-center flex-shrink-0">
+              <Bell className="h-5 w-5 text-violet-400" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold leading-tight">Notificaciones</h1>
+              <p className="text-muted-foreground text-xs mt-0.5">
+                Eventos, deadlines y maquetas listas — próximos 30 días
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <p className="text-xs text-muted-foreground/60 hidden sm:flex items-center gap-2">
+              <kbd className="text-[9px] bg-secondary border border-border/60 px-1 py-0.5 rounded font-mono">R</kbd>
+              actualizar ·
+              <kbd className="text-[9px] bg-secondary border border-border/60 px-1 py-0.5 rounded font-mono">/</kbd>
+              buscar
+            </p>
+            <button
+              onClick={() => load(true)}
+              disabled={refreshing}
+              className="p-2 rounded-xl border border-border/60 hover:bg-secondary/60 transition-all active:scale-95 text-muted-foreground hover:text-foreground"
+              title="Actualizar (R)"
+            >
+              <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+            </button>
+          </div>
         </div>
-        <button
-          onClick={() => load(true)}
-          disabled={refreshing}
-          className="p-2 rounded-lg border border-border hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
-          title="Actualizar"
-        >
-          <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
-        </button>
       </div>
 
       {/* Search bar */}
@@ -257,14 +283,14 @@ function NotificacionesContent() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Buscar… (/) por título o descripción"
-            className="w-full pl-10 pr-10 py-2.5 bg-card border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            className="w-full pl-10 pr-10 py-2.5 bg-card border border-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 transition-shadow"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-all active:scale-95 p-0.5 rounded-xl hover:bg-secondary/80"
             >
-              <X className="h-4 w-4" />
+              <X className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
@@ -295,9 +321,9 @@ function NotificacionesContent() {
                   key={item.label}
                   onClick={() => setUrgencyFilter(isActive ? "all" : item.urgencyKey)}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-medium transition-all",
+                    "flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-medium transition-all active:scale-95",
                     item.color,
-                    isActive ? "ring-2 ring-white/20 scale-105" : "hover:scale-105 hover:brightness-110"
+                    isActive ? "ring-2 ring-white/20 scale-105 font-semibold" : "hover:scale-105 hover:brightness-110"
                   )}
                 >
                   <span className={cn("w-2 h-2 rounded-full flex-shrink-0", item.dot)} />
@@ -310,7 +336,7 @@ function NotificacionesContent() {
             {urgencyFilter !== "all" && (
               <button
                 onClick={() => setUrgencyFilter("all")}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border text-xs text-muted-foreground hover:text-foreground bg-secondary transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border/60 text-xs text-muted-foreground hover:text-foreground bg-secondary transition-all active:scale-95 font-medium"
               >
                 Ver todos
               </button>
@@ -331,10 +357,10 @@ function NotificacionesContent() {
               key={tab.id}
               onClick={() => setFilter(tab.id)}
               className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors",
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-all active:scale-95",
                 active
-                  ? "bg-secondary border border-border text-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                  ? "bg-secondary border border-border/80 text-foreground shadow-sm font-semibold"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/60 border border-transparent"
               )}
             >
               <Icon className={cn("h-3.5 w-3.5", active && tab.id === "overdue" ? "text-red-400" : active ? "text-primary" : "")} />
@@ -394,7 +420,7 @@ function NotificacionesContent() {
           {(urgencyFilter !== "all" || searchQuery.trim()) && (
             <button
               onClick={() => { setUrgencyFilter("all"); setSearchQuery(""); }}
-              className="mt-3 text-sm text-primary hover:underline"
+              className="mt-3 text-sm text-primary hover:underline transition-all active:scale-95"
             >
               Quitar filtros
             </button>

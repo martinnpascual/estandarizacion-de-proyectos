@@ -26,6 +26,7 @@ import {
   Receipt,
   ListMusic,
   Trash2,
+  Zap,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useCommandMenu } from "@/components/search/CommandMenu";
@@ -70,6 +71,7 @@ const navigationGroups = [
     label: "Análisis",
     items: [
       { name: "Estadísticas",    href: "/estadisticas",   icon: BarChart2 },
+      { name: "Analizar BPM",    href: "/analizar",       icon: Zap },
       { name: "Equipo",          href: "/equipo",         icon: UserCog },
       { name: "Notificaciones",  href: "/notificaciones", icon: Bell },
       { name: "Papelera",        href: "/papelera",       icon: Trash2 },
@@ -134,7 +136,7 @@ export default function Sidebar() {
       {/* Botón hamburguesa mobile */}
       <button
         onClick={() => setMobileOpen(true)}
-        className="fixed top-4 left-4 z-50 md:hidden p-2 rounded-lg bg-card hover:bg-secondary transition-colors"
+        className="fixed top-4 left-4 z-50 md:hidden p-2 rounded-xl bg-card hover:bg-secondary transition-all active:scale-95 border border-border/60 shadow-sm"
         aria-label="Abrir menu"
       >
         <Menu className="h-5 w-5" />
@@ -198,7 +200,7 @@ export default function Sidebar() {
 
           <button
             onClick={() => setMobileOpen(false)}
-            className="relative md:hidden p-1.5 rounded-lg hover:bg-secondary/80 text-muted-foreground transition-colors"
+            className="relative md:hidden p-1.5 rounded-xl hover:bg-secondary/80 text-muted-foreground transition-all active:scale-95"
           >
             <X className="h-4 w-4" />
           </button>
@@ -264,7 +266,7 @@ export default function Sidebar() {
           >
             <Search className="h-4 w-4 flex-shrink-0" />
             <span className="flex-1 text-left">Buscar</span>
-            <kbd className="hidden md:inline-flex items-center gap-0.5 text-[9px] bg-secondary px-1.5 py-0.5 rounded border border-border text-muted-foreground">
+            <kbd className="hidden md:inline-flex items-center gap-0.5 text-[9px] bg-secondary px-1.5 py-0.5 rounded border border-border/60 text-muted-foreground">
               ⌘K
             </kbd>
           </button>
@@ -303,7 +305,7 @@ export default function Sidebar() {
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setShowShortcuts(true)}
-                className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary transition-all active:scale-95"
                 aria-label="Atajos de teclado"
                 title="Atajos de teclado (?)"
               >
@@ -311,7 +313,7 @@ export default function Sidebar() {
               </button>
               <button
                 onClick={toggleTheme}
-                className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary transition-all active:scale-95"
                 aria-label="Cambiar tema"
                 title={theme === "dark" ? "Modo claro" : "Modo oscuro"}
               >
@@ -341,7 +343,7 @@ export default function Sidebar() {
                 <button
                   key="more"
                   onClick={() => setMobileOpen(true)}
-                  className="flex-1 flex flex-col items-center justify-center gap-1 py-3 text-muted-foreground hover:text-foreground transition-colors"
+                  className="flex-1 flex flex-col items-center justify-center gap-1 py-3 text-muted-foreground hover:text-foreground transition-all active:scale-95"
                 >
                   <div className="relative">
                     <Menu className="h-5 w-5" />
@@ -364,7 +366,7 @@ export default function Sidebar() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex-1 flex flex-col items-center justify-center gap-1 py-3 transition-colors relative",
+                  "flex-1 flex flex-col items-center justify-center gap-1 py-3 transition-all active:scale-95 relative",
                   isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
                 )}
               >
@@ -385,20 +387,24 @@ export default function Sidebar() {
       {/* Keyboard shortcuts modal */}
       {showShortcuts && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
           onClick={() => setShowShortcuts(false)}
         >
-          <div
-            className="bg-card border border-border rounded-xl w-full max-w-lg max-h-[80vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="relative w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+            {/* Glow ring */}
+            <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-primary/20 via-transparent to-violet-500/10 pointer-events-none" />
+            <div
+              className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl max-h-[80vh] overflow-y-auto shadow-2xl shadow-black/40"
+            >
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border sticky top-0 bg-card">
-              <div className="flex items-center gap-2">
-                <Keyboard className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border/60 sticky top-0 bg-card/95 backdrop-blur-xl rounded-t-2xl z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center flex-shrink-0">
+                  <Keyboard className="h-4 w-4 text-primary" />
+                </div>
                 <h2 className="font-semibold text-sm">Atajos de teclado</h2>
               </div>
-              <button onClick={() => setShowShortcuts(false)} className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground">
+              <button onClick={() => setShowShortcuts(false)} className="p-1.5 rounded-xl hover:bg-muted/50 transition-all active:scale-95 text-muted-foreground hover:text-foreground">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -418,6 +424,12 @@ export default function Sidebar() {
                 <Shortcut keys={["Enter"]} label="Reproducir / abrir canción" />
                 <Shortcut keys={["V"]} label="Alternar vista lista / cuadrícula" />
                 <Shortcut keys={["E"]} label="Exportar CSV" />
+              </ShortcutGroup>
+
+              <ShortcutGroup title="Timeline de lanzamientos">
+                <Shortcut keys={["↑", "↓"]} label="Navegar entre canciones" />
+                <Shortcut keys={["Enter"]} label="Reproducir canción seleccionada" />
+                <Shortcut keys={["Esc"]} label="Volver a discografía" />
               </ShortcutGroup>
 
               <ShortcutGroup title="Maquetas">
@@ -460,8 +472,28 @@ export default function Sidebar() {
                 <Shortcut keys={["6"]} label="Ir a Redes Sociales" />
               </ShortcutGroup>
 
+              <ShortcutGroup title="Ingresos">
+                <Shortcut keys={["N"]} label="Nuevo ingreso" />
+                <Shortcut keys={["E"]} label="Exportar CSV" />
+              </ShortcutGroup>
+
+              <ShortcutGroup title="Gastos">
+                <Shortcut keys={["N"]} label="Nuevo gasto" />
+                <Shortcut keys={["E"]} label="Exportar CSV" />
+              </ShortcutGroup>
+
+              <ShortcutGroup title="Metas">
+                <Shortcut keys={["N"]} label="Nueva meta" />
+                <Shortcut keys={["E"]} label="Exportar CSV" />
+              </ShortcutGroup>
+
               <ShortcutGroup title="Equipo">
                 <Shortcut keys={["N"]} label="Invitar nuevo miembro" />
+              </ShortcutGroup>
+
+              <ShortcutGroup title="Setlists">
+                <Shortcut keys={["N"]} label="Nueva setlist" />
+                <Shortcut keys={["E"]} label="Exportar setlist a CSV" />
               </ShortcutGroup>
 
               <ShortcutGroup title="Redes Sociales">
@@ -473,6 +505,17 @@ export default function Sidebar() {
               <ShortcutGroup title="Notificaciones">
                 <Shortcut keys={["R"]} label="Actualizar notificaciones" />
                 <Shortcut keys={["/"]} label="Enfocar búsqueda" />
+              </ShortcutGroup>
+
+              <ShortcutGroup title="Analizar BPM">
+                <Shortcut keys={["L"]} label="Cargar canciones y maquetas" />
+                <Shortcut keys={["A"]} label="Iniciar / continuar análisis" />
+                <Shortcut keys={["S"]} label="Detener análisis en curso" />
+                <Shortcut keys={["R"]} label="Recargar lista" />
+              </ShortcutGroup>
+
+              <ShortcutGroup title="Papelera">
+                <Shortcut keys={["R"]} label="Actualizar papelera" />
               </ShortcutGroup>
 
               <ShortcutGroup title="Búsqueda global">
@@ -496,6 +539,7 @@ export default function Sidebar() {
                 <Shortcut keys={["Alt", "Q"]} label="Abrir cola de reproducción" />
               </ShortcutGroup>
             </div>
+            </div>
           </div>
         </div>
       )}
@@ -518,7 +562,7 @@ function Shortcut({ keys, label }: { keys: string[]; label: string }) {
       <span className="text-sm text-muted-foreground">{label}</span>
       <div className="flex items-center gap-1 flex-shrink-0">
         {keys.map((k, i) => (
-          <kbd key={i} className="inline-flex items-center justify-center min-w-[24px] h-6 px-1.5 rounded bg-secondary border border-border text-[11px] font-mono font-medium text-foreground">
+          <kbd key={i} className="inline-flex items-center justify-center min-w-[24px] h-6 px-1.5 rounded bg-secondary border border-border/60 text-[11px] font-mono font-medium text-foreground">
             {k}
           </kbd>
         ))}

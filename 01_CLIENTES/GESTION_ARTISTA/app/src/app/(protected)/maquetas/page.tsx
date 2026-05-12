@@ -27,6 +27,7 @@ import {
   ArrowDownToLine,
   CheckSquare,
   Square,
+  Zap,
 } from "lucide-react";
 import DraftVersionsPanel from "@/components/drafts/DraftVersionsPanel";
 import LyricsPanel from "@/components/lyrics/LyricsPanel";
@@ -134,11 +135,20 @@ export default function MaquetasPage() {
   const [versionsOpenId, setVersionsOpenId] = useState<string | null>(null);
   const [commentsOpenId, setCommentsOpenId] = useState<string | null>(null);
   const [lyricsDraft, setLyricsDraft] = useState<Draft | null>(null);
-  const [viewMode, setViewMode] = useState<"list" | "board">("list");
+  const [viewMode, setViewMode] = useState<"list" | "board">(() =>
+    typeof window !== "undefined"
+      ? (localStorage.getItem("maquetas-view-mode") as "list" | "board") || "list"
+      : "list"
+  );
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
-  const [sortBy, setSortBy] = useState<"default" | "az" | "pipeline" | "newest" | "oldest">("default");
+  const [sortBy, setSortBy] = useState<"default" | "az" | "pipeline" | "newest" | "oldest">(() =>
+    typeof window !== "undefined"
+      ? (localStorage.getItem("maquetas-sort") as "default" | "az" | "pipeline" | "newest" | "oldest") || "default"
+      : "default"
+  );
   const [missingAudioFilter, setMissingAudioFilter] = useState(false);
+  const [missingBpmFilter, setMissingBpmFilter] = useState(false);
   const [producerFilter, setProducerFilter] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -235,6 +245,10 @@ export default function MaquetasPage() {
     return () => document.removeEventListener("keydown", onKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Persist view mode + sort to localStorage
+  useEffect(() => { localStorage.setItem("maquetas-view-mode", viewMode); }, [viewMode]);
+  useEffect(() => { localStorage.setItem("maquetas-sort", sortBy); }, [sortBy]);
 
   // Escape closes open side panels (versions / comments)
   useEffect(() => {
@@ -360,6 +374,9 @@ export default function MaquetasPage() {
     if (missingAudioFilter) {
       result = result.filter(d => !d.drive_file_id && !d.drive_file_url);
     }
+    if (missingBpmFilter) {
+      result = result.filter(d => (!!d.drive_file_id || !!d.drive_file_url) && (!d.bpm || !d.key_signature));
+    }
     if (producerFilter) {
       result = result.filter(d => d.producer === producerFilter);
     }
@@ -376,7 +393,7 @@ export default function MaquetasPage() {
   })();
 
   // Group by month_created for the "Recientes" view
-  const showMonthGroups = sortBy === "default" && !isSearching && statusFilter === "todos" && !missingAudioFilter;
+  const showMonthGroups = sortBy === "default" && !isSearching && statusFilter === "todos" && !missingAudioFilter && !missingBpmFilter;
   const draftsByMonth: { month: string; label: string; drafts: Draft[] }[] = [];
   if (showMonthGroups) {
     const seen = new Map<string, Draft[]>();
@@ -503,7 +520,7 @@ export default function MaquetasPage() {
               <button
                 onClick={handleExportCSV}
                 title="Exportar maquetas a CSV (E)"
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border/60 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border/60 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all active:scale-95"
               >
                 <Download className="h-4 w-4" />
                 <span className="hidden sm:inline">Exportar</span>
@@ -514,7 +531,7 @@ export default function MaquetasPage() {
               <button
                 onClick={handlePlayAll}
                 title="Reproducir todos los que tienen audio"
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border/60 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border/60 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all active:scale-95"
               >
                 <ListMusic className="h-4 w-4" />
                 <span className="hidden sm:inline">Reproducir todo</span>
@@ -525,7 +542,7 @@ export default function MaquetasPage() {
               <button
                 onClick={() => setViewMode("list")}
                 className={cn(
-                  "p-2 transition-colors",
+                  "p-2 transition-all active:scale-95",
                   viewMode === "list"
                     ? "bg-primary/20 text-primary"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
@@ -537,7 +554,7 @@ export default function MaquetasPage() {
               <button
                 onClick={() => setViewMode("board")}
                 className={cn(
-                  "p-2 transition-colors",
+                  "p-2 transition-all active:scale-95",
                   viewMode === "board"
                     ? "bg-primary/20 text-primary"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
@@ -553,7 +570,7 @@ export default function MaquetasPage() {
                 setEditingDraft(undefined);
                 setShowForm(true);
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors text-sm font-semibold shadow-[0_0_16px_hsl(var(--primary)/0.25)]"
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-all active:scale-95 text-sm font-semibold shadow-[0_0_16px_hsl(var(--primary)/0.25)]"
             >
               <Plus className="h-4 w-4" />
               Nueva
@@ -608,7 +625,7 @@ export default function MaquetasPage() {
       {!loading && !error && (counts["lista_para_publicar"] ?? 0) > 0 && statusFilter !== "lista_para_publicar" && (
         <button
           onClick={() => setStatusFilter("lista_para_publicar")}
-          className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-green-500/10 border border-green-500/30 hover:bg-green-500/15 transition-colors w-full"
+          className="flex items-center justify-between px-4 py-2.5 rounded-2xl bg-green-500/10 border border-green-500/30 hover:bg-green-500/15 hover:-translate-y-0.5 hover:shadow-sm transition-all w-full group"
         >
           <div className="flex items-center gap-2">
             <Upload className="h-4 w-4 text-green-400 flex-shrink-0" />
@@ -616,7 +633,7 @@ export default function MaquetasPage() {
               {counts["lista_para_publicar"]} maqueta{counts["lista_para_publicar"] !== 1 ? "s" : ""} lista{counts["lista_para_publicar"] !== 1 ? "s" : ""} para publicar
             </p>
           </div>
-          <ChevronRight className="h-4 w-4 text-green-400 flex-shrink-0" />
+          <ChevronRight className="h-4 w-4 text-green-400 flex-shrink-0 group-hover:translate-x-0.5 transition-transform" />
         </button>
       )}
 
@@ -628,7 +645,7 @@ export default function MaquetasPage() {
             <button
               onClick={toggleSelectAll}
               title={displayedDrafts.every(d => selectedIds.has(d.id)) ? "Deseleccionar todo" : "Seleccionar todo"}
-              className="flex-shrink-0 text-muted-foreground hover:text-primary transition-colors"
+              className="flex-shrink-0 text-muted-foreground hover:text-primary transition-all active:scale-95"
             >
               {displayedDrafts.every(d => selectedIds.has(d.id))
                 ? <CheckSquare className="h-4 w-4 text-primary" />
@@ -643,9 +660,9 @@ export default function MaquetasPage() {
                   key={year}
                   onClick={() => setSelectedYear(year)}
                   className={cn(
-                    "px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors",
+                    "px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all active:scale-95",
                     selectedYear === year
-                      ? "bg-blue-500/20 text-blue-400"
+                      ? "bg-blue-500/20 text-blue-400 font-semibold"
                       : "bg-secondary text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -687,6 +704,47 @@ export default function MaquetasPage() {
           </button>
         )}
       </div>
+
+      {/* Filter chips */}
+      {!loading && !isSearching && drafts.length > 0 && (() => {
+        const withoutAudio = drafts.filter(d => !d.drive_file_id && !d.drive_file_url).length;
+        const withoutBpm = drafts.filter(d => (!!d.drive_file_id || !!d.drive_file_url) && (!d.bpm || !d.key_signature)).length;
+        if (withoutAudio === 0 && withoutBpm === 0) return null;
+        return (
+          <div className="flex items-center gap-2 flex-wrap">
+            {withoutAudio > 0 && (
+              <button
+                onClick={() => { setMissingAudioFilter(!missingAudioFilter); setMissingBpmFilter(false); }}
+                className={cn(
+                  "flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full transition-all active:scale-95",
+                  missingAudioFilter
+                    ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+                    : "bg-secondary text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <FileAudio className="h-3 w-3 flex-shrink-0" />
+                {withoutAudio} sin audio
+                {missingAudioFilter && <X className="h-2.5 w-2.5 ml-0.5 opacity-70" />}
+              </button>
+            )}
+            {withoutBpm > 0 && (
+              <button
+                onClick={() => { setMissingBpmFilter(!missingBpmFilter); setMissingAudioFilter(false); }}
+                className={cn(
+                  "flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full transition-all active:scale-95",
+                  missingBpmFilter
+                    ? "bg-violet-500/20 text-violet-400 border border-violet-500/30"
+                    : "bg-secondary text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Zap className="h-3 w-3 flex-shrink-0" />
+                {withoutBpm} sin BPM/key
+                {missingBpmFilter && <X className="h-2.5 w-2.5 ml-0.5 opacity-70" />}
+              </button>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Vista Tablero */}
       {viewMode === "board" && !loading && !error && (
@@ -740,17 +798,17 @@ export default function MaquetasPage() {
               {missingAudioFilter ? "Buen trabajo 🎵" : searchQuery ? "Probá con otro término" : "Empezá a registrar tus canciones en progreso"}
             </p>
             {missingAudioFilter ? (
-              <button onClick={() => setMissingAudioFilter(false)} className="mt-4 text-xs text-primary hover:text-primary/80 transition-colors">
+              <button onClick={() => setMissingAudioFilter(false)} className="mt-4 text-xs text-primary hover:text-primary/80 transition-all active:scale-95">
                 Ver todas las maquetas
               </button>
             ) : producerFilter ? (
-              <button onClick={() => setProducerFilter(null)} className="mt-4 text-xs text-primary hover:text-primary/80 transition-colors">
+              <button onClick={() => setProducerFilter(null)} className="mt-4 text-xs text-primary hover:text-primary/80 transition-all active:scale-95">
                 Ver todas las maquetas
               </button>
             ) : !searchQuery && (
               <button
                 onClick={() => { setEditingDraft(undefined); setShowForm(true); }}
-                className="mt-4 flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/25 text-primary rounded-xl text-sm font-medium hover:bg-primary/20 transition-colors"
+                className="mt-4 flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/25 text-primary rounded-2xl text-sm font-medium hover:bg-primary/20 transition-all active:scale-95"
               >
                 <Plus className="h-4 w-4" />
                 Nueva maqueta
@@ -769,7 +827,7 @@ export default function MaquetasPage() {
                       {groupDrafts.length}
                     </span>
                   </div>
-                  <div className="divide-y divide-border">
+                  <div className="divide-y divide-border/50">
                     {groupDrafts.map((draft) => (
                       <div key={draft.id} id={`draft-row-${draft.id}`} className="bg-card">
                         <DraftRow
@@ -795,7 +853,7 @@ export default function MaquetasPage() {
                           <DraftVersionsPanel draftId={draft.id} draftTitle={draft.title} />
                         )}
                         {commentsOpenId === draft.id && (
-                          <div className="border-t border-border max-h-96 overflow-hidden flex flex-col">
+                          <div className="border-t border-border/60 max-h-96 overflow-hidden flex flex-col">
                             <CommentsPanel draft_id={draft.id} currentUserId={user?.id} />
                           </div>
                         )}
@@ -806,7 +864,7 @@ export default function MaquetasPage() {
               ))
             ) : (
               // Flat list (when filtering / sorting differently)
-              <div className="divide-y divide-border">
+              <div className="divide-y divide-border/50">
                 {displayedDrafts.map((draft) => (
                   <div key={draft.id} id={`draft-row-${draft.id}`} className="bg-card">
                     <DraftRow
@@ -832,7 +890,7 @@ export default function MaquetasPage() {
                       <DraftVersionsPanel draftId={draft.id} draftTitle={draft.title} />
                     )}
                     {commentsOpenId === draft.id && (
-                      <div className="border-t border-border max-h-96 overflow-hidden flex flex-col">
+                      <div className="border-t border-border/60 max-h-96 overflow-hidden flex flex-col">
                         <CommentsPanel draft_id={draft.id} currentUserId={user?.id} />
                       </div>
                     )}
@@ -850,7 +908,7 @@ export default function MaquetasPage() {
           <div className="flex items-center gap-2 px-4 py-3 bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl shadow-2xl shadow-black/40">
             <button
               onClick={() => setSelectedIds(new Set())}
-              className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+              className="p-1.5 rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground transition-all active:scale-95"
               title="Deseleccionar todo"
             >
               <X className="h-4 w-4" />
@@ -863,7 +921,7 @@ export default function MaquetasPage() {
               onClick={handleBulkAdvanceStatus}
               disabled={bulkActionLoading}
               title="Avanzar estado de todas"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 text-xs font-medium transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 text-xs font-medium transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {bulkActionLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ChevronDown className="h-3.5 w-3.5 rotate-[-90deg]" />}
               Avanzar estado
@@ -872,7 +930,7 @@ export default function MaquetasPage() {
               onClick={handleBulkExport}
               disabled={bulkActionLoading}
               title="Exportar seleccionadas a CSV"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 text-xs font-medium transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 text-xs font-medium transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Download className="h-3.5 w-3.5" />
               Exportar
@@ -881,7 +939,7 @@ export default function MaquetasPage() {
               onClick={handleBulkDelete}
               disabled={bulkActionLoading}
               title="Eliminar seleccionadas"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 text-xs font-medium transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 text-xs font-medium transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Trash2 className="h-3.5 w-3.5" />
               Eliminar
@@ -1014,7 +1072,7 @@ function DraftRow({
       </button>
       {/* Cover art thumbnail / Play button */}
       <div className={cn(
-        "w-9 h-9 flex-shrink-0 relative rounded-lg overflow-hidden border border-border/60 flex items-center justify-center",
+        "w-9 h-9 flex-shrink-0 relative rounded-xl overflow-hidden border border-border/60 flex items-center justify-center",
         draft.cover_art_url ? "" : `bg-gradient-to-br ${STATUS_GRADIENT_THUMB[draft.status]}`
       )}>
         {draft.cover_art_url ? (
@@ -1091,14 +1149,16 @@ function DraftRow({
 
       {/* Estado */}
       <div className="flex items-center gap-2 flex-shrink-0">
-        <span
-          className={cn(
-            "px-2 py-0.5 rounded-full text-[11px] font-medium border",
-            STATUS_COLORS[draft.status]
-          )}
-        >
-          {translateDraftStatus(draft.status)}
-        </span>
+        {draft.status !== "borrador" && (
+          <span
+            className={cn(
+              "px-2 py-0.5 rounded-full text-[11px] font-medium border",
+              STATUS_COLORS[draft.status]
+            )}
+          >
+            {translateDraftStatus(draft.status)}
+          </span>
+        )}
 
         {/* Avanzar estado */}
         {canAdvance && (
@@ -1106,7 +1166,7 @@ function DraftRow({
             onClick={onAdvanceStatus}
             disabled={isUpdatingStatus}
             title={`Pasar a ${translateDraftStatus(STATUS_NEXT[draft.status]!)}`}
-            className="hidden group-hover:flex p-1 rounded hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground disabled:opacity-50"
+            className="hidden group-hover:flex p-1 rounded-xl hover:bg-secondary transition-all active:scale-95 text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isUpdatingStatus ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1121,7 +1181,7 @@ function DraftRow({
       {isReady && (
         <button
           onClick={onPublish}
-          className="hidden group-hover:flex items-center gap-1 px-2.5 py-1 rounded-lg bg-green-600 text-white text-xs font-medium hover:bg-green-700 transition-colors flex-shrink-0"
+          className="hidden group-hover:flex items-center gap-1 px-2.5 py-1 rounded-xl bg-green-600 text-white text-xs font-semibold hover:bg-green-700 transition-all active:scale-95 flex-shrink-0"
         >
           <Upload className="h-3 w-3" />
           Publicar
@@ -1139,9 +1199,22 @@ function DraftRow({
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
           title="Descargar audio"
-          className="flex-shrink-0 p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+          className="flex-shrink-0 p-1.5 rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all active:scale-95"
         >
           <ArrowDownToLine className="h-3.5 w-3.5" />
+        </a>
+      )}
+
+      {/* Analizar BPM hint — solo si hay audio y faltan datos musicales */}
+      {hasAudio && !draft.bpm && !draft.key_signature && (
+        <a
+          href="/analizar"
+          onClick={(e) => e.stopPropagation()}
+          title="Analizar BPM y tonalidad"
+          className="hidden group-hover:flex items-center gap-1 px-2 py-1 rounded-xl bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 transition-all active:scale-95 flex-shrink-0 text-[10px] font-medium"
+        >
+          <Zap className="h-3 w-3" />
+          BPM
         </a>
       )}
 
@@ -1151,7 +1224,7 @@ function DraftRow({
           onClick={onToggleComments}
           title="Comentarios"
           className={cn(
-            "p-1.5 rounded-lg transition-colors",
+            "p-1.5 rounded-xl transition-all active:scale-95",
             commentsOpen
               ? "bg-primary/15 text-primary"
               : "hover:bg-secondary text-muted-foreground hover:text-foreground"
@@ -1163,7 +1236,7 @@ function DraftRow({
           onClick={onToggleVersions}
           title="Versiones"
           className={cn(
-            "p-1.5 rounded-lg transition-colors",
+            "p-1.5 rounded-xl transition-all active:scale-95",
             versionsOpen
               ? "bg-primary/15 text-primary"
               : "hover:bg-secondary text-muted-foreground hover:text-foreground"
@@ -1175,7 +1248,7 @@ function DraftRow({
           onClick={handleCopyLink}
           title="Copiar enlace"
           className={cn(
-            "p-1.5 rounded-lg hover:bg-secondary transition-colors",
+            "p-1.5 rounded-xl hover:bg-secondary transition-all active:scale-95",
             linkCopied ? "text-green-400" : "text-muted-foreground hover:text-foreground"
           )}
         >
@@ -1184,7 +1257,7 @@ function DraftRow({
         <button
           onClick={onOpenLyrics}
           className={cn(
-            "p-1.5 rounded-lg transition-colors",
+            "p-1.5 rounded-xl transition-all active:scale-95",
             draft.lyrics
               ? "text-primary/70 hover:text-primary hover:bg-primary/10"
               : "text-muted-foreground hover:text-foreground hover:bg-secondary"
@@ -1195,7 +1268,7 @@ function DraftRow({
         </button>
         <button
           onClick={onEdit}
-          className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+          className="p-1.5 rounded-xl hover:bg-secondary transition-all active:scale-95 text-muted-foreground hover:text-foreground"
           title="Editar"
         >
           <Pencil className="h-3.5 w-3.5" />
@@ -1203,7 +1276,7 @@ function DraftRow({
         <button
           onClick={onDelete}
           disabled={isDeleting}
-          className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors text-muted-foreground hover:text-red-500 disabled:opacity-50"
+          className="p-1.5 rounded-xl hover:bg-red-500/10 transition-all active:scale-95 text-muted-foreground hover:text-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
           title="Eliminar"
         >
           {isDeleting ? (
@@ -1220,7 +1293,7 @@ function DraftRow({
           onClick={() => setNotesExpanded(v => !v)}
           title={notesExpanded ? "Ocultar notas" : "Ver notas"}
           className={cn(
-            "w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[9px] font-bold transition-colors",
+            "w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[9px] font-bold transition-all active:scale-95",
             notesExpanded
               ? "bg-yellow-500 text-black"
               : "bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/40"
@@ -1233,7 +1306,7 @@ function DraftRow({
     {/* Inline notes */}
     {draft.notes && notesExpanded && (
       <div className="px-4 pb-3 pl-14">
-        <p className="text-xs text-muted-foreground bg-yellow-500/5 border border-yellow-500/15 rounded-lg px-3 py-2 leading-relaxed">
+        <p className="text-xs text-muted-foreground bg-yellow-500/5 border border-yellow-500/15 rounded-2xl px-3 py-2 leading-relaxed">
           {draft.notes}
         </p>
       </div>

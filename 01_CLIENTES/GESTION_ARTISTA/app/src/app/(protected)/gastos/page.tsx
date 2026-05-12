@@ -10,6 +10,7 @@ import {
 import type { Expense } from "@/types/database";
 import type { ExpenseFormData } from "@/lib/actions/expenses";
 import { useToast } from "@/components/ui/ToastProvider";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import {
   PageTransition,
   StaggerList,
@@ -27,6 +28,8 @@ import {
   X,
   AlertCircle,
   DollarSign,
+  Pencil,
+  Download,
 } from "lucide-react";
 import {
   AreaChart,
@@ -160,6 +163,12 @@ function ExpenseFormModal({ title = "Nuevo gasto", onClose, onSave, initial }: E
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
     if (!form.description.trim()) errs.description = "La descripción es requerida";
@@ -189,8 +198,11 @@ function ExpenseFormModal({ title = "Nuevo gasto", onClose, onSave, initial }: E
   const activeCat = CATEGORIES[form.category] ?? { label: form.category, color: "#6b7280" };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="relative w-full max-w-md">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div className="relative w-full max-w-md" onClick={(e) => e.stopPropagation()}>
         {/* Glow ring */}
         <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-red-500/20 via-transparent to-purple-500/10 pointer-events-none" />
 
@@ -209,7 +221,7 @@ function ExpenseFormModal({ title = "Nuevo gasto", onClose, onSave, initial }: E
             <button
               type="button"
               onClick={onClose}
-              className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-lg hover:bg-muted/50"
+              className="text-muted-foreground hover:text-foreground transition-all active:scale-95 p-1.5 rounded-xl hover:bg-muted/50"
             >
               <X className="h-4 w-4" />
             </button>
@@ -281,7 +293,7 @@ function ExpenseFormModal({ title = "Nuevo gasto", onClose, onSave, initial }: E
               </label>
               <input
                 type="month"
-                className={fieldCls("period_month")}
+                className={`${fieldCls("period_month")} [color-scheme:dark]`}
                 value={form.period_month}
                 onChange={(e) => setForm((f) => ({ ...f, period_month: e.target.value }))}
               />
@@ -318,7 +330,7 @@ function ExpenseFormModal({ title = "Nuevo gasto", onClose, onSave, initial }: E
             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: activeCat.color }} />
             <span className="font-medium" style={{ color: activeCat.color }}>{activeCat.label}</span>
             {form.amount > 0 && (
-              <span className="ml-auto text-muted-foreground font-mono text-xs">
+              <span className="ml-auto text-muted-foreground font-mono tabular-nums text-xs">
                 {formatCurrency(form.amount)}
               </span>
             )}
@@ -329,14 +341,14 @@ function ExpenseFormModal({ title = "Nuevo gasto", onClose, onSave, initial }: E
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 border border-border/60 rounded-xl px-4 py-2.5 text-sm hover:bg-muted/50 transition-colors"
+              className="flex-1 border border-border/60 rounded-xl px-4 py-2.5 text-sm hover:bg-muted/50 transition-all active:scale-95"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 bg-primary text-primary-foreground rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex-1 bg-primary text-primary-foreground rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {saving ? (
                 <><Loader2 className="h-4 w-4 animate-spin" /> Guardando...</>
@@ -360,9 +372,14 @@ export default function GastosPage() {
   const [error, setError]                 = useState<string | null>(null);
   const [showForm, setShowForm]           = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
-  const [selectedYear, setSelectedYear]   = useState(CURRENT_YEAR);
+  const [selectedYear, setSelectedYear]   = useState<number>(() =>
+    typeof window !== "undefined"
+      ? parseInt(localStorage.getItem("gastos-year") ?? String(CURRENT_YEAR), 10) || CURRENT_YEAR
+      : CURRENT_YEAR
+  );
   const [deletingId, setDeletingId]       = useState<string | null>(null);
   const { error: toastError, success: toastSuccess } = useToast();
+  const { confirm, ConfirmDialog } = useConfirm();
 
   // ── Data loaders ─────────────────────────────────────────────────────────────
   const loadYear = useCallback(async () => {
@@ -388,6 +405,46 @@ export default function GastosPage() {
 
   useEffect(() => { loadYear(); }, [loadYear]);
   useEffect(() => { loadAll();  }, [loadAll]);
+  useEffect(() => { localStorage.setItem("gastos-year", String(selectedYear)); }, [selectedYear]);
+
+  // ── CSV export ───────────────────────────────────────────────────────────────
+  function handleExportCSV() {
+    if (expenses.length === 0) return;
+    const headers = ["Descripción", "Categoría", "Monto (USD)", "Período", "Notas"];
+    const rows = expenses.map((e) => [
+      e.description,
+      CATEGORIES[e.category]?.label ?? e.category,
+      Number(e.amount).toFixed(2),
+      e.period_month ?? "",
+      e.notes ?? "",
+    ]);
+    const csv = [headers, ...rows].map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `gastos_${selectedYear}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ── Keyboard shortcuts: N → new expense, E → export CSV, Escape → close ─────
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT") return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "Escape") {
+        if (editingExpense) { setEditingExpense(null); return; }
+        if (showForm) { setShowForm(false); return; }
+      }
+      if (e.key === "n" || e.key === "N") { e.preventDefault(); setShowForm(true); }
+      if (e.key === "e" || e.key === "E") { e.preventDefault(); handleExportCSV(); }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expenses, selectedYear, showForm, editingExpense]);
 
   // ── Stats (all-time data) ────────────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -426,7 +483,8 @@ export default function GastosPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("¿Eliminar este gasto? Esta acción no se puede deshacer.")) return;
+    const ok = await confirm({ title: "¿Eliminar este gasto?", message: "Esta acción no se puede deshacer.", confirmLabel: "Eliminar", variant: "danger" });
+    if (!ok) return;
     setDeletingId(id);
     try {
       const res = await deleteExpense(id);
@@ -445,36 +503,53 @@ export default function GastosPage() {
       <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
 
         {/* ── Header ─────────────────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-red-500/25 to-orange-500/15 border border-red-500/20 flex items-center justify-center">
-              <Receipt className="h-5 w-5 text-red-400" />
+        <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card">
+          <div className="absolute inset-0 bg-gradient-to-br from-red-500/8 via-transparent to-transparent pointer-events-none" />
+          <div className="absolute -top-10 -right-10 w-40 h-40 bg-red-500/6 rounded-full blur-3xl pointer-events-none" />
+          <div className="relative flex items-center justify-between gap-4 flex-wrap px-6 py-5">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500/30 to-orange-500/10 border border-red-500/20 flex items-center justify-center flex-shrink-0">
+                <Receipt className="h-5 w-5 text-red-400" />
+              </div>
+              <div>
+                <h1 className="text-lg font-bold leading-tight">Gastos</h1>
+                <p className="text-muted-foreground text-xs mt-0.5">Control de gastos del estudio</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Gastos</h1>
-              <p className="text-muted-foreground text-sm mt-0.5">Control de gastos del estudio</p>
-            </div>
-          </div>
 
-          <div className="flex items-center gap-3 flex-wrap">
-            {/* Year dropdown */}
-            <div className="relative">
-              <select
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(Number(e.target.value))}
-                className="appearance-none border border-border/60 rounded-xl px-3 py-2 pr-8 text-sm bg-card/80 backdrop-blur-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40 transition-colors"
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Year dropdown */}
+              <div className="relative">
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(Number(e.target.value))}
+                  className="appearance-none border border-border/60 rounded-xl px-3 py-2 pr-8 text-sm bg-card/80 backdrop-blur-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40 transition-colors"
+                >
+                  {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+                </select>
+                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground text-xs">▾</span>
+              </div>
+
+              {expenses.length > 0 && (
+                <button
+                  onClick={handleExportCSV}
+                  title="Exportar gastos a CSV (E)"
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border/60 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all active:scale-95"
+                >
+                  <Download className="h-4 w-4" />
+                  <span className="hidden sm:inline">Exportar</span>
+                </button>
+              )}
+
+              <button
+                onClick={() => setShowForm(true)}
+                title="Nuevo gasto (N)"
+                className="flex items-center gap-2 bg-red-500/90 hover:bg-red-500 text-white rounded-xl px-4 py-2 text-sm font-semibold transition-all active:scale-95 shadow-lg shadow-red-500/20 hover:shadow-red-500/30"
               >
-                {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
-              </select>
-              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground text-xs">▾</span>
+                <Plus className="h-4 w-4" /> Nuevo gasto
+                <kbd className="hidden md:inline-flex ml-1 text-[9px] bg-white/20 px-1 py-0.5 rounded font-mono">N</kbd>
+              </button>
             </div>
-
-            <button
-              onClick={() => setShowForm(true)}
-              className="flex items-center gap-2 bg-red-500/90 hover:bg-red-500 text-white rounded-xl px-4 py-2 text-sm font-medium transition-all shadow-lg shadow-red-500/20 hover:shadow-red-500/30"
-            >
-              <Plus className="h-4 w-4" /> Nuevo gasto
-            </button>
           </div>
         </div>
 
@@ -483,45 +558,45 @@ export default function GastosPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => (
               <div key={i} className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl p-5 animate-pulse space-y-3">
-                <div className="h-3.5 w-28 bg-muted rounded-lg" />
-                <div className="h-8 w-36 bg-muted rounded-lg" />
-                <div className="h-3 w-20 bg-muted rounded-lg" />
+                <div className="h-3.5 w-28 bg-muted rounded-xl" />
+                <div className="h-8 w-36 bg-muted rounded-xl" />
+                <div className="h-3 w-20 bg-muted rounded-xl" />
               </div>
             ))}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {/* Total acumulado */}
-            <div className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl p-5 relative overflow-hidden group hover:border-red-500/30 transition-colors">
+            <div className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl p-5 relative overflow-hidden group hover:border-red-500/30 hover:-translate-y-0.5 hover:shadow-md transition-all">
               <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-full -translate-y-8 translate-x-8 group-hover:bg-red-500/10 transition-colors" />
               <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium mb-3 uppercase tracking-wide">
-                <DollarSign className="h-3.5 w-3.5" /> Total gastos
+                <DollarSign className="h-3.5 w-3.5 group-hover:scale-110 transition-transform" /> Total gastos
               </div>
-              <div className="text-2xl font-bold text-red-400">
+              <div className="text-2xl font-bold text-red-400 tabular-nums">
                 <AnimatedCounter value={stats.total_all_time} prefix="$" decimals={2} />
               </div>
               <div className="text-xs text-muted-foreground mt-1">Histórico acumulado</div>
             </div>
 
             {/* Este año */}
-            <div className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl p-5 relative overflow-hidden group hover:border-orange-500/30 transition-colors">
+            <div className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl p-5 relative overflow-hidden group hover:border-orange-500/30 hover:-translate-y-0.5 hover:shadow-md transition-all">
               <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/5 rounded-full -translate-y-8 translate-x-8 group-hover:bg-orange-500/10 transition-colors" />
               <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium mb-3 uppercase tracking-wide">
-                <TrendingDown className="h-3.5 w-3.5" /> Este año
+                <TrendingDown className="h-3.5 w-3.5 group-hover:scale-110 transition-transform" /> Este año
               </div>
-              <div className="text-2xl font-bold text-orange-400">
+              <div className="text-2xl font-bold text-orange-400 tabular-nums">
                 <AnimatedCounter value={stats.total_this_year} prefix="$" decimals={2} />
               </div>
               <div className="text-xs text-muted-foreground mt-1">{CURRENT_YEAR}</div>
             </div>
 
             {/* Este mes */}
-            <div className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl p-5 relative overflow-hidden group hover:border-yellow-500/30 transition-colors">
+            <div className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl p-5 relative overflow-hidden group hover:border-yellow-500/30 hover:-translate-y-0.5 hover:shadow-md transition-all">
               <div className="absolute top-0 right-0 w-24 h-24 bg-yellow-500/5 rounded-full -translate-y-8 translate-x-8 group-hover:bg-yellow-500/10 transition-colors" />
               <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium mb-3 uppercase tracking-wide">
-                <Receipt className="h-3.5 w-3.5" /> Este mes
+                <Receipt className="h-3.5 w-3.5 group-hover:scale-110 transition-transform" /> Este mes
               </div>
-              <div className="text-2xl font-bold text-yellow-400">
+              <div className="text-2xl font-bold text-yellow-400 tabular-nums">
                 <AnimatedCounter value={stats.total_this_month} prefix="$" decimals={2} />
               </div>
               <div className="text-xs text-muted-foreground mt-1">
@@ -562,7 +637,7 @@ export default function GastosPage() {
                       <TrendingDown className="h-4 w-4 text-red-400" />
                       Gastos mensuales — {selectedYear}
                     </h3>
-                    <span className="text-xs text-muted-foreground bg-muted/50 rounded-lg px-2.5 py-1 font-mono">
+                    <span className="text-xs text-muted-foreground bg-muted/50 rounded-xl px-2.5 py-1 font-mono tabular-nums">
                       {formatCurrency(totalYear)}
                     </span>
                   </div>
@@ -592,7 +667,7 @@ export default function GastosPage() {
                           contentStyle={{
                             backgroundColor: "hsl(var(--card))",
                             border: "1px solid hsl(var(--border))",
-                            borderRadius: "12px",
+                            borderRadius: "16px",
                             fontSize: 12,
                           }}
                           formatter={(v: unknown) => [formatCurrency(Number(v)), "Gastos"]}
@@ -627,7 +702,7 @@ export default function GastosPage() {
                       : `${expenses.length} registro${expenses.length !== 1 ? "s" : ""} en ${selectedYear}`}
                   </span>
                   {!loading && expenses.length > 0 && (
-                    <span className="text-xs text-muted-foreground font-mono">{formatCurrency(totalYear)}</span>
+                    <span className="text-xs text-muted-foreground font-mono tabular-nums">{formatCurrency(totalYear)}</span>
                   )}
                 </div>
 
@@ -655,7 +730,7 @@ export default function GastosPage() {
                     </p>
                     <button
                       onClick={() => setShowForm(true)}
-                      className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm font-medium hover:bg-red-500/20 transition-colors"
+                      className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm font-medium hover:bg-red-500/20 transition-all active:scale-95"
                     >
                       <Plus className="h-4 w-4" /> Registrar primer gasto
                     </button>
@@ -666,7 +741,10 @@ export default function GastosPage() {
                       const cat = CATEGORIES[exp.category] ?? { label: exp.category, color: "#6b7280" };
                       return (
                         <StaggerItem key={exp.id}>
-                          <div className="flex items-center gap-4 px-5 py-3.5 border-b border-border/40 last:border-0 hover:bg-muted/20 transition-colors group">
+                          <div
+                            className="flex items-center gap-4 px-5 py-3.5 border-b border-border/40 last:border-0 hover:bg-muted/20 transition-all group cursor-pointer"
+                            onDoubleClick={() => setEditingExpense(exp)}
+                          >
                             {/* Category badge icon */}
                             <div
                               className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold"
@@ -704,15 +782,22 @@ export default function GastosPage() {
                             </div>
 
                             {/* Amount */}
-                            <div className="font-semibold text-red-400 text-sm shrink-0 font-mono">
+                            <div className="font-semibold text-red-400 text-sm shrink-0 font-mono tabular-nums">
                               {formatCurrency(Number(exp.amount))}
                             </div>
 
-                            {/* Delete */}
+                            {/* Edit + Delete */}
                             <button
-                              onClick={() => handleDelete(exp.id)}
+                              onClick={(e) => { e.stopPropagation(); setEditingExpense(exp); }}
+                              className="opacity-0 group-hover:opacity-100 transition-all active:scale-95 text-muted-foreground hover:text-foreground p-1.5 rounded-xl hover:bg-muted/50"
+                              title="Editar gasto"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDelete(exp.id); }}
                               disabled={deletingId === exp.id}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-400 p-1.5 rounded-lg hover:bg-red-500/10 disabled:opacity-50"
+                              className="opacity-0 group-hover:opacity-100 transition-all active:scale-95 text-muted-foreground hover:text-red-400 p-1.5 rounded-xl hover:bg-red-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
                               title="Eliminar gasto"
                             >
                               {deletingId === exp.id ? (
@@ -766,7 +851,7 @@ export default function GastosPage() {
                             contentStyle={{
                               backgroundColor: "hsl(var(--card))",
                               border: "1px solid hsl(var(--border))",
-                              borderRadius: "10px",
+                              borderRadius: "16px",
                               fontSize: 12,
                             }}
                             formatter={(v: unknown) => [formatCurrency(Number(v)), ""]}
@@ -782,7 +867,7 @@ export default function GastosPage() {
                               <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
                               <span className="text-muted-foreground">{entry.label}</span>
                             </div>
-                            <span className="font-mono font-medium">{formatCurrency(entry.total)}</span>
+                            <span className="font-mono font-medium tabular-nums">{formatCurrency(entry.total)}</span>
                           </div>
                         ))}
                       </div>
@@ -809,7 +894,7 @@ export default function GastosPage() {
                       <TrendingUp className="h-3.5 w-3.5 text-green-400" />
                       <span>Ingresos</span>
                     </div>
-                    <span className="font-mono font-medium text-green-400">{formatCurrency(0)}</span>
+                    <span className="font-mono font-medium tabular-nums text-green-400">{formatCurrency(0)}</span>
                   </div>
 
                   <div className="flex items-center justify-between text-sm">
@@ -817,7 +902,7 @@ export default function GastosPage() {
                       <TrendingDown className="h-3.5 w-3.5 text-red-400" />
                       <span>Gastos</span>
                     </div>
-                    <span className="font-mono font-medium text-red-400">{formatCurrency(totalYear)}</span>
+                    <span className="font-mono font-medium tabular-nums text-red-400">{formatCurrency(totalYear)}</span>
                   </div>
 
                   <div className="h-px bg-border/60" />
@@ -827,7 +912,7 @@ export default function GastosPage() {
                       {0 - totalYear >= 0 ? "Ganancia" : "Pérdida"}
                     </span>
                     <span
-                      className={`text-lg font-bold font-mono ${
+                      className={`text-lg font-bold font-mono tabular-nums ${
                         0 - totalYear >= 0 ? "text-green-400" : "text-red-400"
                       }`}
                     >
@@ -900,6 +985,8 @@ export default function GastosPage() {
           }}
         />
       )}
+
+      {ConfirmDialog}
     </PageTransition>
   );
 }

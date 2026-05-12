@@ -316,7 +316,7 @@ export interface DiscografiaStats {
   songsByGenre: { genre: string; count: number }[];
   topTags: { tag: string; count: number }[];
   topFeaturing: { artist: string; count: number }[];
-  recentSongs: Pick<Song, "id" | "title" | "artist_name" | "year" | "genre">[];
+  recentSongs: Pick<Song, "id" | "title" | "artist_name" | "year" | "genre" | "cover_art_url" | "bpm" | "key_signature">[];
 }
 
 export interface PlatformCoverage {
@@ -335,7 +335,7 @@ export async function getDiscografiaStats(): Promise<{
   const { data: songs, error } = await supabase
     .from("songs")
     .select(
-      "id, title, artist_name, year, genre, duration_seconds, featuring, tags, spotify_url, youtube_url, apple_music_url, soundcloud_url"
+      "id, title, artist_name, year, genre, duration_seconds, featuring, tags, spotify_url, youtube_url, apple_music_url, soundcloud_url, cover_art_url, bpm, key_signature"
     )
     .eq("is_deleted", false);
 
@@ -438,12 +438,15 @@ export async function getDiscografiaStats(): Promise<{
   const recentSongs = [...songs]
     .sort((a, b) => b.year - a.year)
     .slice(0, 5)
-    .map(({ id, title, artist_name, year, genre }) => ({
+    .map(({ id, title, artist_name, year, genre, cover_art_url, bpm, key_signature }) => ({
       id,
       title,
       artist_name,
       year,
       genre,
+      cover_art_url: cover_art_url ?? null,
+      bpm: bpm ?? null,
+      key_signature: key_signature ?? null,
     }));
 
   return {

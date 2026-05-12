@@ -83,14 +83,14 @@ export function useConfirm() {
             <button
               ref={cancelBtnRef}
               onClick={handleCancel}
-              className="flex-1 py-2.5 rounded-xl border border-border/60 text-sm font-medium hover:bg-secondary/60 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className="flex-1 py-2.5 rounded-xl border border-border/60 text-sm font-medium hover:bg-secondary/60 transition-all active:scale-95 focus:outline-none focus:ring-2 focus:ring-primary/40"
             >
               {dialog.cancelLabel ?? "Cancelar"}
             </button>
             <button
               onClick={handleConfirm}
               className={cn(
-                "flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all focus:outline-none focus:ring-2 focus:ring-offset-2",
+                "flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2",
                 isDanger
                   ? "bg-red-500/90 text-white hover:bg-red-500 shadow-[0_0_16px_hsl(0_84%_60%/0.25)] focus:ring-red-500"
                   : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_0_16px_hsl(var(--primary)/0.25)] focus:ring-primary"

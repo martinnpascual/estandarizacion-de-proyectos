@@ -87,6 +87,21 @@ export default function PerfilPage() {
   const [savingPassword, setSavingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
+  // ── Cmd+S / Ctrl+S → save profile ────────────────────────────────────────
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!((e.metaKey || e.ctrlKey) && (e.key === "s" || e.key === "S"))) return;
+      // Don't intercept if focused inside the password form inputs
+      const target = e.target as HTMLElement;
+      if (target.id === "new-pwd" || target.id === "confirm-pwd") return;
+      e.preventDefault();
+      if (!saving) handleSave(e as unknown as React.FormEvent);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saving, fullName, avatarUrl, artistSlug, bio]);
+
   useEffect(() => {
     Promise.allSettled([
       getProfile(),
@@ -182,12 +197,12 @@ export default function PerfilPage() {
   if (loading) {
     return (
       <div className="space-y-6 max-w-2xl">
-        <div className="h-8 bg-secondary rounded w-48 animate-pulse" />
-        <div className="bg-card border border-border rounded-xl p-6 space-y-4">
+        <div className="h-8 bg-secondary rounded-xl w-48 animate-pulse" />
+        <div className="bg-card border border-border/60 rounded-2xl p-6 space-y-4">
           {[1, 2, 3].map((i) => (
             <div key={i} className="space-y-2">
-              <div className="h-3 bg-secondary rounded w-24 animate-pulse" />
-              <div className="h-10 bg-secondary rounded animate-pulse" />
+              <div className="h-3 bg-secondary rounded-xl w-24 animate-pulse" />
+              <div className="h-10 bg-secondary rounded-xl animate-pulse" />
             </div>
           ))}
         </div>
@@ -198,15 +213,22 @@ export default function PerfilPage() {
   return (
     <div className="space-y-6 max-w-2xl">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold">Mi perfil</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Administra tu información personal
-        </p>
+      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-primary/6 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative flex items-center gap-3 px-6 py-5">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/30 to-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
+            <User className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold leading-tight">Mi perfil</h1>
+            <p className="text-muted-foreground text-xs mt-0.5">Administra tu información personal</p>
+          </div>
+        </div>
       </div>
 
       {/* Avatar preview */}
-      <div className="bg-card border border-border rounded-xl p-6">
+      <div className="bg-card border border-border/60 rounded-2xl p-6">
         <div className="flex items-center gap-5">
           <div className="relative">
             {avatarUrl ? (
@@ -224,7 +246,7 @@ export default function PerfilPage() {
                 <User className="h-8 w-8 text-primary" />
               </div>
             )}
-            <div className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-secondary border border-border flex items-center justify-center">
+            <div className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-secondary border border-border/60 flex items-center justify-center">
               <Camera className="h-3 w-3 text-muted-foreground" />
             </div>
           </div>
@@ -248,7 +270,7 @@ export default function PerfilPage() {
       {/* Edit form */}
       <form
         onSubmit={handleSave}
-        className="bg-card border border-border rounded-xl p-6 space-y-5"
+        className="bg-card border border-border/60 rounded-2xl p-6 space-y-5"
       >
         <h2 className="font-semibold flex items-center gap-2 text-sm">
           <User className="h-4 w-4 text-muted-foreground" />
@@ -257,7 +279,7 @@ export default function PerfilPage() {
 
         {/* Full name */}
         <div className="space-y-1.5">
-          <label className="text-xs text-muted-foreground font-medium">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             Nombre completo
           </label>
           <input
@@ -265,14 +287,14 @@ export default function PerfilPage() {
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
             placeholder="Tu nombre artístico o real"
-            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            className="w-full bg-background border border-border/60 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
             required
           />
         </div>
 
         {/* Email (read-only) */}
         <div className="space-y-1.5">
-          <label className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
             <Mail className="h-3 w-3" />
             Email
           </label>
@@ -280,7 +302,7 @@ export default function PerfilPage() {
             type="email"
             value={profile?.email ?? ""}
             disabled
-            className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-muted-foreground cursor-not-allowed"
+            className="w-full bg-secondary border border-border/60 rounded-xl px-3 py-2 text-sm text-muted-foreground cursor-not-allowed"
           />
           <p className="text-[11px] text-muted-foreground">
             El email no puede modificarse desde aquí
@@ -289,7 +311,7 @@ export default function PerfilPage() {
 
         {/* Avatar URL */}
         <div className="space-y-1.5">
-          <label className="text-xs text-muted-foreground font-medium">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             URL de avatar (opcional)
           </label>
           <input
@@ -297,13 +319,13 @@ export default function PerfilPage() {
             value={avatarUrl}
             onChange={(e) => setAvatarUrl(e.target.value)}
             placeholder="https://..."
-            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            className="w-full bg-background border border-border/60 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
         </div>
 
         {/* Bio */}
         <div className="space-y-1.5">
-          <label className="text-xs text-muted-foreground font-medium">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             Bio pública (opcional)
           </label>
           <textarea
@@ -312,19 +334,19 @@ export default function PerfilPage() {
             maxLength={300}
             rows={3}
             placeholder="Breve descripción del artista para tu EPK público…"
-            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+            className="w-full bg-background border border-border/60 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
           />
           <p className="text-[11px] text-muted-foreground">{bio.length}/300 caracteres</p>
         </div>
 
         {/* EPK Slug */}
         <div className="space-y-1.5">
-          <label className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
             <Globe className="h-3 w-3" />
             Slug de artista (EPK público)
           </label>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground bg-secondary px-2.5 py-2 rounded-l-lg border border-border border-r-0 flex-shrink-0">
+            <span className="text-xs text-muted-foreground bg-secondary px-2.5 py-2 rounded-l-xl border border-border/60 border-r-0 flex-shrink-0">
               /p/
             </span>
             <input
@@ -333,7 +355,7 @@ export default function PerfilPage() {
               onChange={(e) => setArtistSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
               placeholder="nombre-artista"
               maxLength={50}
-              className="flex-1 bg-background border border-border rounded-r-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className="flex-1 bg-background border border-border/60 rounded-r-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
             />
           </div>
           {artistSlug && (
@@ -363,11 +385,11 @@ export default function PerfilPage() {
 
         {/* Role (read-only) */}
         <div className="space-y-1.5">
-          <label className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
             <Shield className="h-3 w-3" />
             Rol
           </label>
-          <div className="flex items-center gap-2 px-3 py-2 bg-secondary rounded-lg border border-border">
+          <div className="flex items-center gap-2 px-3 py-2 bg-secondary rounded-2xl border border-border/60">
             {profile?.role && (
               <span
                 className={cn(
@@ -388,16 +410,17 @@ export default function PerfilPage() {
           <button
             type="submit"
             disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/80 transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="h-4 w-4" />
             {saving ? "Guardando…" : "Guardar cambios"}
+            <kbd className="hidden md:inline-flex ml-1 text-[9px] bg-primary-foreground/20 px-1 py-0.5 rounded font-mono">⌘S</kbd>
           </button>
         </div>
       </form>
 
       {/* Google integration */}
-      <div className="bg-card border border-border rounded-xl p-6 space-y-4">
+      <div className="bg-card border border-border/60 rounded-2xl p-6 space-y-4">
         <h2 className="font-semibold flex items-center gap-2 text-sm">
           <svg
             className="h-4 w-4"
@@ -438,7 +461,7 @@ export default function PerfilPage() {
             <button
               onClick={handleDisconnectGoogle}
               disabled={disconnecting}
-              className="flex items-center gap-2 text-xs px-3 py-1.5 border border-red-500/30 text-red-400 rounded-lg hover:bg-red-500/10 transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 text-xs px-3 py-1.5 border border-red-500/30 text-red-400 rounded-xl hover:bg-red-500/10 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Link2Off className="h-3.5 w-3.5" />
               {disconnecting ? "Desconectando…" : "Desconectar Google"}
@@ -456,7 +479,7 @@ export default function PerfilPage() {
             </p>
             <a
               href="/api/auth/google"
-              className="flex items-center gap-2 text-xs px-3 py-1.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/80 transition-colors w-fit"
+              className="flex items-center gap-2 text-xs px-3 py-1.5 bg-primary text-primary-foreground rounded-xl font-semibold hover:bg-primary/80 transition-all active:scale-95 w-fit"
             >
               <Link2 className="h-3.5 w-3.5" />
               Conectar Google
@@ -466,33 +489,34 @@ export default function PerfilPage() {
       </div>
 
       {/* Password change */}
-      <form onSubmit={handleChangePassword} className="bg-card border border-border rounded-xl p-6 space-y-4">
+      <form onSubmit={handleChangePassword} className="bg-card border border-border/60 rounded-2xl p-6 space-y-4">
         <h2 className="font-semibold flex items-center gap-2 text-sm">
           <KeyRound className="h-4 w-4 text-muted-foreground" />
           Cambiar contraseña
         </h2>
 
         {passwordError && (
-          <p className="text-sm text-red-500 bg-red-500/10 px-3 py-2 rounded-lg">{passwordError}</p>
+          <p className="text-sm text-red-500 bg-red-500/10 px-3 py-2 rounded-2xl">{passwordError}</p>
         )}
 
         <div className="space-y-1.5">
-          <label className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
             <Lock className="h-3 w-3" />
             Nueva contraseña
           </label>
           <div className="relative">
             <input
+              id="new-pwd"
               type={showNewPwd ? "text" : "password"}
               value={newPassword}
               onChange={(e) => { setNewPassword(e.target.value); setPasswordError(null); }}
               placeholder="Mínimo 8 caracteres"
-              className="w-full bg-background border border-border rounded-lg pl-3 pr-10 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className="w-full bg-background border border-border/60 rounded-xl pl-3 pr-10 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
             />
             <button
               type="button"
               onClick={() => setShowNewPwd((v) => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-all active:scale-95"
               tabIndex={-1}
             >
               {showNewPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -520,22 +544,23 @@ export default function PerfilPage() {
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
             <Lock className="h-3 w-3" />
             Confirmar contraseña
           </label>
           <div className="relative">
             <input
+              id="confirm-pwd"
               type={showConfirmPwd ? "text" : "password"}
               value={confirmPassword}
               onChange={(e) => { setConfirmPassword(e.target.value); setPasswordError(null); }}
               placeholder="Repetí la contraseña"
-              className="w-full bg-background border border-border rounded-lg pl-3 pr-10 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className="w-full bg-background border border-border/60 rounded-xl pl-3 pr-10 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
             />
             <button
               type="button"
               onClick={() => setShowConfirmPwd((v) => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-all active:scale-95"
               tabIndex={-1}
             >
               {showConfirmPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -553,7 +578,7 @@ export default function PerfilPage() {
           <button
             type="submit"
             disabled={savingPassword || !newPassword || !confirmPassword}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/80 transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Lock className="h-4 w-4" />
             {savingPassword ? "Guardando…" : "Actualizar contraseña"}
@@ -562,7 +587,7 @@ export default function PerfilPage() {
       </form>
 
       {/* Keyboard shortcuts */}
-      <div className="bg-card border border-border rounded-xl p-6 space-y-4">
+      <div className="bg-card border border-border/60 rounded-2xl p-6 space-y-4">
         <h2 className="font-semibold flex items-center gap-2 text-sm">
           <Keyboard className="h-4 w-4 text-muted-foreground" />
           Atajos de teclado
@@ -570,14 +595,16 @@ export default function PerfilPage() {
         <div className="grid sm:grid-cols-2 gap-x-8 gap-y-2.5">
           {[
             { keys: ["⌘", "K"],          desc: "Abrir búsqueda rápida" },
+            { keys: ["⌘", "S"],          desc: "Guardar perfil (en perfil)" },
             { keys: ["?"],               desc: "Mostrar / ocultar panel de atajos" },
             { keys: ["N"],               desc: "Nuevo item (en páginas de lista)" },
             { keys: ["/"],               desc: "Enfocar búsqueda (en páginas de lista)" },
             { keys: ["V"],               desc: "Alternar vista (lista / tablero / cuadrícula)" },
             { keys: ["E"],               desc: "Exportar CSV (listas) · Exportar .ics (calendario)" },
-            { keys: ["P"],               desc: "Reproducir / pausar (panel detalle de canción)" },
+            { keys: ["P"],               desc: "Reproducir / pausar (panel / detalle de canción)" },
+            { keys: ["L"],               desc: "Mostrar / ocultar letra (detalle de canción)" },
             { keys: ["B"],               desc: "Registrar estadísticas hoy (redes)" },
-            { keys: ["R"],               desc: "Actualizar notificaciones" },
+            { keys: ["R"],               desc: "Actualizar notificaciones / papelera / dashboard" },
             { keys: ["↑", "↓"],          desc: "Navegar entre canciones (discografía)" },
             { keys: ["Enter"],           desc: "Reproducir / abrir detalle (canción seleccionada)" },
             { keys: ["Espacio"],         desc: "Play / Pause (player activo)" },
@@ -599,7 +626,7 @@ export default function PerfilPage() {
                 {keys.map((k, i) => (
                   <span key={i} className="flex items-center gap-1">
                     {i > 0 && <span className="text-[10px] text-muted-foreground/50">+</span>}
-                    <kbd className="text-[10px] bg-secondary border border-border px-1.5 py-0.5 rounded font-mono leading-none">
+                    <kbd className="text-[10px] bg-secondary border border-border/60 px-1.5 py-0.5 rounded font-mono leading-none">
                       {k}
                     </kbd>
                   </span>
@@ -611,7 +638,7 @@ export default function PerfilPage() {
       </div>
 
       {/* Theme */}
-      <div className="bg-card border border-border rounded-xl p-6 space-y-4">
+      <div className="bg-card border border-border/60 rounded-2xl p-6 space-y-4">
         <h2 className="font-semibold flex items-center gap-2 text-sm">
           {theme === "dark" ? <Moon className="h-4 w-4 text-muted-foreground" /> : <Sun className="h-4 w-4 text-muted-foreground" />}
           Apariencia
@@ -625,7 +652,7 @@ export default function PerfilPage() {
             onClick={toggleTheme}
             className={cn(
               "relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary/50",
-              theme === "dark" ? "bg-primary" : "bg-secondary border border-border"
+              theme === "dark" ? "bg-primary" : "bg-secondary border border-border/60"
             )}
             aria-label="Cambiar tema"
           >
@@ -645,7 +672,7 @@ export default function PerfilPage() {
 
       {/* Quick stats */}
       {stats && (
-        <div className="bg-card border border-border rounded-xl p-6 space-y-4">
+        <div className="bg-card border border-border/60 rounded-2xl p-6 space-y-4">
           <h2 className="font-semibold text-sm text-muted-foreground">Resumen del catálogo</h2>
           <div className="grid grid-cols-3 gap-3">
             {[
@@ -659,9 +686,9 @@ export default function PerfilPage() {
               <a
                 key={label}
                 href={href}
-                className="flex flex-col gap-2 p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors group"
+                className="flex flex-col gap-2 p-3 rounded-2xl bg-secondary/50 hover:bg-secondary hover:-translate-y-0.5 hover:shadow-sm transition-all active:scale-[0.98] group"
               >
-                <Icon className={cn("h-4 w-4 flex-shrink-0", color)} />
+                <Icon className={cn("h-4 w-4 flex-shrink-0 group-hover:scale-110 transition-transform", color)} />
                 <div className="min-w-0">
                   <p className="text-xl font-bold tabular-nums leading-none">{value}</p>
                   <p className="text-[10px] text-muted-foreground mt-1 leading-tight">{label}</p>
@@ -674,7 +701,7 @@ export default function PerfilPage() {
 
       {/* Recent activity */}
       {recentActivity.length > 0 && (
-        <div className="bg-card border border-border rounded-xl p-6 space-y-4">
+        <div className="bg-card border border-border/60 rounded-2xl p-6 space-y-4">
           <h2 className="font-semibold text-sm text-muted-foreground flex items-center gap-2">
             <Activity className="h-4 w-4" />
             Actividad reciente
@@ -699,7 +726,7 @@ export default function PerfilPage() {
                 <a
                   key={`${item.id}-${item.action}`}
                   href={item.href}
-                  className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-secondary transition-colors group"
+                  className="flex items-center gap-3 px-2 py-2 rounded-2xl hover:bg-secondary transition-all active:scale-[0.99] group"
                 >
                   <div className={cn("w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0", BG_MAP[item.type])}>
                     <Icon className={cn("h-3.5 w-3.5", COLOR_MAP[item.type])} />
@@ -709,7 +736,7 @@ export default function PerfilPage() {
                     <p className="text-[11px] text-muted-foreground truncate">{item.subtitle}</p>
                   </div>
                   <span className="text-[10px] text-muted-foreground flex-shrink-0 tabular-nums">{timeAgoStr}</span>
-                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
                 </a>
               );
             })}
@@ -720,7 +747,7 @@ export default function PerfilPage() {
       {ConfirmDialog}
 
       {/* Account info */}
-      <div className="bg-card border border-border rounded-xl p-6 space-y-3">
+      <div className="bg-card border border-border/60 rounded-2xl p-6 space-y-3">
         <h2 className="font-semibold text-sm text-muted-foreground">
           Información de cuenta
         </h2>

@@ -120,23 +120,30 @@ export default function PublishDraftModal({
   const platformCount = [form.spotify_url, form.youtube_url, form.apple_music_url, form.soundcloud_url].filter(Boolean).length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-      <div className="bg-card border border-border rounded-xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className="relative w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+        {/* Glow ring */}
+        <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-green-500/20 via-transparent to-emerald-500/10 pointer-events-none" />
+        <div className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl max-h-[90vh] flex flex-col shadow-2xl shadow-black/40">
 
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-border flex-shrink-0">
-          <div>
-            <h2 className="text-base font-semibold flex items-center gap-2">
-              <Upload className="h-4 w-4 text-green-500" />
-              {step === "form" ? "Publicar maqueta" : "Confirmar publicación"}
-            </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              &ldquo;{draft.title}&rdquo; → Discografía
-            </p>
+        <div className="flex items-center justify-between p-5 border-b border-border/60 flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-green-500/15 border border-green-500/20 flex items-center justify-center flex-shrink-0">
+              <Upload className="h-4 w-4 text-green-400" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold">
+                {step === "form" ? "Publicar maqueta" : "Confirmar publicación"}
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                &ldquo;{draft.title}&rdquo; → Discografía
+              </p>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground"
+            className="p-1.5 rounded-xl hover:bg-muted/50 transition-all active:scale-95 text-muted-foreground hover:text-foreground"
           >
             <X className="h-4 w-4" />
           </button>
@@ -144,7 +151,7 @@ export default function PublishDraftModal({
 
         {/* Draft context strip */}
         {(draft.producer || draft.notes) && (
-          <div className="px-5 py-2.5 bg-secondary/30 border-b border-border flex items-start gap-3">
+          <div className="px-5 py-2.5 bg-secondary/30 border-b border-border/60 flex items-start gap-3">
             <Music2 className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 mt-0.5" />
             <div className="min-w-0 flex-1">
               {draft.producer && (
@@ -167,7 +174,7 @@ export default function PublishDraftModal({
           <form onSubmit={handleNext} className="flex-1 overflow-y-auto">
             <div className="p-5 space-y-4">
               {error && (
-                <p className="text-sm text-red-500 bg-red-500/10 px-3 py-2 rounded-lg">{error}</p>
+                <p className="text-sm text-red-500 bg-red-500/10 px-3 py-2 rounded-2xl">{error}</p>
               )}
 
               <SectionLabel icon={Music2} label="Información básica" />
@@ -268,13 +275,13 @@ export default function PublishDraftModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-secondary transition-colors"
+                className="flex-1 py-2.5 rounded-xl border border-border/60 text-sm font-medium hover:bg-secondary/60 transition-all active:scale-95"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                className="flex-1 py-2.5 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                className="flex-1 py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-all active:scale-95 flex items-center justify-center gap-2"
               >
                 Revisar y publicar →
               </button>
@@ -287,13 +294,13 @@ export default function PublishDraftModal({
           <div className="flex-1 overflow-y-auto">
             <div className="p-5 space-y-4">
               {error && (
-                <p className="text-sm text-red-500 bg-red-500/10 px-3 py-2 rounded-lg">{error}</p>
+                <p className="text-sm text-red-500 bg-red-500/10 px-3 py-2 rounded-2xl">{error}</p>
               )}
 
               {/* Summary card */}
-              <div className="bg-secondary/30 rounded-xl border border-border p-4 space-y-3">
+              <div className="bg-secondary/30 rounded-2xl border border-border/60 p-4 space-y-3">
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
                     <Music2 className="h-5 w-5 text-primary" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -357,7 +364,7 @@ export default function PublishDraftModal({
               <button
                 type="button"
                 onClick={() => setStep("form")}
-                className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-secondary transition-colors"
+                className="flex-1 py-2.5 rounded-xl border border-border/60 text-sm font-medium hover:bg-secondary/60 transition-all active:scale-95"
               >
                 ← Atrás
               </button>
@@ -365,7 +372,7 @@ export default function PublishDraftModal({
                 type="button"
                 onClick={handlePublish}
                 disabled={loading}
-                className="flex-1 py-2.5 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 py-2.5 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {loading && <Loader2 className="h-4 w-4 animate-spin" />}
                 Publicar ahora
@@ -373,6 +380,7 @@ export default function PublishDraftModal({
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );
@@ -381,7 +389,7 @@ export default function PublishDraftModal({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <label className="block text-xs font-medium text-muted-foreground">{label}</label>
+      <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</label>
       {children}
     </div>
   );
@@ -392,10 +400,10 @@ function SectionLabel({ icon: Icon, label }: { icon: React.ElementType; label: s
     <div className="flex items-center gap-2 pt-1">
       <Icon className="h-3.5 w-3.5 text-muted-foreground" />
       <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">{label}</span>
-      <div className="flex-1 h-px bg-border" />
+      <div className="flex-1 h-px bg-border/60" />
     </div>
   );
 }
 
 const inputClass =
-  "w-full px-3 py-2.5 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-colors";
+  "w-full px-3 py-2.5 bg-background border border-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-colors";

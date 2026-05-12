@@ -129,7 +129,7 @@ export default function DraftVersionsPanel({ draftId, draftTitle }: Props) {
   }
 
   return (
-    <div className="border-t border-border">
+    <div className="border-t border-border/60">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 bg-secondary/20">
         <div className="flex items-center gap-2">
@@ -152,7 +152,7 @@ export default function DraftVersionsPanel({ draftId, draftTitle }: Props) {
 
       {/* Note input after file selection */}
       {showNoteInput && pendingFile && (
-        <div className="px-4 py-3 bg-secondary/30 border-b border-border space-y-2">
+        <div className="px-4 py-3 bg-secondary/30 border-b border-border/60 space-y-2">
           <p className="text-xs text-muted-foreground truncate">
             Archivo: <span className="text-foreground font-medium">{pendingFile.name}</span>
           </p>
@@ -161,7 +161,7 @@ export default function DraftVersionsPanel({ draftId, draftTitle }: Props) {
             placeholder="Notas de esta versión (opcional)"
             value={addNotes}
             onChange={(e) => setAddNotes(e.target.value)}
-            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
+            className="w-full px-3 py-2 bg-background border border-border/60 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/50"
             onKeyDown={(e) => {
               if (e.key === "Enter") { e.preventDefault(); handleConfirmAdd(); }
               if (e.key === "Escape") { e.stopPropagation(); setShowNoteInput(false); setPendingFile(null); setAddNotes(""); }
@@ -171,14 +171,14 @@ export default function DraftVersionsPanel({ draftId, draftTitle }: Props) {
           <div className="flex gap-2">
             <button
               onClick={() => { setShowNoteInput(false); setPendingFile(null); setAddNotes(""); }}
-              className="flex-1 py-1.5 rounded-lg border border-border text-xs hover:bg-secondary transition-colors"
+              className="flex-1 py-1.5 rounded-xl border border-border/60 text-xs hover:bg-secondary/60 transition-all active:scale-95"
             >
               Cancelar
             </button>
             <button
               onClick={handleConfirmAdd}
               disabled={adding}
-              className="flex-1 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/80 transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
+              className="flex-1 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
             >
               {adding && <Loader2 className="h-3 w-3 animate-spin" />}
               Guardar versión
@@ -198,7 +198,7 @@ export default function DraftVersionsPanel({ draftId, draftTitle }: Props) {
           <p className="text-xs text-muted-foreground">Sin versiones guardadas</p>
         </div>
       ) : (
-        <div className="divide-y divide-border">
+        <div className="divide-y divide-border/50">
           {versions.map((v) => {
             const isActive = player.currentTrack?.id === v.id;
             const isPlaying = isActive && player.isPlaying;
@@ -206,7 +206,7 @@ export default function DraftVersionsPanel({ draftId, draftTitle }: Props) {
             <div
               key={v.id}
               className={cn(
-                "flex items-center gap-3 px-4 py-2.5 transition-colors group",
+                "flex items-center gap-3 px-4 py-2.5 transition-all group",
                 isPlaying
                   ? "bg-primary/5"
                   : isActive
@@ -251,7 +251,7 @@ export default function DraftVersionsPanel({ draftId, draftTitle }: Props) {
                       onClick={() => playVersion(v)}
                       title={isPlaying ? "Pausar" : "Reproducir"}
                       className={cn(
-                        "p-1.5 rounded-lg transition-colors",
+                        "p-1.5 rounded-xl transition-all active:scale-95",
                         isPlaying
                           ? "text-primary bg-primary/10 flex"
                           : isActive
@@ -272,7 +272,7 @@ export default function DraftVersionsPanel({ draftId, draftTitle }: Props) {
                       }}
                       title="Copiar URL"
                       className={cn(
-                        "p-1.5 rounded-lg transition-colors",
+                        "p-1.5 rounded-xl transition-all active:scale-95",
                         copiedVersionId === v.id
                           ? "flex text-green-400 bg-green-500/10"
                           : "hidden group-hover:flex text-muted-foreground hover:text-foreground hover:bg-secondary"
@@ -287,7 +287,7 @@ export default function DraftVersionsPanel({ draftId, draftTitle }: Props) {
                       target="_blank"
                       rel="noopener noreferrer"
                       title="Abrir en Drive"
-                      className="hidden group-hover:flex p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                      className="hidden group-hover:flex p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary transition-all active:scale-95"
                     >
                       <ExternalLink className="h-3 w-3" />
                     </a>
@@ -297,7 +297,7 @@ export default function DraftVersionsPanel({ draftId, draftTitle }: Props) {
                   onClick={() => handleDelete(v.id)}
                   disabled={deletingId === v.id}
                   title="Eliminar versión"
-                  className="hidden group-hover:flex p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                  className="hidden group-hover:flex p-1.5 rounded-xl text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {deletingId === v.id ? (
                     <Loader2 className="h-3 w-3 animate-spin" />

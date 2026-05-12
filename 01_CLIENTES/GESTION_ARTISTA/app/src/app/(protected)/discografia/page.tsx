@@ -31,6 +31,7 @@ import {
   Globe,
   ExternalLink,
   CalendarDays,
+  Zap,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -85,8 +86,17 @@ export default function DiscografiaPage() {
   const [missingGenreFilter, setMissingGenreFilter] = useState(false);
   const [missingAudioFilter, setMissingAudioFilter] = useState(false);
   const [missingCoverArtFilter, setMissingCoverArtFilter] = useState(false);
-  const [sortBy, setSortBy] = useState<"default" | "az" | "za" | "duration_asc" | "duration_desc" | "newest" | "oldest">("default");
-  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [missingBpmFilter, setMissingBpmFilter] = useState(false);
+  const [sortBy, setSortBy] = useState<"default" | "az" | "za" | "duration_asc" | "duration_desc" | "newest" | "oldest">(() =>
+    typeof window !== "undefined"
+      ? (localStorage.getItem("discografia-sort") as "default" | "az" | "za" | "duration_asc" | "duration_desc" | "newest" | "oldest") || "default"
+      : "default"
+  );
+  const [viewMode, setViewMode] = useState<"list" | "grid">(() =>
+    typeof window !== "undefined"
+      ? (localStorage.getItem("discografia-view-mode") as "list" | "grid") || "list"
+      : "list"
+  );
   const [copiedSongId, setCopiedSongId] = useState<string | null>(null);
 
   function handleCopySongLink(e: React.MouseEvent, songId: string) {
@@ -254,6 +264,10 @@ export default function DiscografiaPage() {
     return () => document.removeEventListener("keydown", onKey);
   }, [selectedSong, detailSong, keyboardSongId]);
 
+  // Persist view mode + sort to localStorage
+  useEffect(() => { localStorage.setItem("discografia-view-mode", viewMode); }, [viewMode]);
+  useEffect(() => { localStorage.setItem("discografia-sort", sortBy); }, [sortBy]);
+
   // Keyboard: / = focus search; ↑/↓ = navigate songs; Enter = play/open detail
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -379,6 +393,7 @@ export default function DiscografiaPage() {
     if (missingGenreFilter) result = result.filter(s => !s.genre);
     if (missingAudioFilter) result = result.filter(s => !s.drive_file_url && !s.drive_file_id);
     if (missingCoverArtFilter) result = result.filter(s => !s.cover_art_url);
+    if (missingBpmFilter) result = result.filter(s => (!!s.drive_file_url || !!s.drive_file_id) && (!s.bpm || !s.key_signature));
     switch (sortBy) {
       case "az":            result.sort((a, b) => a.title.localeCompare(b.title)); break;
       case "za":            result.sort((a, b) => b.title.localeCompare(a.title)); break;
@@ -388,7 +403,7 @@ export default function DiscografiaPage() {
       case "oldest":        result.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()); break;
     }
     return result;
-  }, [songs, genreFilter, missingPlatformFilter, missingGenreFilter, missingAudioFilter, missingCoverArtFilter, sortBy]);
+  }, [songs, genreFilter, missingPlatformFilter, missingGenreFilter, missingAudioFilter, missingCoverArtFilter, missingBpmFilter, sortBy]);
 
   // Stable dispatch — onAction no cambia entre renders → memo en SongRow funciona
   type SongActionType = "play" | "select" | "edit" | "delete" | "detail" | "lyrics";
@@ -416,15 +431,18 @@ export default function DiscografiaPage() {
         detailSong ? "flex-1" : "w-full"
       )}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Disc3 className="h-6 w-6 text-primary" />
-            Discografía
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Toda la música publicada organizada por año
-          </p>
+      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-primary/6 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-5">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/30 to-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
+            <Disc3 className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold leading-tight">Discografía</h1>
+            <p className="text-muted-foreground text-xs mt-0.5">Toda la música publicada organizada por año</p>
+          </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {songs.length > 0 && (
@@ -435,7 +453,7 @@ export default function DiscografiaPage() {
                   <button
                     onClick={handlePlayAll}
                     title="Reproducir todo"
-                    className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg hover:bg-secondary transition-colors text-sm text-muted-foreground hover:text-foreground"
+                    className="flex items-center gap-1.5 px-3 py-2 border border-border/60 rounded-xl hover:bg-secondary/60 transition-all active:scale-95 text-sm text-muted-foreground hover:text-foreground"
                   >
                     <ListMusic className="h-4 w-4" />
                     <span className="hidden sm:inline">Reproducir</span>
@@ -443,7 +461,7 @@ export default function DiscografiaPage() {
                   <button
                     onClick={handleShuffleAll}
                     title="Reproducir en modo aleatorio"
-                    className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg hover:bg-secondary transition-colors text-sm text-muted-foreground hover:text-foreground"
+                    className="flex items-center gap-1.5 px-3 py-2 border border-border/60 rounded-xl hover:bg-secondary/60 transition-all active:scale-95 text-sm text-muted-foreground hover:text-foreground"
                   >
                     <Shuffle className="h-4 w-4" />
                     <span className="hidden sm:inline">Aleatorio</span>
@@ -451,12 +469,12 @@ export default function DiscografiaPage() {
                 </>
               )}
               {/* View toggle */}
-              <div className="flex items-center border border-border rounded-lg overflow-hidden">
+              <div className="flex items-center border border-border/60 rounded-xl overflow-hidden">
                 <button
                   onClick={() => setViewMode("list")}
                   title="Vista lista"
                   className={cn(
-                    "px-2.5 py-2 transition-colors",
+                    "px-2.5 py-2 transition-all active:scale-95",
                     viewMode === "list" ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -466,7 +484,7 @@ export default function DiscografiaPage() {
                   onClick={() => setViewMode("grid")}
                   title="Vista cuadrícula"
                   className={cn(
-                    "px-2.5 py-2 transition-colors border-l border-border",
+                    "px-2.5 py-2 transition-all active:scale-95 border-l border-border/60",
                     viewMode === "grid" ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -478,7 +496,7 @@ export default function DiscografiaPage() {
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                  className="appearance-none pl-7 pr-7 py-2 bg-card border border-border rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer"
+                  className="appearance-none pl-7 pr-7 py-2 bg-card border border-border/60 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer"
                 >
                   <option value="default">Orden original</option>
                   <option value="newest">Más reciente</option>
@@ -492,8 +510,8 @@ export default function DiscografiaPage() {
               </div>
               <button
                 onClick={handleExportCSV}
-                title="Exportar como CSV"
-                className="flex items-center gap-2 px-3 py-2 border border-border rounded-lg hover:bg-secondary transition-colors text-sm text-muted-foreground hover:text-foreground"
+                title="Exportar como CSV (E)"
+                className="flex items-center gap-2 px-3 py-2 border border-border/60 rounded-xl hover:bg-secondary/60 transition-all active:scale-95 text-sm text-muted-foreground hover:text-foreground"
               >
                 <Download className="h-4 w-4" />
                 <span className="hidden sm:inline">Exportar</span>
@@ -502,7 +520,7 @@ export default function DiscografiaPage() {
           )}
           <Link
             href="/discografia/timeline"
-            className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg hover:bg-secondary transition-colors text-sm text-muted-foreground hover:text-foreground"
+            className="flex items-center gap-1.5 px-3 py-2 border border-border/60 rounded-xl hover:bg-secondary/60 transition-all active:scale-95 text-sm text-muted-foreground hover:text-foreground"
             title="Ver timeline de lanzamientos"
           >
             <CalendarDays className="h-4 w-4" />
@@ -510,12 +528,13 @@ export default function DiscografiaPage() {
           </Link>
           <button
             onClick={handleAdd}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/80 transition-colors text-sm font-medium"
+            className="flex items-center gap-2 px-4 py-2 bg-primary/90 hover:bg-primary text-primary-foreground rounded-xl transition-all active:scale-95 text-sm font-semibold shadow-lg shadow-primary/20 hover:shadow-primary/30"
           >
             <Plus className="h-4 w-4" />
             Agregar canción
-            <kbd className="hidden md:inline-flex ml-1 text-[9px] bg-primary/20 px-1 py-0.5 rounded font-mono">N</kbd>
+            <kbd className="hidden md:inline-flex ml-1 text-[9px] bg-primary-foreground/20 px-1 py-0.5 rounded font-mono">N</kbd>
           </button>
+        </div>
         </div>
       </div>
 
@@ -537,7 +556,7 @@ export default function DiscografiaPage() {
           ) : searchQuery ? (
             <button
               onClick={() => setSearchQuery("")}
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              className="text-muted-foreground hover:text-foreground transition-all active:scale-95"
             >
               <X className="h-4 w-4" />
             </button>
@@ -554,9 +573,9 @@ export default function DiscografiaPage() {
                 key={year}
                 onClick={() => setSelectedYear(year)}
                 className={cn(
-                  "px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors",
+                  "px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all active:scale-95",
                   selectedYear === year
-                    ? "bg-primary text-primary-foreground"
+                    ? "bg-primary text-primary-foreground font-semibold"
                     : "bg-secondary text-muted-foreground hover:text-foreground"
                 )}
               >
@@ -605,9 +624,9 @@ export default function DiscografiaPage() {
                   key={genre}
                   onClick={() => setGenreFilter(active ? null : genre)}
                   className={cn(
-                    "flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full transition-colors",
+                    "flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full transition-all active:scale-95",
                     active
-                      ? "bg-primary/20 text-primary border border-primary/30"
+                      ? "bg-primary/20 text-primary border border-primary/30 font-semibold"
                       : "bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80"
                   )}
                   title={active ? "Quitar filtro" : `Filtrar por ${genre}`}
@@ -640,7 +659,7 @@ export default function DiscografiaPage() {
                 <button
                   onClick={() => setMissingAudioFilter(!missingAudioFilter)}
                   className={cn(
-                    "flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full transition-colors",
+                    "flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full transition-all active:scale-95",
                     missingAudioFilter
                       ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
                       : "bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80"
@@ -660,7 +679,7 @@ export default function DiscografiaPage() {
                 <button
                   onClick={() => setMissingPlatformFilter(!missingPlatformFilter)}
                   className={cn(
-                    "flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full transition-colors",
+                    "flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full transition-all active:scale-95",
                     missingPlatformFilter
                       ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
                       : "bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80"
@@ -679,7 +698,7 @@ export default function DiscografiaPage() {
                 <button
                   onClick={() => { setMissingGenreFilter(!missingGenreFilter); setGenreFilter(null); }}
                   className={cn(
-                    "flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full transition-colors",
+                    "flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full transition-all active:scale-95",
                     missingGenreFilter
                       ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30"
                       : "bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80"
@@ -698,7 +717,7 @@ export default function DiscografiaPage() {
                 <button
                   onClick={() => setMissingCoverArtFilter(!missingCoverArtFilter)}
                   className={cn(
-                    "flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full transition-colors",
+                    "flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full transition-all active:scale-95",
                     missingCoverArtFilter
                       ? "bg-pink-500/20 text-pink-400 border border-pink-500/30"
                       : "bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80"
@@ -708,6 +727,26 @@ export default function DiscografiaPage() {
                   <ImageOff className="h-3 w-3 flex-shrink-0" />
                   {withoutCover} sin cover
                   {missingCoverArtFilter && <X className="h-2.5 w-2.5 ml-0.5 opacity-70" />}
+                </button>
+              );
+            })()}
+            {(() => {
+              const withoutBpm = songs.filter(s => (!!s.drive_file_url || !!s.drive_file_id) && (!s.bpm || !s.key_signature)).length;
+              if (withoutBpm === 0) return null;
+              return (
+                <button
+                  onClick={() => setMissingBpmFilter(!missingBpmFilter)}
+                  className={cn(
+                    "flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full transition-all active:scale-95",
+                    missingBpmFilter
+                      ? "bg-violet-500/20 text-violet-400 border border-violet-500/30"
+                      : "bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80"
+                  )}
+                  title={missingBpmFilter ? "Mostrar todas" : "Ver canciones sin BPM o tonalidad"}
+                >
+                  <Zap className="h-3 w-3 flex-shrink-0" />
+                  {withoutBpm} sin BPM/key
+                  {missingBpmFilter && <X className="h-2.5 w-2.5 ml-0.5 opacity-70" />}
                 </button>
               );
             })()}
@@ -850,7 +889,7 @@ export default function DiscografiaPage() {
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
                         title="Descargar audio"
-                        className="flex-shrink-0 p-1 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors opacity-0 group-hover:opacity-100"
+                        className="flex-shrink-0 p-1 rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all active:scale-95 opacity-0 group-hover:opacity-100"
                       >
                         <ArrowDownToLine className="h-3 w-3" />
                       </a>
@@ -913,7 +952,7 @@ export default function DiscografiaPage() {
                         <button
                           onClick={(e) => { e.stopPropagation(); setLyricsSong(song); }}
                           title="Ver letra"
-                          className="p-1 rounded-md text-primary/60 hover:text-primary hover:bg-primary/10 transition-colors"
+                          className="p-1 rounded-xl text-primary/60 hover:text-primary hover:bg-primary/10 transition-all active:scale-95"
                         >
                           <FileText className="h-3 w-3" />
                         </button>
@@ -922,7 +961,7 @@ export default function DiscografiaPage() {
                         onClick={(e) => handleCopySongLink(e, song.id)}
                         title="Copiar enlace"
                         className={cn(
-                          "p-1 rounded-md transition-colors opacity-0 group-hover:opacity-100",
+                          "p-1 rounded-xl transition-all active:scale-95 opacity-0 group-hover:opacity-100",
                           copiedSongId === song.id ? "text-green-400" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
                         )}
                       >
@@ -941,7 +980,7 @@ export default function DiscografiaPage() {
 
       {/* List view — Contenido */}
       {(viewMode === "list" || loading || displayedSongs.length === 0) && (
-      <div className="bg-card rounded-xl border border-border overflow-hidden">
+      <div className="bg-card rounded-2xl border border-border/60 overflow-hidden">
         {loading ? (
           <div>
             {Array.from({ length: 8 }).map((_, i) => <SongRowSkeleton key={i} />)}
@@ -973,7 +1012,7 @@ export default function DiscografiaPage() {
             {!isSearching && (
               <button
                 onClick={handleAdd}
-                className="mt-4 flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/25 text-primary rounded-xl text-sm font-medium hover:bg-primary/20 transition-colors"
+                className="mt-4 flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/25 text-primary rounded-xl text-sm font-medium hover:bg-primary/20 transition-all active:scale-95"
               >
                 <Plus className="h-4 w-4" />
                 Agregar canción
@@ -1029,7 +1068,7 @@ export default function DiscografiaPage() {
             )}
             <button
               onClick={() => { setGenreFilter(null); setSortBy("default"); setMissingPlatformFilter(false); setMissingGenreFilter(false); setMissingAudioFilter(false); }}
-              className="mt-4 text-xs text-primary/70 hover:text-primary transition-colors"
+              className="mt-4 text-xs text-primary/70 hover:text-primary transition-all active:scale-95"
             >
               Quitar filtros
             </button>
@@ -1048,16 +1087,16 @@ export default function DiscografiaPage() {
               <div>
                 {years.map((year) => (
                   <div key={year}>
-                    <div className="flex items-center gap-3 px-4 py-2 bg-secondary/30 border-b border-border sticky top-0 z-10">
+                    <div className="flex items-center gap-3 px-4 py-2 bg-secondary/30 border-b border-border/60 sticky top-0 z-10">
                       <span className="text-xs font-bold text-muted-foreground tracking-widest">{year}</span>
-                      <div className="flex-1 h-px bg-border" />
+                      <div className="flex-1 h-px bg-border/60" />
                       <span className="text-[10px] text-muted-foreground">{yearGroups[year].length}</span>
                     </div>
-                    <div className="divide-y divide-border">
+                    <div className="divide-y divide-border/50">
                       {yearGroups[year].map((song) => {
                         const idx = globalIdx++;
                         return (
-                          <div key={song.id} id={`song-row-${song.id}`}>
+                          <div key={song.id} id={`song-row-${song.id}`} onDoubleClick={() => handleEdit(song)}>
                             <SongRow
                               song={song}
                               index={idx + 1}
@@ -1076,9 +1115,9 @@ export default function DiscografiaPage() {
             );
           })()
         ) : (
-          <div className="divide-y divide-border">
+          <div className="divide-y divide-border/50">
             {displayedSongs.map((song, idx) => (
-              <div key={song.id} id={`song-row-${song.id}`}>
+              <div key={song.id} id={`song-row-${song.id}`} onDoubleClick={() => handleEdit(song)}>
                 <SongRow
                   song={song}
                   index={idx + 1}
@@ -1096,14 +1135,14 @@ export default function DiscografiaPage() {
 
       {/* Panel de comentarios */}
       {selectedSong && (
-        <div className="bg-card rounded-xl border border-border overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-2 bg-secondary/50 border-b border-border">
+        <div className="bg-card rounded-2xl border border-border/60 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-2 bg-secondary/50 border-b border-border/60">
             <span className="text-xs text-muted-foreground font-medium">
               {selectedSong.title}
             </span>
             <button
               onClick={() => setSelectedSong(null)}
-              className="p-1 rounded hover:bg-secondary text-muted-foreground"
+              className="p-1 rounded-xl hover:bg-secondary text-muted-foreground"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -1126,7 +1165,7 @@ export default function DiscografiaPage() {
         <>
           {/* Desktop: sidebar fijo a la derecha */}
           <div
-            className="hidden md:flex flex-col flex-shrink-0 w-80 xl:w-[360px] sticky top-0 self-start border-l border-border overflow-hidden"
+            className="hidden md:flex flex-col flex-shrink-0 w-80 xl:w-[360px] sticky top-0 self-start border-l border-border/60 overflow-hidden"
             style={{ height: "calc(100vh - 72px)" }}
           >
             <SongDetailPanel
@@ -1253,7 +1292,7 @@ const SongRow = memo(function SongRow({
   return (
     <div
       className={cn(
-        "stagger-item flex items-center gap-3 px-4 py-3 hover:bg-secondary/40 transition-all duration-150 group rounded-lg mx-1",
+        "stagger-item flex items-center gap-3 px-4 py-3 hover:bg-secondary/40 transition-all duration-150 active:scale-[0.99] group rounded-2xl mx-1",
         isPlaying && "bg-primary/5",
         isSelected && "bg-secondary/60",
         isKeyboardSelected && "ring-1 ring-inset ring-primary/50 bg-primary/5"
@@ -1267,7 +1306,7 @@ const SongRow = memo(function SongRow({
             <button
               onClick={() => onAction("play", song)}
               title="Pausar"
-              className="hidden group-hover:flex items-center justify-center w-7 h-7 rounded-full bg-primary text-primary-foreground hover:bg-primary/80 transition-colors"
+              className="hidden group-hover:flex items-center justify-center w-7 h-7 rounded-full bg-primary text-primary-foreground hover:bg-primary/80 transition-all active:scale-95"
             >
               <Pause className="h-3 w-3" />
             </button>
@@ -1284,7 +1323,7 @@ const SongRow = memo(function SongRow({
           <button
             onClick={() => onAction("play", song)}
             title="Reproducir"
-            className="flex items-center justify-center w-7 h-7 rounded-full text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-colors"
+            className="flex items-center justify-center w-7 h-7 rounded-full text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-all active:scale-95"
           >
             <Play className="h-3 w-3 ml-0.5" />
           </button>
@@ -1296,7 +1335,7 @@ const SongRow = memo(function SongRow({
 
       {/* Cover art placeholder */}
       <div className={cn(
-        "w-9 h-9 flex-shrink-0 rounded-lg flex items-center justify-center overflow-hidden relative",
+        "w-9 h-9 flex-shrink-0 rounded-xl flex items-center justify-center overflow-hidden relative",
         !song.cover_art_url && genreColors ? genreColors.bg : "bg-secondary"
       )}>
         {song.cover_art_url ? (
@@ -1305,10 +1344,10 @@ const SongRow = memo(function SongRow({
             alt={song.title}
             fill
             sizes="36px"
-            className="rounded-lg object-cover"
+            className="rounded-xl object-cover"
           />
         ) : (
-          <Music className={cn("h-4 w-4", genreColors ? genreColors.text : "text-muted-foreground/50")} />
+          <Music className={cn("h-4 w-4 group-hover:scale-110 transition-transform", genreColors ? genreColors.text : "text-muted-foreground/50")} />
         )}
       </div>
 
@@ -1333,6 +1372,16 @@ const SongRow = memo(function SongRow({
           )}
           {song.genre && !genreColors && (
             <span className="text-xs text-muted-foreground"> · {song.genre}</span>
+          )}
+          {song.bpm && (
+            <span className="text-[10px] text-blue-400/70 font-mono tabular-nums flex-shrink-0" title="BPM">
+              {song.bpm}bpm
+            </span>
+          )}
+          {song.key_signature && (
+            <span className="text-[10px] text-purple-400/70 font-medium flex-shrink-0" title="Tonalidad">
+              {song.key_signature}
+            </span>
           )}
         </div>
       </button>
@@ -1364,7 +1413,7 @@ const SongRow = memo(function SongRow({
               target="_blank"
               rel="noopener noreferrer"
               className={cn(
-                "inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded text-[10px] font-bold transition-colors",
+                "inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded-xl text-[10px] font-bold transition-colors",
                 color
               )}
               title={label}
@@ -1385,10 +1434,23 @@ const SongRow = memo(function SongRow({
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
           title="Descargar audio"
-          className="flex-shrink-0 p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+          className="flex-shrink-0 p-1.5 rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all active:scale-95"
         >
           <ArrowDownToLine className="h-3.5 w-3.5" />
         </a>
+      )}
+
+      {/* Analizar BPM hint — solo si hay audio y faltan datos musicales */}
+      {hasAudio && !song.bpm && !song.key_signature && (
+        <Link
+          href="/analizar"
+          onClick={(e) => e.stopPropagation()}
+          title="Analizar BPM y tonalidad"
+          className="hidden group-hover:flex items-center gap-1 px-2 py-1 rounded-xl bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 transition-all active:scale-95 flex-shrink-0 text-[10px] font-medium"
+        >
+          <Zap className="h-3 w-3" />
+          BPM
+        </Link>
       )}
 
       {/* Public badge (always visible) */}
@@ -1405,14 +1467,14 @@ const SongRow = memo(function SongRow({
           href={`/discografia/${song.id}`}
           onClick={(e) => e.stopPropagation()}
           title="Abrir página completa"
-          className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+          className="p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary transition-all active:scale-95"
         >
           <ExternalLink className="h-3.5 w-3.5" />
         </Link>
         <button
           onClick={handleCopyLink}
           className={cn(
-            "p-1.5 rounded-lg transition-colors",
+            "p-1.5 rounded-xl transition-all active:scale-95",
             linkCopied ? "text-green-400" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
           )}
           title="Copiar enlace"
@@ -1422,7 +1484,7 @@ const SongRow = memo(function SongRow({
         <button
           onClick={() => onAction("select", song)}
           className={cn(
-            "p-1.5 rounded-lg transition-colors",
+            "p-1.5 rounded-xl transition-all active:scale-95",
             isSelected
               ? "bg-primary/15 text-primary"
               : "hover:bg-secondary text-muted-foreground hover:text-foreground"
@@ -1434,7 +1496,7 @@ const SongRow = memo(function SongRow({
         <button
           onClick={() => onAction("lyrics", song)}
           className={cn(
-            "p-1.5 rounded-lg transition-colors",
+            "p-1.5 rounded-xl transition-all active:scale-95",
             song.lyrics
               ? "text-primary/70 hover:text-primary hover:bg-primary/10"
               : "text-muted-foreground hover:text-foreground hover:bg-secondary"
@@ -1445,14 +1507,14 @@ const SongRow = memo(function SongRow({
         </button>
         <button
           onClick={() => onAction("edit", song)}
-          className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+          className="p-1.5 rounded-xl hover:bg-secondary transition-all active:scale-95 text-muted-foreground hover:text-foreground"
           title="Editar"
         >
           <Pencil className="h-3.5 w-3.5" />
         </button>
         <button
           onClick={() => onAction("delete", song)}
-          className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors text-muted-foreground hover:text-red-500"
+          className="p-1.5 rounded-xl hover:bg-red-500/10 transition-all active:scale-95 text-muted-foreground hover:text-red-500"
           title="Eliminar"
         >
           <Trash2 className="h-3.5 w-3.5" />

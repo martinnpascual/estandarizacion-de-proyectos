@@ -84,7 +84,7 @@ function ToastItem({
   return (
     <div
       className={cn(
-        "flex items-start gap-3 px-4 py-3 rounded-xl shadow-xl border text-sm min-w-[260px] max-w-xs transition-all duration-300",
+        "flex items-start gap-3 px-4 py-3 rounded-2xl shadow-2xl shadow-black/30 border text-sm min-w-[260px] max-w-xs transition-all duration-300 backdrop-blur-xl",
         META.classes,
         visible
           ? "opacity-100 translate-x-0"
@@ -98,7 +98,7 @@ function ToastItem({
           setVisible(false);
           setTimeout(() => onDismiss(toast.id), 300);
         }}
-        className="flex-shrink-0 p-0.5 rounded hover:bg-secondary text-muted-foreground transition-colors"
+        className="flex-shrink-0 p-0.5 rounded-xl hover:bg-secondary text-muted-foreground transition-all active:scale-95"
       >
         <X className="h-3.5 w-3.5" />
       </button>

@@ -111,10 +111,18 @@ export default function CalendarioPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState<"push" | "pull" | null>(null);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"calendar" | "agenda" | "year">("calendar");
+  const [viewMode, setViewMode] = useState<"calendar" | "agenda" | "year">(() =>
+    typeof window !== "undefined"
+      ? (localStorage.getItem("calendario-view-mode") as "calendar" | "agenda" | "year") || "calendar"
+      : "calendar"
+  );
   const [yearEvents, setYearEvents] = useState<CalendarEvent[]>([]);
   const [yearLoading, setYearLoading] = useState(false);
-  const [typeFilter, setTypeFilter] = useState<CalendarEventType | "all">("all");
+  const [typeFilter, setTypeFilter] = useState<CalendarEventType | "all">(() =>
+    typeof window !== "undefined"
+      ? (localStorage.getItem("calendario-type-filter") as CalendarEventType | "all") || "all"
+      : "all"
+  );
   const [agendaSearch, setAgendaSearch] = useState("");
   const eventTitleRef = useRef<HTMLInputElement>(null);
   const deepLinkAppliedRef = useRef(false);
@@ -277,6 +285,10 @@ export default function CalendarioPage() {
     return () => document.removeEventListener("keydown", onKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewYear, viewMonth, player.currentTrack]);
+
+  // Persist view mode and type filter to localStorage
+  useEffect(() => { localStorage.setItem("calendario-view-mode", viewMode); }, [viewMode]);
+  useEffect(() => { localStorage.setItem("calendario-type-filter", typeFilter); }, [typeFilter]);
 
   function openCreate(date?: string) {
     setEditingEvent(null);
@@ -490,23 +502,26 @@ export default function CalendarioPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Calendar className="h-6 w-6 text-green-400" />
-            Calendario
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Lanzamientos, sesiones, eventos y reuniones
-          </p>
+      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card">
+        <div className="absolute inset-0 bg-gradient-to-br from-green-500/8 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-green-500/6 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-5">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500/30 to-green-600/10 border border-green-500/20 flex items-center justify-center flex-shrink-0">
+            <Calendar className="h-5 w-5 text-green-400" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold leading-tight">Calendario</h1>
+            <p className="text-muted-foreground text-xs mt-0.5">Lanzamientos, sesiones, eventos y reuniones</p>
+          </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* View mode toggle */}
-          <div className="flex items-center gap-0.5 bg-secondary rounded-lg p-0.5">
+          <div className="flex items-center gap-0.5 bg-secondary/60 rounded-xl p-0.5 border border-border/40">
             <button
               onClick={() => setViewMode("calendar")}
               className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all active:scale-95",
                 viewMode === "calendar"
                   ? "bg-card text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
@@ -518,7 +533,7 @@ export default function CalendarioPage() {
             <button
               onClick={() => setViewMode("agenda")}
               className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all active:scale-95",
                 viewMode === "agenda"
                   ? "bg-card text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
@@ -530,7 +545,7 @@ export default function CalendarioPage() {
             <button
               onClick={() => setViewMode("year")}
               className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all active:scale-95",
                 viewMode === "year"
                   ? "bg-card text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
@@ -549,7 +564,7 @@ export default function CalendarioPage() {
                 setViewMonth(today.getMonth() + 1);
                 setSelectedDate(todayStr);
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary border border-primary/20 rounded-lg text-xs font-medium hover:bg-primary/15 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary border border-primary/20 rounded-xl text-xs font-medium hover:bg-primary/15 transition-all active:scale-95"
             >
               Hoy
             </button>
@@ -558,7 +573,7 @@ export default function CalendarioPage() {
           <button
             onClick={handlePullFromGoogle}
             disabled={syncing !== null}
-            className="flex items-center gap-1.5 px-3 py-2 bg-card border border-border rounded-lg hover:bg-secondary transition-colors text-sm text-muted-foreground disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-2 bg-card border border-border/60 rounded-xl hover:bg-secondary/60 transition-all active:scale-95 text-sm text-muted-foreground disabled:opacity-50 disabled:cursor-not-allowed"
             title="Importar desde Google Calendar"
           >
             {syncing === "pull" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
@@ -567,7 +582,7 @@ export default function CalendarioPage() {
           <button
             onClick={handlePushToGoogle}
             disabled={syncing !== null}
-            className="flex items-center gap-1.5 px-3 py-2 bg-card border border-border rounded-lg hover:bg-secondary transition-colors text-sm text-muted-foreground disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-2 bg-card border border-border/60 rounded-xl hover:bg-secondary/60 transition-all active:scale-95 text-sm text-muted-foreground disabled:opacity-50 disabled:cursor-not-allowed"
             title="Exportar a Google Calendar"
           >
             {syncing === "push" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
@@ -576,7 +591,7 @@ export default function CalendarioPage() {
           {events.length > 0 && (
             <button
               onClick={handleExportICS}
-              className="flex items-center gap-1.5 px-3 py-2 bg-card border border-border rounded-lg hover:bg-secondary transition-colors text-sm text-muted-foreground"
+              className="flex items-center gap-1.5 px-3 py-2 bg-card border border-border/60 rounded-xl hover:bg-secondary/60 transition-all active:scale-95 text-sm text-muted-foreground"
               title={`Descargar ${MONTHS_ES[viewMonth - 1]} ${viewYear} como archivo ICS`}
             >
               <FileDown className="h-3.5 w-3.5" />
@@ -585,25 +600,26 @@ export default function CalendarioPage() {
           )}
           <button
             onClick={() => openCreate()}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/80 transition-colors text-sm font-medium"
+            className="flex items-center gap-2 px-4 py-2 bg-green-500/90 hover:bg-green-500 text-white rounded-xl transition-all active:scale-95 text-sm font-semibold shadow-lg shadow-green-500/20 hover:shadow-green-500/30"
           >
             <Plus className="h-4 w-4" />
             Nuevo evento
-            <kbd className="hidden md:inline-flex ml-1 text-[9px] bg-primary/20 px-1 py-0.5 rounded font-mono">N</kbd>
+            <kbd className="hidden md:inline-flex ml-1 text-[9px] bg-white/20 px-1 py-0.5 rounded font-mono">N</kbd>
           </button>
+        </div>
         </div>
       </div>
 
       {/* Sync feedback */}
       {syncMsg && (
         <div className={cn(
-          "flex items-center justify-between px-4 py-2.5 rounded-xl text-sm border",
+          "flex items-center justify-between px-4 py-2.5 rounded-2xl text-sm border",
           syncMsg.startsWith("✓")
             ? "bg-green-500/10 border-green-500/20 text-green-400"
             : "bg-red-500/10 border-red-500/20 text-red-400"
         )}>
           <span>{syncMsg}</span>
-          <button onClick={() => setSyncMsg(null)} className="p-0.5 rounded hover:opacity-70">
+          <button onClick={() => setSyncMsg(null)} className="p-0.5 rounded-xl hover:opacity-70">
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
@@ -614,9 +630,9 @@ export default function CalendarioPage() {
         <button
           onClick={() => setTypeFilter("all")}
           className={cn(
-            "flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition-colors",
+            "flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition-all active:scale-95",
             typeFilter === "all"
-              ? "bg-primary/10 border-primary/30 text-primary font-medium"
+              ? "bg-primary/10 border-primary/30 text-primary font-semibold"
               : "border-border text-muted-foreground hover:text-foreground bg-secondary"
           )}
         >
@@ -631,9 +647,9 @@ export default function CalendarioPage() {
                 key={type}
                 onClick={() => setTypeFilter(typeFilter === type ? "all" : type)}
                 className={cn(
-                  "flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition-colors",
+                  "flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition-all active:scale-95",
                   typeFilter === type
-                    ? cn(meta.color, "font-medium")
+                    ? cn(meta.color, "font-semibold")
                     : "border-border text-muted-foreground hover:text-foreground bg-secondary"
                 )}
               >
@@ -653,7 +669,7 @@ export default function CalendarioPage() {
           <div className="flex items-center justify-between">
             <button
               onClick={() => setViewYear((y) => y - 1)}
-              className="p-1.5 rounded-lg hover:bg-secondary transition-colors"
+              className="p-1.5 rounded-xl hover:bg-secondary transition-all active:scale-95"
               title="Año anterior"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -663,7 +679,7 @@ export default function CalendarioPage() {
               {viewYear !== today.getFullYear() && (
                 <button
                   onClick={() => setViewYear(today.getFullYear())}
-                  className="text-xs px-2.5 py-1 bg-primary/10 text-primary border border-primary/20 rounded-lg hover:bg-primary/15 transition-colors"
+                  className="text-xs px-2.5 py-1 bg-primary/10 text-primary border border-primary/20 rounded-xl hover:bg-primary/15 transition-all active:scale-95"
                 >
                   Este año
                 </button>
@@ -671,7 +687,7 @@ export default function CalendarioPage() {
             </div>
             <button
               onClick={() => setViewYear((y) => y + 1)}
-              className="p-1.5 rounded-lg hover:bg-secondary transition-colors"
+              className="p-1.5 rounded-xl hover:bg-secondary transition-all active:scale-95"
               title="Año siguiente"
             >
               <ChevronRight className="h-4 w-4" />
@@ -681,7 +697,7 @@ export default function CalendarioPage() {
           {yearLoading ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
               {Array.from({ length: 12 }, (_, i) => (
-                <div key={i} className="bg-card border border-border rounded-xl p-3 animate-pulse h-36" />
+                <div key={i} className="bg-card border border-border/60 rounded-2xl p-3 animate-pulse h-36" />
               ))}
             </div>
           ) : (
@@ -721,8 +737,8 @@ export default function CalendarioPage() {
                       setViewMode("calendar");
                     }}
                     className={cn(
-                      "bg-card border rounded-xl p-3 text-left hover:border-primary/40 transition-colors group w-full",
-                      isCurrentMonth ? "border-primary/30" : "border-border"
+                      "bg-card border rounded-2xl p-3 text-left hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-sm transition-all group w-full",
+                      isCurrentMonth ? "border-primary/30" : "border-border/60"
                     )}
                   >
                     {/* Month header */}
@@ -785,7 +801,7 @@ export default function CalendarioPage() {
 
                     {/* Type breakdown dots */}
                     {Object.keys(typeBreakdown).length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-border">
+                      <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-border/60">
                         {(Object.entries(typeBreakdown) as [CalendarEventType, number][]).map(([type, count]) => (
                           <span key={type} className="flex items-center gap-0.5 text-[9px] text-muted-foreground">
                             <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", EVENT_TYPE_META[type].dot)} />
@@ -805,10 +821,10 @@ export default function CalendarioPage() {
       {/* Calendar / Agenda view (hidden when in year view) */}
       {viewMode === "year" ? null : viewMode === "agenda" ? (
         /* ── Agenda view ─────────────────────────────────────────────── */
-        <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <div className="bg-card rounded-2xl border border-border/60 overflow-hidden">
           {/* Month nav */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-            <button onClick={prevMonth} title="Mes anterior (←)" className="p-1.5 rounded-lg hover:bg-secondary transition-colors">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
+            <button onClick={prevMonth} title="Mes anterior (←)" className="p-1.5 rounded-xl hover:bg-secondary transition-all active:scale-95">
               <ChevronLeft className="h-4 w-4" />
             </button>
             <div className="flex items-center gap-2">
@@ -821,14 +837,14 @@ export default function CalendarioPage() {
                 </span>
               )}
             </div>
-            <button onClick={nextMonth} title="Mes siguiente (→)" className="p-1.5 rounded-lg hover:bg-secondary transition-colors">
+            <button onClick={nextMonth} title="Mes siguiente (→)" className="p-1.5 rounded-xl hover:bg-secondary transition-all active:scale-95">
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
 
           {/* Agenda search */}
           {!loading && events.length > 2 && (
-            <div className="px-4 py-2 border-b border-border">
+            <div className="px-4 py-2 border-b border-border/60">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
                 <input
@@ -836,12 +852,12 @@ export default function CalendarioPage() {
                   value={agendaSearch}
                   onChange={(e) => setAgendaSearch(e.target.value)}
                   placeholder="Buscar evento…"
-                  className="w-full pl-9 pr-8 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  className="w-full pl-9 pr-8 py-2 bg-secondary border border-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                 />
                 {agendaSearch && (
                   <button
                     onClick={() => setAgendaSearch("")}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-border text-muted-foreground transition-colors"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-xl hover:bg-border text-muted-foreground transition-all active:scale-95"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -904,7 +920,7 @@ export default function CalendarioPage() {
                   <div
                     key={dateStr}
                     className={cn(
-                      "px-4 py-4 border-b border-border last:border-b-0",
+                      "px-4 py-4 border-b border-border/60 last:border-b-0",
                       isPast && "opacity-55"
                     )}
                   >
@@ -935,7 +951,7 @@ export default function CalendarioPage() {
                       </div>
                       <button
                         onClick={() => openCreate(dateStr)}
-                        className="ml-auto p-1 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+                        className="ml-auto p-1 rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground transition-all active:scale-95"
                         title="Agregar evento"
                       >
                         <Plus className="h-3.5 w-3.5" />
@@ -950,7 +966,7 @@ export default function CalendarioPage() {
                           <div
                             key={ev.id}
                             className={cn(
-                              "flex items-center gap-2.5 px-3 py-2 rounded-lg border text-xs group",
+                              "flex items-center gap-2.5 px-3 py-2 rounded-2xl border text-xs group",
                               meta.color
                             )}
                           >
@@ -965,7 +981,7 @@ export default function CalendarioPage() {
                             <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleShareEvent(ev.id); }}
-                                className="p-0.5 rounded hover:bg-black/10 transition-colors"
+                                className="p-0.5 rounded-xl hover:bg-black/10 transition-all active:scale-95"
                                 title="Copiar enlace"
                               >
                                 {copiedEventId === ev.id
@@ -975,14 +991,14 @@ export default function CalendarioPage() {
                               </button>
                               <button
                                 onClick={() => openEdit(ev)}
-                                className="p-0.5 rounded hover:bg-black/10 transition-colors"
+                                className="p-0.5 rounded-xl hover:bg-black/10 transition-all active:scale-95"
                               >
                                 <Pencil className="h-3 w-3" />
                               </button>
                               <button
                                 onClick={() => handleDelete(ev)}
                                 disabled={deletingId === ev.id}
-                                className="p-0.5 rounded hover:bg-black/10 transition-colors disabled:opacity-50"
+                                className="p-0.5 rounded-xl hover:bg-black/10 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 {deletingId === ev.id
                                   ? <Loader2 className="h-3 w-3 animate-spin" />
@@ -1003,10 +1019,10 @@ export default function CalendarioPage() {
         </div>
       ) : (
         /* ── Calendar grid ───────────────────────────────────────────── */
-        <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <div className="bg-card rounded-2xl border border-border/60 overflow-hidden">
           {/* Month nav */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-            <button onClick={prevMonth} title="Mes anterior (←)" className="p-1.5 rounded-lg hover:bg-secondary transition-colors">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
+            <button onClick={prevMonth} title="Mes anterior (←)" className="p-1.5 rounded-xl hover:bg-secondary transition-all active:scale-95">
               <ChevronLeft className="h-4 w-4" />
             </button>
             <div className="flex items-center gap-2">
@@ -1019,13 +1035,13 @@ export default function CalendarioPage() {
                 </span>
               )}
             </div>
-            <button onClick={nextMonth} title="Mes siguiente (→)" className="p-1.5 rounded-lg hover:bg-secondary transition-colors">
+            <button onClick={nextMonth} title="Mes siguiente (→)" className="p-1.5 rounded-xl hover:bg-secondary transition-all active:scale-95">
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
 
           {/* Day labels */}
-          <div className="grid grid-cols-7 border-b border-border">
+          <div className="grid grid-cols-7 border-b border-border/60">
             {DAYS.map((d) => (
               <div key={d} className="py-2 text-center text-[11px] font-medium text-muted-foreground">
                 {d}
@@ -1041,7 +1057,7 @@ export default function CalendarioPage() {
             <div className="grid grid-cols-7">
               {grid.map((date, i) => {
                 if (!date) {
-                  return <div key={`empty-${i}`} className="min-h-[80px] border-r border-b border-border/50 last:border-r-0 bg-secondary/20" />;
+                  return <div key={`empty-${i}`} className="min-h-[80px] border-r border-b border-border/60/50 last:border-r-0 bg-secondary/20" />;
                 }
                 const dateStr = toDateStr(date);
                 const dayEvents = eventsByDate[dateStr] ?? [];
@@ -1056,7 +1072,7 @@ export default function CalendarioPage() {
                       setSelectedEvent(null);
                     }}
                     className={cn(
-                      "min-h-[80px] p-1.5 border-r border-b border-border/50 cursor-pointer transition-colors",
+                      "min-h-[80px] p-1.5 border-r border-b border-border/60/50 cursor-pointer transition-all active:scale-[0.99]",
                       "hover:bg-secondary/30",
                       isSelected && "bg-secondary/50",
                       i % 7 === 6 && "border-r-0"
@@ -1075,7 +1091,7 @@ export default function CalendarioPage() {
                       {dayEvents.length === 0 && (
                         <button
                           onClick={(e) => { e.stopPropagation(); openCreate(dateStr); }}
-                          className="opacity-0 hover:opacity-100 p-0.5 rounded hover:bg-secondary text-muted-foreground transition-opacity"
+                          className="opacity-0 hover:opacity-100 p-0.5 rounded-xl hover:bg-secondary text-muted-foreground transition-opacity"
                           title="Agregar evento"
                         >
                           <Plus className="h-3 w-3" />
@@ -1090,7 +1106,7 @@ export default function CalendarioPage() {
                             key={ev.id}
                             onClick={(e) => { e.stopPropagation(); setSelectedDate(dateStr); setSelectedEvent(ev); }}
                             className={cn(
-                              "text-[10px] px-1.5 py-0.5 rounded truncate border cursor-pointer hover:opacity-80 transition-opacity",
+                              "text-[10px] px-1.5 py-0.5 rounded-xl truncate border cursor-pointer hover:opacity-80 transition-opacity",
                               meta.color
                             )}
                             title={ev.title}
@@ -1115,8 +1131,8 @@ export default function CalendarioPage() {
 
       {/* Selected date panel (grid mode only) */}
       {viewMode === "calendar" && selectedDate && (
-        <div className="bg-card rounded-xl border border-border overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <div className="bg-card rounded-2xl border border-border/60 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
             <h3 className="text-sm font-semibold">
               {new Date(selectedDate + "T12:00:00").toLocaleDateString("es-AR", {
                 weekday: "long",
@@ -1127,12 +1143,12 @@ export default function CalendarioPage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => openCreate(selectedDate)}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-all active:scale-95"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Agregar
               </button>
-              <button onClick={() => { setSelectedDate(null); setSelectedEvent(null); }} className="p-1 rounded hover:bg-secondary">
+              <button onClick={() => { setSelectedDate(null); setSelectedEvent(null); }} className="p-1 rounded-xl hover:bg-secondary">
                 <X className="h-4 w-4 text-muted-foreground" />
               </button>
             </div>
@@ -1149,7 +1165,7 @@ export default function CalendarioPage() {
               </button>
             </div>
           ) : (
-            <div className="divide-y divide-border">
+            <div className="divide-y divide-border/50">
               {selectedDateEvents.map((ev) => {
                 const meta = EVENT_TYPE_META[ev.event_type];
                 const isExpanded = selectedEvent?.id === ev.id;
@@ -1158,6 +1174,7 @@ export default function CalendarioPage() {
                     <div
                       className="flex items-start gap-3 cursor-pointer"
                       onClick={() => setSelectedEvent(isExpanded ? null : ev)}
+                      onDoubleClick={() => openEdit(ev)}
                     >
                       <span className={cn("w-2.5 h-2.5 rounded-full mt-1 flex-shrink-0", meta.dot)} />
                       <div className="flex-1 min-w-0">
@@ -1167,14 +1184,14 @@ export default function CalendarioPage() {
                       <div className="flex items-center gap-1 flex-shrink-0">
                         <button
                           onClick={(e) => { e.stopPropagation(); openEdit(ev); }}
-                          className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+                          className="p-1 rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground transition-all active:scale-95"
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); handleDelete(ev); }}
                           disabled={deletingId === ev.id}
-                          className="p-1 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-colors disabled:opacity-50"
+                          className="p-1 rounded-xl hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {deletingId === ev.id
                             ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1228,11 +1245,11 @@ export default function CalendarioPage() {
 
       {/* Upcoming events strip — only shown in grid mode when today's month and nothing selected */}
       {viewMode === "calendar" && !selectedDate && upcomingEvents.length > 0 && (
-        <div className="bg-card rounded-xl border border-border overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <div className="bg-card rounded-2xl border border-border/60 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
             <h3 className="text-sm font-semibold text-muted-foreground">Próximos eventos</h3>
           </div>
-          <div className="divide-y divide-border">
+          <div className="divide-y divide-border/50">
             {upcomingEvents.map((ev) => {
               const meta = EVENT_TYPE_META[ev.event_type];
               const evDate = new Date(ev.start_date.split("T")[0] + "T12:00:00");
@@ -1250,7 +1267,7 @@ export default function CalendarioPage() {
               return (
                 <div
                   key={ev.id}
-                  className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-secondary/30 transition-colors group"
+                  className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-secondary/30 transition-all active:scale-[0.99] group"
                   onClick={() => {
                     setSelectedDate(ev.start_date.split("T")[0]);
                     setSelectedEvent(ev);
@@ -1259,6 +1276,7 @@ export default function CalendarioPage() {
                       setViewMonth(evDate.getMonth() + 1);
                     }
                   }}
+                  onDoubleClick={() => openEdit(ev)}
                 >
                   <span className={cn("w-2 h-2 rounded-full flex-shrink-0", meta.dot)} />
                   <div className="flex-1 min-w-0">
@@ -1282,40 +1300,50 @@ export default function CalendarioPage() {
 
       {/* Event form modal */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-          <div className="bg-card border border-border rounded-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-5 border-b border-border">
-              <h2 className="text-base font-semibold">
-                {editingEvent ? "Editar evento" : "Nuevo evento"}
-              </h2>
-              <button onClick={() => setShowForm(false)} className="p-1.5 rounded-lg hover:bg-secondary">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={() => setShowForm(false)}
+        >
+          <div className="relative w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-primary/20 via-transparent to-cyan-500/10 pointer-events-none" />
+            <div className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl max-h-[90vh] overflow-y-auto shadow-2xl shadow-black/40">
+            <div className="flex items-center justify-between p-5 border-b border-border/60 sticky top-0 bg-card/95 backdrop-blur-xl z-10 rounded-t-2xl">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center flex-shrink-0">
+                  <Calendar className="h-4 w-4 text-primary" />
+                </div>
+                <h2 className="text-base font-semibold">
+                  {editingEvent ? "Editar evento" : "Nuevo evento"}
+                </h2>
+              </div>
+              <button onClick={() => setShowForm(false)} className="p-1.5 rounded-xl hover:bg-muted/50 transition-all active:scale-95 text-muted-foreground hover:text-foreground">
                 <X className="h-4 w-4" />
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-5 space-y-4">
               {formErrors.root && (
-                <p className="text-sm text-red-500 bg-red-500/10 px-3 py-2 rounded-lg">{formErrors.root}</p>
+                <p className="text-sm text-red-500 bg-red-500/10 px-3 py-2 rounded-xl">{formErrors.root}</p>
               )}
 
               <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-muted-foreground">Título *</label>
+                <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide">Título *</label>
                 <input
                   ref={eventTitleRef}
                   type="text"
                   value={form.title}
                   onChange={(e) => { setForm((p) => ({ ...p, title: e.target.value })); setFormErrors((p) => ({ ...p, title: undefined })); }}
                   placeholder="Sesión de grabación en el estudio"
-                  className={cn("w-full px-3 py-2.5 bg-background border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50", formErrors.title ? "border-red-500" : "border-border")}
+                  className={cn("w-full px-3 py-2.5 bg-background border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50", formErrors.title ? "border-red-500" : "border-border/60")}
                 />
                 {formErrors.title && <p className="text-xs text-red-500">{formErrors.title}</p>}
               </div>
 
               <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-muted-foreground">Tipo *</label>
+                <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide">Tipo *</label>
                 <select
                   value={form.event_type}
                   onChange={(e) => setForm((p) => ({ ...p, event_type: e.target.value as CalendarEventType }))}
-                  className="w-full px-3 py-2.5 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  className="w-full px-3 py-2.5 bg-background border border-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                 >
                   {(Object.entries(EVENT_TYPE_META) as [CalendarEventType, typeof EVENT_TYPE_META[CalendarEventType]][]).map(
                     ([type, meta]) => (
@@ -1327,45 +1355,45 @@ export default function CalendarioPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-muted-foreground">Fecha *</label>
+                  <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide">Fecha *</label>
                   <input
                     type="date"
                     value={form.start_date}
                     onChange={(e) => { setForm((p) => ({ ...p, start_date: e.target.value })); setFormErrors((p) => ({ ...p, start_date: undefined })); }}
-                    className={cn("w-full px-3 py-2.5 bg-background border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50", formErrors.start_date ? "border-red-500" : "border-border")}
+                    className={cn("w-full px-3 py-2.5 bg-background border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 [color-scheme:dark]", formErrors.start_date ? "border-red-500" : "border-border/60")}
                   />
                   {formErrors.start_date && <p className="text-xs text-red-500">{formErrors.start_date}</p>}
                 </div>
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-muted-foreground">Fecha fin</label>
+                  <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide">Fecha fin</label>
                   <input
                     type="date"
                     value={form.end_date ?? ""}
                     onChange={(e) => setForm((p) => ({ ...p, end_date: e.target.value || null }))}
-                    className="w-full px-3 py-2.5 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className="w-full px-3 py-2.5 bg-background border border-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 [color-scheme:dark]"
                   />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-muted-foreground">Descripción</label>
+                <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide">Descripción</label>
                 <textarea
                   value={form.description ?? ""}
                   onChange={(e) => setForm((p) => ({ ...p, description: e.target.value || null }))}
                   placeholder="Detalles del evento..."
                   rows={3}
-                  className="w-full px-3 py-2.5 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+                  className="w-full px-3 py-2.5 bg-background border border-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
                 />
               </div>
 
               {/* Song & Project linking */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-muted-foreground">Canción vinculada</label>
+                  <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide">Canción vinculada</label>
                   <select
                     value={form.song_id ?? ""}
                     onChange={(e) => setForm((p) => ({ ...p, song_id: e.target.value || null }))}
-                    className="w-full px-3 py-2.5 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className="w-full px-3 py-2.5 bg-background border border-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                   >
                     <option value="">— Ninguna —</option>
                     {formSongs.map((s) => (
@@ -1374,11 +1402,11 @@ export default function CalendarioPage() {
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-muted-foreground">Proyecto vinculado</label>
+                  <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide">Proyecto vinculado</label>
                   <select
                     value={form.project_id ?? ""}
                     onChange={(e) => setForm((p) => ({ ...p, project_id: e.target.value || null }))}
-                    className="w-full px-3 py-2.5 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className="w-full px-3 py-2.5 bg-background border border-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                   >
                     <option value="">— Ninguno —</option>
                     {formProjects.map((p) => (
@@ -1393,21 +1421,22 @@ export default function CalendarioPage() {
                   type="checkbox"
                   checked={form.all_day}
                   onChange={(e) => setForm((p) => ({ ...p, all_day: e.target.checked }))}
-                  className="rounded border-border text-primary focus:ring-primary/50"
+                  className="rounded border-border/60 text-primary focus:ring-primary/50"
                 />
                 <span className="text-sm text-muted-foreground">Todo el día</span>
               </label>
 
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setShowForm(false)} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-secondary transition-colors">
+                <button type="button" onClick={() => setShowForm(false)} className="flex-1 py-2.5 rounded-xl border border-border/60 text-sm font-semibold hover:bg-secondary/60 transition-all active:scale-95">
                   Cancelar
                 </button>
-                <button type="submit" disabled={submitting} className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/80 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                <button type="submit" disabled={submitting} className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                   {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
                   {editingEvent ? "Guardar" : "Crear"}
                 </button>
               </div>
             </form>
+            </div>
           </div>
         </div>
       )}

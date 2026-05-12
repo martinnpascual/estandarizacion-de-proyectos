@@ -42,9 +42,9 @@ function SongCard({ song }: { song: Song }) {
   ].filter(p => !!song[p.key as keyof Song]);
 
   return (
-    <div className="group flex items-center gap-4 p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all duration-200">
+    <div className="group flex items-center gap-4 p-4 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all duration-200">
       {/* Cover */}
-      <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-white/10 flex-shrink-0 flex items-center justify-center">
+      <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-white/10 flex-shrink-0 flex items-center justify-center">
         {song.cover_art_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={song.cover_art_url} alt={song.title} className="w-full h-full object-cover" />
@@ -70,7 +70,7 @@ function SongCard({ song }: { song: Song }) {
                 href={song[p.key as keyof Song] as string}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[10px] px-2 py-0.5 rounded-full font-medium hover:opacity-80 transition-opacity"
+                className="text-[10px] px-2 py-0.5 rounded-full font-medium hover:opacity-80 transition-all active:scale-95"
                 style={{ background: PLATFORM_COLORS[p.key] ?? "#666", color: "#fff" }}
               >
                 {p.label}
@@ -90,7 +90,7 @@ function SongCard({ song }: { song: Song }) {
             if (playing) { audio.pause(); setPlaying(false); }
             else { audio.play(); setPlaying(true); }
           }}
-          className="w-10 h-10 rounded-full bg-white/10 hover:bg-primary flex items-center justify-center transition-colors flex-shrink-0"
+          className="w-10 h-10 rounded-full bg-white/10 hover:bg-primary flex items-center justify-center transition-all active:scale-95 flex-shrink-0"
         >
           {playing ? <Pause className="h-4 w-4 text-white" /> : <Play className="h-4 w-4 text-white ml-0.5" />}
         </button>
