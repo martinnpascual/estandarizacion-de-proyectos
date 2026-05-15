@@ -290,7 +290,7 @@ export default function SetlistsPage() {
       ["#", "Título", "Artista", "Duración", "BPM", "Tono", "Tipo"],
       ...setlistSongs.map((s, i) => {
         const title = getTrackTitle(s);
-        const artist = s.song?.artist_name ?? s.draft?.artist_name ?? "";
+        const artist = s.song?.artist_name ?? "";
         const duration = s.song?.duration_seconds ? formatTime(s.song.duration_seconds) : "";
         const bpm = (s.song?.bpm ?? s.draft?.bpm) ? String(s.song?.bpm ?? s.draft?.bpm) : "";
         const key = s.song?.key_signature ?? s.draft?.key_signature ?? "";
