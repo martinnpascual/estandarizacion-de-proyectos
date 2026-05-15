@@ -259,18 +259,7 @@ export default function AudioPlayer() {
     return () => window.removeEventListener("keydown", handleKey);
   }, [player, currentTime, duration, volume, showQueue]);
 
-  if (!currentTrack) {
-    return (
-      <div className="fixed bottom-0 left-0 right-0 h-[64px] bg-card/80 backdrop-blur-xl border-t border-border/50 flex items-center justify-center z-30">
-        <p className="text-xs text-muted-foreground/40 select-none flex items-center gap-2">
-          <Music className="h-3.5 w-3.5" />
-          Seleccioná una canción para reproducir ·{" "}
-          <kbd className="bg-secondary/60 px-1.5 rounded border border-border/60 text-[10px]">Espacio</kbd>
-          {" "}play/pause
-        </p>
-      </div>
-    );
-  }
+  if (!currentTrack) return null;
 
   // Cover art del track actual (pasado explícitamente desde las páginas)
   const coverUrl = currentTrack.coverArt ?? null;
@@ -279,7 +268,7 @@ export default function AudioPlayer() {
     <>
       <QueueDrawer open={showQueue} onClose={() => setShowQueue(false)} />
 
-      <div className="fixed bottom-0 left-0 right-0 z-30 bg-card/85 backdrop-blur-2xl border-t border-border/50 shadow-[0_-8px_40px_hsl(var(--background)/0.9)]">
+      <div className="fixed bottom-0 left-0 right-0 z-30 bg-card/85 backdrop-blur-2xl border-t border-border/50 shadow-[0_-8px_40px_hsl(var(--background)/0.9)] animate-in slide-in-from-bottom-4 duration-300">
         {/* ── Barra de progreso — fina y con gradiente ──────────────────── */}
         <div className="px-0">
           <div className="relative h-1 group cursor-pointer" onClick={(e) => {

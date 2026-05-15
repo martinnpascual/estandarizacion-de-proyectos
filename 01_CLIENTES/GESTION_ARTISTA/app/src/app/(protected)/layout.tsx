@@ -6,10 +6,27 @@ import { createClient } from "@/lib/supabase/client";
 import Sidebar from "@/components/layout/Sidebar";
 import AudioPlayer, {
   AudioPlayerProvider,
+  useAudioPlayerContext,
 } from "@/components/audio/AudioPlayer";
 import { CommandMenuProvider } from "@/components/search/CommandMenu";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import NavProgressBar from "@/components/ui/NavProgressBar";
+
+/** Componente interno que puede leer el contexto del player para ajustar el padding */
+function LayoutContent({ children }: { children: React.ReactNode }) {
+  const { currentTrack } = useAudioPlayerContext();
+  return (
+    <main
+      className={
+        currentTrack
+          ? "flex-1 md:ml-0 pb-40 md:pb-24 pt-14 md:pt-0 transition-[padding] duration-300"
+          : "flex-1 md:ml-0 pb-20 md:pb-6 pt-14 md:pt-0 transition-[padding] duration-300"
+      }
+    >
+      <div className="p-4 md:p-6 lg:p-8 page-enter">{children}</div>
+    </main>
+  );
+}
 
 export default function ProtectedLayout({
   children,
@@ -46,11 +63,7 @@ export default function ProtectedLayout({
           <div className="flex min-h-screen">
             <NavProgressBar />
             <Sidebar />
-            {/* Contenido principal — con padding para sidebar y player */}
-            {/* pb-40 on mobile: bottom tab nav (~56px) + audio player (~64px) + gap */}
-            <main className="flex-1 md:ml-0 pb-40 md:pb-24 pt-14 md:pt-0">
-              <div className="p-4 md:p-6 lg:p-8 page-enter">{children}</div>
-            </main>
+            <LayoutContent>{children}</LayoutContent>
             <AudioPlayer />
           </div>
         </AudioPlayerProvider>
