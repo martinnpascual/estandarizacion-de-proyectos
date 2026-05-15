@@ -581,46 +581,6 @@ export default function MaquetasPage() {
       </div>
 
 
-      {/* Pipeline visual — distribución de estados */}
-      {!loading && !error && drafts.length > 0 && (() => {
-        const total = drafts.length;
-        const pipeline = ([
-          { status: "borrador"            as DraftStatus, label: "Borrador",          color: "text-zinc-400",   bg: "bg-zinc-500",   count: counts["borrador"] ?? 0 },
-          { status: "en_mezcla"           as DraftStatus, label: "En mezcla",         color: "text-blue-400",   bg: "bg-blue-500",   count: counts["en_mezcla"] ?? 0 },
-          { status: "masterizada"         as DraftStatus, label: "Masterizada",       color: "text-purple-400", bg: "bg-purple-500", count: counts["masterizada"] ?? 0 },
-          { status: "lista_para_publicar" as DraftStatus, label: "Lista p/ publicar", color: "text-green-400",  bg: "bg-green-500",  count: counts["lista_para_publicar"] ?? 0 },
-        ] as { status: DraftStatus; label: string; color: string; bg: string; count: number }[]).filter(s => s.count > 0);
-
-        return (
-          <div className="bg-card/60 backdrop-blur-sm border border-border/60 rounded-2xl p-4 space-y-3">
-            {/* Bar segmentada */}
-            <div className="flex h-2 rounded-full overflow-hidden gap-[2px]">
-              {pipeline.map((s) => (
-                <div
-                  key={s.status}
-                  className={`${s.bg} opacity-80 transition-all duration-500`}
-                  style={{ width: `${(s.count / total) * 100}%` }}
-                  title={`${s.label}: ${s.count}`}
-                />
-              ))}
-            </div>
-            {/* Leyenda */}
-            <div className="flex items-center gap-4 flex-wrap">
-              {pipeline.map((s) => (
-                <div key={s.status} className="flex items-center gap-1.5">
-                  <div className={`w-2 h-2 rounded-full ${s.bg} opacity-80 flex-shrink-0`} />
-                  <span className={`text-[11px] font-medium ${s.color}`}>{s.label}</span>
-                  <span className="text-[11px] text-muted-foreground/60 tabular-nums">
-                    {s.count} · {Math.round((s.count / total) * 100)}%
-                  </span>
-                </div>
-              ))}
-              <div className="ml-auto text-[11px] text-muted-foreground/50 tabular-nums">{total} total</div>
-            </div>
-          </div>
-        );
-      })()}
-
       {/* Lista para publicar alert */}
       {!loading && !error && (counts["lista_para_publicar"] ?? 0) > 0 && statusFilter !== "lista_para_publicar" && (
         <button
