@@ -132,16 +132,15 @@ function SpectrumAnalyzer({
           smoothed.current[i] += alpha * (raw - smoothed.current[i]);
         }
       } else {
-        // Gentle breathing when paused
-        idlePhase.current += 0.014;
+        // Organic breathing when paused — more visible & alive
+        idlePhase.current += 0.016;
         const t = idlePhase.current;
         for (let i = 0; i < BAR_COUNT; i++) {
           const x   = i / BAR_COUNT;
-          // multi-frequency wave for organic feel
           const wave = 0.5 * Math.sin(t + x * 6.2)
                      + 0.3 * Math.sin(t * 1.3 + x * 12.4)
                      + 0.2 * Math.sin(t * 0.7 + x * 3.1);
-          const target = MIN_AMP + 0.065 * (1 + wave) * 0.5;
+          const target = MIN_AMP + 0.12 * (1 + wave) * 0.5;  // was 0.065 — more organic movement
           smoothed.current[i] += 0.05 * (target - smoothed.current[i]);
         }
       }
@@ -154,6 +153,23 @@ function SpectrumAnalyzer({
 
       const pct        = duration > 0 ? currentTime / duration : 0;
       const playheadX  = pct * W;
+
+      // ── Center axis baseline ─────────────────────────────────────────────
+      ctx.beginPath();
+      ctx.moveTo(0, midY);
+      ctx.lineTo(W, midY);
+      ctx.strokeStyle = `rgba(255,255,255,0.06)`;
+      ctx.lineWidth   = 0.5;
+      ctx.stroke();
+
+      // ── Played-region ambient tint ───────────────────────────────────────
+      if (pct > 0.002) {
+        const tintGrd = ctx.createLinearGradient(0, 0, playheadX, 0);
+        tintGrd.addColorStop(0, `hsla(${pH}, ${pS}%, ${pL}%, 0.04)`);
+        tintGrd.addColorStop(1, `hsla(${pH}, ${pS}%, ${pL}%, 0.09)`);
+        ctx.fillStyle = tintGrd;
+        ctx.fillRect(0, 0, playheadX, H);
+      }
 
       // ── Pre-build 3 amplitude-tier gradients + paused  (reused every frame) ──
       // Low amplitude — subtle glow
@@ -174,9 +190,9 @@ function SpectrumAnalyzer({
       gradPeak.addColorStop(1,   `hsla(${pH + 12}, ${pS + 8}%, ${Math.min(pL + 34, 95)}%, 0.98)`);
 
       const gradPaused = ctx.createLinearGradient(0, midY - halfH, 0, midY + halfH);
-      gradPaused.addColorStop(0,   `hsla(${pH}, ${pS}%, ${pL + 12}%, 0.48)`);
-      gradPaused.addColorStop(0.5, `hsla(${pH}, ${pS}%, ${pL}%,      0.36)`);
-      gradPaused.addColorStop(1,   `hsla(${pH}, ${pS}%, ${pL + 12}%, 0.48)`);
+      gradPaused.addColorStop(0,   `hsla(${pH}, ${pS}%, ${pL + 14}%, 0.72)`);
+      gradPaused.addColorStop(0.5, `hsla(${pH}, ${pS}%, ${pL}%,      0.58)`);
+      gradPaused.addColorStop(1,   `hsla(${pH}, ${pS}%, ${pL + 14}%, 0.72)`);
 
       // ── Draw bars (symmetric: grow up + down from midY) ─────────────
       for (let i = 0; i < BAR_COUNT; i++) {
@@ -197,7 +213,7 @@ function SpectrumAnalyzer({
         } else if (isFilled) {
           ctx.fillStyle = gradPaused;
         } else {
-          ctx.fillStyle = `rgba(255,255,255,${isPlaying ? 0.13 : 0.09})`;
+          ctx.fillStyle = `rgba(255,255,255,${isPlaying ? 0.20 : 0.14})`;
         }
 
         // Top arm (up from center)
@@ -228,34 +244,40 @@ function SpectrumAnalyzer({
 
       // ── Playhead ─────────────────────────────────────────────────────
       if (duration > 0 && pct > 0.001) {
-        // Soft glow column
-        const grd = ctx.createLinearGradient(playheadX - 6, 0, playheadX + 6, 0);
-        grd.addColorStop(0,   `hsla(${pH},${pS}%,${pL+10}%,0)`);
-        grd.addColorStop(0.5, `hsla(${pH},${pS}%,${pL+20}%,0.18)`);
-        grd.addColorStop(1,   `hsla(${pH},${pS}%,${pL+10}%,0)`);
+        // Wide soft glow halo
+        const grd = ctx.createLinearGradient(playheadX - 10, 0, playheadX + 10, 0);
+        grd.addColorStop(0,    `hsla(${pH},${pS}%,${pL+10}%,0)`);
+        grd.addColorStop(0.45, `hsla(${pH},${pS}%,${pL+20}%,0.24)`);
+        grd.addColorStop(0.55, `hsla(${pH},${pS}%,${pL+20}%,0.24)`);
+        grd.addColorStop(1,    `hsla(${pH},${pS}%,${pL+10}%,0)`);
         ctx.fillStyle = grd;
-        ctx.fillRect(playheadX - 6, 0, 12, H);
+        ctx.fillRect(playheadX - 10, 0, 20, H);
 
-        // Crisp 1px line
+        // Crisp 1.5px line with stronger glow
         ctx.save();
         ctx.beginPath();
-        ctx.moveTo(playheadX, 2);
-        ctx.lineTo(playheadX, H - 2);
-        ctx.strokeStyle = `hsla(${pH},${pS}%,${Math.min(pL+28,95)}%,0.95)`;
-        ctx.lineWidth   = 1;
-        ctx.shadowColor = `hsl(${pH} ${pS}% ${pL}%)`;
-        ctx.shadowBlur  = 6;
+        ctx.moveTo(playheadX, 1);
+        ctx.lineTo(playheadX, H - 1);
+        ctx.strokeStyle = `hsla(${pH},${pS}%,${Math.min(pL+32,96)}%,0.98)`;
+        ctx.lineWidth   = 1.5;
+        ctx.shadowColor = `hsl(${pH} ${pS}% ${Math.min(pL+20,90)}%)`;
+        ctx.shadowBlur  = 8;
         ctx.stroke();
         ctx.restore();
 
-        // Small knob at center
+        // Prominent knob at center
         ctx.beginPath();
-        ctx.arc(playheadX, midY, 3.5, 0, Math.PI * 2);
-        ctx.fillStyle   = `hsl(${pH} ${pS}% ${Math.min(pL+30,96)}%)`;
+        ctx.arc(playheadX, midY, 4.5, 0, Math.PI * 2);
+        ctx.fillStyle   = `hsl(${pH} ${pS}% ${Math.min(pL+32,96)}%)`;
         ctx.shadowColor = `hsl(${pH} ${pS}% ${pL}%)`;
-        ctx.shadowBlur  = 10;
+        ctx.shadowBlur  = 14;
         ctx.fill();
         ctx.shadowBlur  = 0;
+        // White center dot on knob
+        ctx.beginPath();
+        ctx.arc(playheadX, midY, 1.8, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255,255,255,0.95)";
+        ctx.fill();
       }
 
       // ── Comment markers ──────────────────────────────────────────────
@@ -277,7 +299,7 @@ function SpectrumAnalyzer({
   }, [analyserRef, isPlaying, currentTime, duration, commentMarkers]);
 
   return (
-    <div className="relative w-full" style={{ height: 26 }}>
+    <div className="relative w-full" style={{ height: 36 }}>
       {/* Timestamp hover tooltip */}
       {hoverTime !== null && hoverPct !== null && (
         <div
@@ -573,25 +595,36 @@ export default function AudioPlayer() {
         {/* ── Background ──────────────────────────────────────────────── */}
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute inset-0" style={{
-            background: "rgba(7,7,11,0.97)",
-            backdropFilter: "blur(48px) saturate(2)",
+            background: "rgba(6,6,10,0.98)",
+            backdropFilter: "blur(52px) saturate(2.2)",
           }} />
+          {/* Ambient color bloom from primary */}
           <div className="absolute inset-0 pointer-events-none" style={{
-            background: "linear-gradient(135deg, hsl(var(--section-hsl, 262 80% 62%) / 0.22) 0%, transparent 55%, hsl(var(--section-hsl, 262 80% 62%) / 0.12) 100%)",
+            background: "linear-gradient(135deg, hsl(var(--primary)/0.18) 0%, transparent 50%, hsl(var(--primary)/0.10) 100%)",
+          }} />
+          {/* Central glow pulse — gives depth to flat background */}
+          <div className="absolute left-1/2 top-0 -translate-x-1/2 pointer-events-none" style={{
+            width: "50%", height: "120%",
+            background: "radial-gradient(ellipse at 50% 100%, hsl(var(--primary)/0.14) 0%, transparent 70%)",
           }} />
           {coverUrl && (
-            <div className="absolute inset-0 pointer-events-none opacity-[0.12] blur-3xl scale-110" style={{
+            <div className="absolute inset-0 pointer-events-none opacity-[0.14] blur-3xl scale-110" style={{
               backgroundImage: `url(${coverUrl})`,
               backgroundSize: "cover",
               backgroundPosition: "center",
             }} />
           )}
+          {/* Subtle grain texture for premium material feel */}
+          <div className="absolute inset-0 pointer-events-none opacity-[0.028]" style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
+            backgroundSize: "200px 200px",
+          }} />
         </div>
 
         {/* ── Top accent line ──────────────────────────────────────────── */}
-        <div className="absolute top-0 left-0 right-0 h-[1.5px] pointer-events-none" style={{
-          background: "linear-gradient(90deg, transparent 0%, hsl(var(--section-hsl,262 80% 62%)/0.5) 15%, hsl(var(--primary)/1) 50%, hsl(var(--section-hsl,262 80% 62%)/0.5) 85%, transparent 100%)",
-          boxShadow: "0 0 16px hsl(var(--primary)/0.45)",
+        <div className="absolute top-0 left-0 right-0 h-[2px] pointer-events-none" style={{
+          background: "linear-gradient(90deg, transparent 0%, hsl(var(--primary)/0.55) 12%, hsl(var(--primary)) 50%, hsl(var(--primary)/0.55) 88%, transparent 100%)",
+          boxShadow: "0 0 20px hsl(var(--primary)/0.55), 0 0 40px hsl(var(--primary)/0.22)",
         }} />
 
         {/* ── Spectrum + time labels ────────────────────────────────────── */}
@@ -675,23 +708,23 @@ export default function AudioPlayer() {
               <div className="relative flex-shrink-0">
                 {isPlaying && (
                   <div className="absolute -inset-[4px] rounded-[18px] pointer-events-none animate-pulse" style={{
-                    boxShadow: "0 0 0 1.5px hsl(var(--primary)/0.55), 0 0 22px hsl(var(--primary)/0.40), 0 0 44px hsl(var(--primary)/0.16)",
-                    animationDuration: "2.2s",
+                    boxShadow: "0 0 0 1.5px hsl(var(--primary)/0.75), 0 0 32px hsl(var(--primary)/0.58), 0 0 64px hsl(var(--primary)/0.28)",
+                    animationDuration: "2.0s",
                   }} />
                 )}
                 {isPlaying && (
                   <>
-                    {/* Inner ring — primary CW fast */}
+                    {/* Inner ring — vivid primary CW */}
                     <div className="absolute -inset-[5px] rounded-full pointer-events-none player-ring-spin" style={{
-                      background: "conic-gradient(from 0deg, hsl(var(--primary)) 0%, transparent 32%, hsl(var(--primary)/0.55) 62%, transparent 100%)",
+                      background: "conic-gradient(from 0deg, hsl(var(--primary)) 0%, hsl(var(--primary)/0.70) 20%, transparent 38%, hsl(var(--primary)/0.50) 62%, transparent 80%, hsl(var(--primary)) 100%)",
+                      WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 3px), black calc(100% - 3px))",
+                      mask: "radial-gradient(farthest-side, transparent calc(100% - 3px), black calc(100% - 3px))",
+                    }} />
+                    {/* Outer ring — lighter purple CCW slow */}
+                    <div className="absolute -inset-[11px] rounded-full pointer-events-none player-ring-spin-ccw" style={{
+                      background: "conic-gradient(from 120deg, transparent 0%, hsl(262 85% 82%/0.80) 18%, transparent 42%, hsl(var(--primary)/0.45) 72%, transparent 100%)",
                       WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 2px), black calc(100% - 2px))",
                       mask: "radial-gradient(farthest-side, transparent calc(100% - 2px), black calc(100% - 2px))",
-                    }} />
-                    {/* Outer ring — lighter CCW slow */}
-                    <div className="absolute -inset-[10px] rounded-full pointer-events-none player-ring-spin-ccw" style={{
-                      background: "conic-gradient(from 180deg, transparent 0%, hsl(262 80% 80%/0.60) 22%, transparent 48%, hsl(var(--primary)/0.32) 76%, transparent 100%)",
-                      WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 1.5px), black calc(100% - 1.5px))",
-                      mask: "radial-gradient(farthest-side, transparent calc(100% - 1.5px), black calc(100% - 1.5px))",
                     }} />
                   </>
                 )}
@@ -754,15 +787,23 @@ export default function AudioPlayer() {
               {/* Title + artist */}
               <div className="min-w-0 flex-1">
                 {isPlaying ? (
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <div className="player-now-dot" />
-                    <span className="text-[9px] font-black uppercase tracking-widest text-primary/80 drop-shadow-[0_0_4px_hsl(var(--primary)/0.6)]">
-                      Reproduciendo
-                    </span>
+                  <div className="flex items-center mb-1.5">
+                    <div className="flex items-center gap-1.5 px-2 py-[3px] rounded-full" style={{
+                      background: "linear-gradient(135deg, hsl(var(--primary)/0.28) 0%, hsl(var(--primary)/0.14) 100%)",
+                      border: "1px solid hsl(var(--primary)/0.35)",
+                      boxShadow: "0 0 10px hsl(var(--primary)/0.22), inset 0 1px 0 rgba(255,255,255,0.08)",
+                    }}>
+                      <div className="player-now-dot" />
+                      <span className="text-[9px] font-black uppercase tracking-widest text-primary drop-shadow-[0_0_5px_hsl(var(--primary)/0.7)]">
+                        Reproduciendo
+                      </span>
+                    </div>
                   </div>
                 ) : (
-                  <div className="mb-1">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-white/20">En pausa</span>
+                  <div className="mb-1.5">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-white/25 px-2 py-[3px] rounded-full border border-white/8">
+                      En pausa
+                    </span>
                   </div>
                 )}
                 {/* Marquee for long titles */}
@@ -770,7 +811,7 @@ export default function AudioPlayer() {
                   <p
                     ref={titleRef}
                     className={cn(
-                      "text-sm font-black leading-tight transition-colors",
+                      "text-[15px] font-black leading-tight transition-colors",
                       titleOverflows ? "player-marquee-inner" : "truncate",
                       isPlaying ? "text-white" : "text-white/65"
                     )}
@@ -826,7 +867,7 @@ export default function AudioPlayer() {
             </div>
 
             {/* ── Separator ─────────────────────────────────────────── */}
-            <div className="hidden lg:block w-px h-10 bg-white/8 flex-shrink-0 mx-1" />
+            <div className="hidden lg:block w-px h-10 bg-white/12 flex-shrink-0 mx-1" />
 
             {/* ── CENTER: Controls ──────────────────────────────────── */}
             <div className="flex-1 flex flex-col items-center gap-1 min-w-0">
@@ -848,14 +889,19 @@ export default function AudioPlayer() {
 
                 {/* ── Play / Pause ─────────────────────────────────── */}
                 <div className="relative mx-2">
+                  {/* Ambient pulse ring behind button */}
+                  {isPlaying && (
+                    <div className="absolute inset-0 rounded-full pointer-events-none animate-ping"
+                      style={{ background: "hsl(var(--primary)/0.20)", animationDuration: "2.4s" }} />
+                  )}
                   <button
                     onClick={() => { resumeAudioContext(); player.togglePlay(); }}
                     title={isPlaying ? "Pausar (Espacio)" : "Reproducir (Espacio)"}
-                    className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 player-play-btn relative z-10"
+                    className="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0 player-play-btn relative z-10"
                   >
                     {isPlaying
-                      ? <Pause className="h-5 w-5 text-white" />
-                      : <Play className="h-5 w-5 text-white ml-0.5" />}
+                      ? <Pause className="h-[22px] w-[22px] text-white" />
+                      : <Play className="h-[22px] w-[22px] text-white ml-0.5" />}
                   </button>
                 </div>
 
@@ -884,7 +930,7 @@ export default function AudioPlayer() {
             </div>
 
             {/* ── Separator ─────────────────────────────────────────── */}
-            <div className="hidden lg:block w-px h-10 bg-white/8 flex-shrink-0 mx-1" />
+            <div className="hidden lg:block w-px h-10 bg-white/12 flex-shrink-0 mx-1" />
 
             {/* ── RIGHT: Speed, volume, queue, collapse ─────────────── */}
             <div className="hidden sm:flex items-center gap-1.5 w-[250px] justify-end flex-shrink-0">
@@ -992,7 +1038,7 @@ export default function AudioPlayer() {
                 {playbackRate}×
               </button>
 
-              <div className="w-px h-5 bg-white/8 mx-0.5" />
+              <div className="w-px h-5 bg-white/12 mx-0.5" />
 
               {/* Volume icon */}
               <button
@@ -1029,7 +1075,7 @@ export default function AudioPlayer() {
                 </div>
               </div>
 
-              <div className="w-px h-5 bg-white/8 mx-0.5" />
+              <div className="w-px h-5 bg-white/12 mx-0.5" />
 
               {/* Queue */}
               <button
