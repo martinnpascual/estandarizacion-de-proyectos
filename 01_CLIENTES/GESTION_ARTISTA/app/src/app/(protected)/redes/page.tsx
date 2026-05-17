@@ -23,6 +23,8 @@ import {
   ClipboardList,
   Save,
   ArrowUpDown,
+  Zap,
+  RefreshCw,
 } from "lucide-react";
 import {
   LineChart,
@@ -38,8 +40,15 @@ import {
   upsertSocialLink,
   deleteSocialLink,
   addSocialStat,
+  syncSocialStats,
   type SocialLinkWithLatestStat,
 } from "@/lib/actions/social";
+
+/** Plataformas con sincronización automática vía API pública. */
+const AUTO_SYNC_PLATFORMS = ["youtube", "spotify"] as const;
+function supportsAutoSync(platform: string): boolean {
+  return (AUTO_SYNC_PLATFORMS as readonly string[]).includes(platform);
+}
 import { SocialLinkSchema, type SocialLinkFormData } from "@/lib/schemas";
 import type { SocialPlatform, SocialStat } from "@/types/database";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -237,7 +246,7 @@ function CombinedOverviewChart({ links }: { links: SocialLinkWithLatestStat[] })
 
   if (loadingCombined) {
     return (
-      <div className="bg-card rounded-2xl border border-border/60 p-5 flex items-center justify-center h-36">
+      <div className="card-premium rounded-2xl p-5 flex items-center justify-center h-36">
         <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
       </div>
     );
@@ -246,12 +255,12 @@ function CombinedOverviewChart({ links }: { links: SocialLinkWithLatestStat[] })
   if (allDates.length < 2 || activePlatforms.length < 2) return null;
 
   return (
-    <div className="bg-card rounded-2xl border border-border/60 p-5">
+    <div className="card-premium rounded-2xl p-5">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-semibold">Vista combinada</span>
+          <span className="text-sm font-black">Vista combinada</span>
           <span className="text-[11px] text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">
             {activePlatforms.length} plataformas
           </span>
@@ -260,24 +269,24 @@ function CombinedOverviewChart({ links }: { links: SocialLinkWithLatestStat[] })
         <div className="flex items-center gap-0.5 bg-secondary rounded-xl p-0.5">
           <button
             onClick={() => setMetric("followers")}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-medium transition-all active:scale-95 ${
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs transition-all active:scale-95 ${
               metric === "followers"
-                ? "bg-card text-foreground shadow-sm font-semibold"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-card text-foreground font-black shadow-[0_2px_8px_hsl(0_0%_0%/0.15),inset_0_1px_0_hsl(0_0%_100%/0.08)] border border-border/50"
+                : "font-medium text-muted-foreground hover:text-foreground"
             }`}
           >
-            <Users className="h-3 w-3" />
+            <Users className={`h-3 w-3 ${metric === "followers" ? "text-primary drop-shadow-[0_0_4px_hsl(var(--primary)/0.6)]" : ""}`} />
             Seguidores
           </button>
           <button
             onClick={() => setMetric("monthly_plays")}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-medium transition-all active:scale-95 ${
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs transition-all active:scale-95 ${
               metric === "monthly_plays"
-                ? "bg-card text-foreground shadow-sm font-semibold"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-card text-foreground font-black shadow-[0_2px_8px_hsl(0_0%_0%/0.15),inset_0_1px_0_hsl(0_0%_100%/0.08)] border border-border/50"
+                : "font-medium text-muted-foreground hover:text-foreground"
             }`}
           >
-            <Play className="h-3 w-3" />
+            <Play className={`h-3 w-3 ${metric === "monthly_plays" ? "text-primary drop-shadow-[0_0_4px_hsl(var(--primary)/0.6)]" : ""}`} />
             Reproducciones
           </button>
         </div>
@@ -354,12 +363,37 @@ export default function RedesPage() {
 
   const [expandedChart, setExpandedChart] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [platformSort, setPlatformSort] = useState<"default" | "followers" | "az">(() =>
     typeof window !== "undefined"
       ? (localStorage.getItem("redes-platform-sort") as "default" | "followers" | "az") || "default"
       : "default"
   );
   const urlRef = useRef<HTMLInputElement>(null);
+
+  async function handleAutoSync() {
+    setIsSyncing(true);
+    try {
+      const result = await syncSocialStats();
+      if (result.error) {
+        toast.error(result.error);
+      } else if (result.synced === 0) {
+        const errors = result.results.filter(r => r.status === "error");
+        if (errors.length > 0) {
+          toast.error(`Error al sincronizar: ${errors[0].error ?? "desconocido"}`);
+        } else {
+          toast.info("No hay plataformas con auto-sync configuradas");
+        }
+      } else {
+        toast.success(`✅ ${result.synced} plataforma${result.synced !== 1 ? "s" : ""} sincronizadas automáticamente`);
+        await load(); // Refresh stats
+      }
+    } catch {
+      toast.error("Error al sincronizar");
+    } finally {
+      setIsSyncing(false);
+    }
+  }
 
   // Batch stats form
   const [showBatchForm, setShowBatchForm] = useState(false);
@@ -391,6 +425,11 @@ export default function RedesPage() {
       if ((e.key === "b" || e.key === "B") && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         if (links.length > 0) openBatchForm();
+      }
+      if ((e.key === "s" || e.key === "S") && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        const hasAutoSync = links.some(l => supportsAutoSync(l.platform));
+        if (hasAutoSync && !isSyncing) handleAutoSync();
       }
     }
     document.addEventListener("keydown", onKey);
@@ -587,16 +626,17 @@ export default function RedesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card">
-        <div className="absolute inset-0 bg-gradient-to-br from-pink-500/8 via-transparent to-transparent pointer-events-none" />
-        <div className="absolute -top-10 -right-10 w-40 h-40 bg-pink-500/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="card-premium relative overflow-hidden rounded-2xl">
+        <div className="absolute inset-0 bg-gradient-to-br from-pink-500/10 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-pink-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-purple-400/6 rounded-full blur-2xl pointer-events-none" />
         <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-5">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500/30 to-pink-600/10 border border-pink-500/20 flex items-center justify-center flex-shrink-0">
               <Share2 className="h-5 w-5 text-pink-400" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">Redes Sociales</h1>
+              <h1 className="text-xl font-black tracking-tight gradient-text">Redes Sociales</h1>
               <p className="text-muted-foreground text-xs mt-0.5">
                 Todas tus redes y estadísticas en un solo lugar
               </p>
@@ -605,6 +645,21 @@ export default function RedesPage() {
           <div className="flex items-center gap-2">
           {!loading && links.length > 0 && (
             <>
+              {links.some(l => supportsAutoSync(l.platform)) && (
+                <button
+                  onClick={handleAutoSync}
+                  disabled={isSyncing}
+                  title="Sincronizar automáticamente YouTube y Spotify (S)"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-primary/40 text-sm text-primary hover:bg-primary/10 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {isSyncing
+                    ? <RefreshCw className="h-4 w-4 animate-spin" />
+                    : <Zap className="h-4 w-4" />
+                  }
+                  <span className="hidden sm:inline">{isSyncing ? "Sincronizando…" : "Sincronizar"}</span>
+                  {!isSyncing && <kbd className="hidden md:inline-flex ml-1 text-[9px] bg-primary/15 px-1 py-0.5 rounded font-mono">S</kbd>}
+                </button>
+              )}
               <button
                 onClick={openBatchForm}
                 title="Registrar estadísticas de hoy (B)"
@@ -642,7 +697,7 @@ export default function RedesPage() {
             <button
               onClick={openAddLink}
               title="Agregar red social (N)"
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-all active:scale-95 text-sm font-semibold shadow-[0_0_16px_hsl(var(--primary)/0.2)]"
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-all active:scale-95 text-sm font-black shadow-[0_0_16px_hsl(var(--primary)/0.2)] btn-shine"
             >
               <Plus className="h-4 w-4" />
               Agregar red
@@ -685,6 +740,53 @@ export default function RedesPage() {
         </div>
       ) : error ? (
         <p className="text-sm text-red-500">{error}</p>
+      ) : links.length === 0 ? (
+        /* ── Empty state ─────────────────────────────────────────────── */
+        <div className="flex flex-col items-center justify-center py-20 text-center gap-6">
+          <div className="relative">
+            {/* Glow halo */}
+            <div className="absolute inset-0 rounded-full blur-2xl opacity-20 bg-primary scale-150" />
+            <svg
+              width="110" height="110"
+              viewBox="0 0 110 110"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              className="relative drop-shadow-lg"
+            >
+              {/* Outer circle */}
+              <circle cx="55" cy="55" r="48" stroke="hsl(var(--primary))" strokeWidth="2" strokeDasharray="6 4" opacity="0.35" />
+              {/* Phone body */}
+              <rect x="33" y="22" width="44" height="66" rx="7" fill="hsl(var(--card))" stroke="hsl(var(--border))" strokeWidth="1.5"/>
+              {/* Screen */}
+              <rect x="38" y="30" width="34" height="42" rx="3" fill="hsl(var(--muted))" opacity="0.5"/>
+              {/* Three social dots (Spotify green, Instagram pink, YouTube red) */}
+              <circle cx="47" cy="44" r="5" fill="#1DB954" opacity="0.85"/>
+              <circle cx="55" cy="56" r="5" fill="#E1306C" opacity="0.85"/>
+              <circle cx="63" cy="44" r="5" fill="#FF0000" opacity="0.85"/>
+              {/* Connector lines */}
+              <line x1="47" y1="44" x2="55" y2="56" stroke="hsl(var(--border))" strokeWidth="1" opacity="0.5"/>
+              <line x1="55" y1="56" x2="63" y2="44" stroke="hsl(var(--border))" strokeWidth="1" opacity="0.5"/>
+              <line x1="47" y1="44" x2="63" y2="44" stroke="hsl(var(--border))" strokeWidth="1" opacity="0.5"/>
+              {/* Home button */}
+              <circle cx="55" cy="79" r="4" stroke="hsl(var(--border))" strokeWidth="1.5" opacity="0.6"/>
+            </svg>
+          </div>
+          <div className="space-y-2 max-w-xs">
+            <h3 className="text-lg font-black tracking-tight gradient-text">Sin redes sociales</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Conectá tus plataformas para ver estadísticas, tendencias y comparar tu crecimiento en un solo lugar.
+            </p>
+          </div>
+          {missingPlatforms.length > 0 && (
+            <button
+              onClick={openAddLink}
+              className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-all active:scale-95 text-sm font-black shadow-[0_0_20px_hsl(var(--primary)/0.25)] btn-shine"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+              Agregar primera red
+            </button>
+          )}
+        </div>
       ) : (
         <>
           {links.length > 0 && (
@@ -701,7 +803,7 @@ export default function RedesPage() {
             const prevTotalPlays = links.reduce((sum, l) => sum + (l.previous_stat?.monthly_plays ?? 0), 0);
 
             return totalFollowers > 0 || totalPlays > 0 ? (
-              <div className="flex flex-wrap gap-4 bg-card border border-border/60 rounded-2xl px-5 py-4">
+              <div className="flex flex-wrap gap-4 card-premium rounded-2xl px-5 py-4">
                 {totalFollowers > 0 && (
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -710,7 +812,7 @@ export default function RedesPage() {
                     <div>
                       <p className="text-xs text-muted-foreground">Seguidores totales</p>
                       <div className="flex items-center gap-2">
-                        <p className="text-xl font-bold tabular-nums">{formatNumber(totalFollowers)}</p>
+                        <p className="text-2xl font-black tabular-nums tracking-tight gradient-text">{formatNumber(totalFollowers)}</p>
                         <TrendBadge current={totalFollowers} previous={prevTotalFollowers} />
                       </div>
                     </div>
@@ -724,7 +826,7 @@ export default function RedesPage() {
                     <div>
                       <p className="text-xs text-muted-foreground">Reproducciones mensuales</p>
                       <div className="flex items-center gap-2">
-                        <p className="text-xl font-bold tabular-nums">{formatNumber(totalPlays)}</p>
+                        <p className="text-2xl font-black tabular-nums tracking-tight gradient-text">{formatNumber(totalPlays)}</p>
                         <TrendBadge current={totalPlays} previous={prevTotalPlays} />
                       </div>
                     </div>
@@ -744,16 +846,38 @@ export default function RedesPage() {
                 const stat = link.latest_stat;
                 const chartOpen = expandedChart === link.id;
                 return (
-                  <div key={link.id} className={cn(
-                    "bg-card rounded-2xl border p-5 group hover:border-muted-foreground/30 hover:-translate-y-0.5 hover:shadow-md transition-all",
-                    isStale(stat?.recorded_at) && stat != null ? "border-orange-500/30" : "border-border/60"
-                  )}>
+                  <div key={link.id}
+                    className={cn(
+                      "card-premium platform-stat-card platform-card-ambient rounded-2xl p-5 group",
+                      isStale(stat?.recorded_at) && stat != null ? "!border-orange-500/30" : ""
+                    )}
+                    style={{
+                      "--platform-color": meta.chartColor + "66",
+                    } as React.CSSProperties}
+                  >
+                    {/* Platform accent top stripe */}
+                    <div
+                      className="-mx-5 -mt-5 mb-4 h-[3px] rounded-t-2xl opacity-80"
+                      style={{ background: meta.chartColor }}
+                    />
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-2">
-                        <span className={`w-3 h-3 rounded-full ${meta.color}`} />
-                        <h3 className="font-semibold text-sm">{meta.label}</h3>
+                        <span
+                          className="w-2.5 h-2.5 rounded-full flex-shrink-0 platform-dot"
+                          style={{
+                            background: meta.chartColor,
+                            "--platform-color": meta.chartColor,
+                          } as React.CSSProperties}
+                        />
+                        <h3 className="font-black text-sm">{meta.label}</h3>
                         {link.username && (
                           <span className="text-xs text-muted-foreground">@{link.username}</span>
+                        )}
+                        {supportsAutoSync(link.platform) && (
+                          <span className="flex items-center gap-0.5 text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded-full font-medium" title="Se sincroniza automáticamente cada día">
+                            <Zap className="h-2.5 w-2.5" />
+                            Auto
+                          </span>
                         )}
                         {isStale(stat?.recorded_at) && stat != null && (
                           <span className="flex items-center gap-0.5 text-[10px] text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded-full">
@@ -798,24 +922,22 @@ export default function RedesPage() {
                     </div>
 
                     <div className="space-y-3">
-                      <div className="flex items-center gap-2">
-                        <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs text-muted-foreground">Seguidores</p>
-                          <div className="flex items-center gap-2">
-                            <p className="text-lg font-bold tabular-nums">{formatNumber(stat?.followers)}</p>
-                            <TrendBadge current={stat?.followers} previous={link.previous_stat?.followers} />
-                          </div>
+                      <div>
+                        <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wider font-black mb-0.5">Seguidores</p>
+                        <div className="flex items-end gap-2">
+                          <p className="text-2xl font-black tabular-nums tracking-tight" style={{ color: stat?.followers ? meta.chartColor : undefined }}>
+                            {formatNumber(stat?.followers)}
+                          </p>
+                          <TrendBadge current={stat?.followers} previous={link.previous_stat?.followers} />
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Play className="h-3.5 w-3.5 text-muted-foreground" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs text-muted-foreground">Reproducciones mensuales</p>
-                          <div className="flex items-center gap-2">
-                            <p className="text-lg font-bold tabular-nums">{formatNumber(stat?.monthly_plays)}</p>
-                            <TrendBadge current={stat?.monthly_plays} previous={link.previous_stat?.monthly_plays} />
-                          </div>
+                      <div>
+                        <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wider font-black mb-0.5">Reproducciones/mes</p>
+                        <div className="flex items-end gap-2">
+                          <p className="text-2xl font-black tabular-nums tracking-tight" style={{ color: stat?.monthly_plays ? meta.chartColor : undefined }}>
+                            {formatNumber(stat?.monthly_plays)}
+                          </p>
+                          <TrendBadge current={stat?.monthly_plays} previous={link.previous_stat?.monthly_plays} />
                         </div>
                       </div>
                       {stat?.recorded_at && (
@@ -870,7 +992,7 @@ export default function RedesPage() {
                           </div>
                           <div className="flex gap-2">
                             <button type="button" onClick={() => { setShowStatForm(null); setStatErrors({}); }} className="flex-1 py-1.5 rounded-xl border border-border/60 text-xs hover:bg-secondary/60 transition-all active:scale-95">Cancelar</button>
-                            <button type="submit" disabled={submittingStat} className="flex-1 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1">
+                            <button type="submit" disabled={submittingStat} className="flex-1 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-black hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1">
                               {submittingStat && <Loader2 className="h-3 w-3 animate-spin" />}
                               Guardar
                             </button>
@@ -936,16 +1058,16 @@ export default function RedesPage() {
 
       {/* Modal: Batch stats recording */}
       {showBatchForm && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowBatchForm(false)}>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 modal-backdrop" onClick={() => setShowBatchForm(false)}>
           <div className="relative w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-pink-500/20 via-transparent to-primary/10 pointer-events-none" />
-            <div className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl max-h-[90vh] overflow-y-auto shadow-2xl shadow-black/40">
-            <div className="flex items-center justify-between p-5 border-b border-border/60 sticky top-0 bg-card/95 backdrop-blur-xl z-10 rounded-t-2xl">
+            <div className="relative glass-panel rounded-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-border/60 sticky top-0 sticky-frosted z-10 rounded-t-2xl">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-xl bg-pink-500/15 border border-pink-500/20 flex items-center justify-center flex-shrink-0">
                   <ClipboardList className="h-4 w-4 text-pink-400" />
                 </div>
-                <h2 className="font-semibold text-sm">Registrar estadísticas de hoy</h2>
+                <h2 className="font-black text-sm">Registrar estadísticas de hoy</h2>
               </div>
               <button onClick={() => setShowBatchForm(false)} className="p-1.5 rounded-xl hover:bg-muted/50 transition-all active:scale-95 text-muted-foreground hover:text-foreground">
                 <X className="h-4 w-4" />
@@ -962,7 +1084,7 @@ export default function RedesPage() {
                   <div key={link.id} className="space-y-3">
                     <div className="flex items-center gap-2">
                       <span className={`w-2.5 h-2.5 rounded-full ${meta.color}`} />
-                      <span className="text-sm font-semibold">{meta.label}</span>
+                      <span className="text-sm font-black">{meta.label}</span>
                       {link.username && (
                         <span className="text-xs text-muted-foreground">@{link.username}</span>
                       )}
@@ -1051,7 +1173,7 @@ export default function RedesPage() {
                 <button
                   type="submit"
                   disabled={batchSubmitting}
-                  className="flex-1 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2"
+                  className="flex-1 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-black hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2"
                 >
                   {batchSubmitting
                     ? <><Loader2 className="h-4 w-4 animate-spin" /> Guardando…</>
@@ -1073,13 +1195,13 @@ export default function RedesPage() {
         >
           <div className="relative w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
             <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-primary/20 via-transparent to-primary/10 pointer-events-none" />
-            <div className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl shadow-2xl shadow-black/40">
+            <div className="relative glass-panel rounded-2xl">
             <div className="flex items-center justify-between p-5 border-b border-border/60">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center flex-shrink-0">
                   <Share2 className="h-4 w-4 text-primary" />
                 </div>
-                <h2 className="text-base font-semibold">
+                <h2 className="text-base font-black">
                   {editingLink ? "Editar perfil" : "Agregar red social"}
                 </h2>
               </div>

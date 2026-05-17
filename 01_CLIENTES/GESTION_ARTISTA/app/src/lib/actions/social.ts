@@ -152,3 +152,72 @@ export async function addSocialStat(
   if (error) return { data: null, error: error.message };
   return { data: data as SocialStat, error: null };
 }
+
+// ── Auto-sync ─────────────────────────────────────────────────────────────────
+
+export interface SyncSocialResult {
+  synced: number;
+  results: Array<{ platform: string; status: string; followers?: number | null; error?: string }>;
+  error?: string;
+}
+
+/**
+ * Manually trigger auto-sync for the current user's social links.
+ * Fetches live data from YouTube & Spotify public APIs and saves a new stat row.
+ */
+export async function syncSocialStats(): Promise<SyncSocialResult> {
+  const supabase = await createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { synced: 0, results: [], error: "No autenticado" };
+
+  const { data: links, error: linksError } = await supabase
+    .from("social_links")
+    .select("id, platform, url")
+    .eq("is_deleted", false);
+
+  if (linksError || !links) {
+    return { synced: 0, results: [], error: linksError?.message ?? "Error al cargar redes" };
+  }
+
+  const { fetchPlatformStats, supportsAutoSync } = await import("@/lib/social-sync");
+
+  const results: Array<{ platform: string; status: string; followers?: number | null; error?: string }> = [];
+
+  for (const link of links) {
+    if (!supportsAutoSync(link.platform)) {
+      results.push({ platform: link.platform, status: "skipped" });
+      continue;
+    }
+
+    const stats = await fetchPlatformStats(link.platform, link.url);
+
+    if (stats.error) {
+      results.push({ platform: link.platform, status: "error", error: stats.error });
+      continue;
+    }
+
+    if (stats.followers === null && stats.monthly_plays === null) {
+      results.push({ platform: link.platform, status: "no_data" });
+      continue;
+    }
+
+    const { error: insertError } = await supabase.from("social_stats").insert({
+      social_link_id: link.id,
+      followers: stats.followers,
+      monthly_plays: stats.monthly_plays,
+      recorded_at: new Date().toISOString(),
+    });
+
+    results.push({
+      platform: link.platform,
+      status: insertError ? "error" : "ok",
+      followers: stats.followers,
+      error: insertError?.message,
+    });
+  }
+
+  const synced = results.filter((r) => r.status === "ok").length;
+  return { synced, results };
+}
