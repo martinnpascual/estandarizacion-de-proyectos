@@ -3149,3 +3149,165 @@ input[type="range"]:active::-webkit-slider-thumb {
 .player-progress-wrap:hover .time-display {
   color: hsl(var(--foreground) / 0.75);
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   WAVE 21 — Final polish: share, shortcuts, buffering, new-badge, stale
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Share button copy-success flash ─────────────────────────────────────── */
+@keyframes copy-flash {
+  0%   { transform: scale(0.8); opacity: 0; }
+  40%  { transform: scale(1.15); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.share-copied-icon {
+  animation: copy-flash 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* ── Keyboard shortcuts modal — kbd styling ──────────────────────────────── */
+kbd {
+  font-family: ui-monospace, 'Cascadia Code', Menlo, monospace;
+}
+.shortcuts-grid-item {
+  transition: background 0.12s ease;
+}
+.shortcuts-grid-item:hover {
+  background: hsl(var(--primary) / 0.06);
+}
+
+/* ── "NEW" badge — bounce in ─────────────────────────────────────────────── */
+@keyframes new-badge-in {
+  0%   { transform: scale(0) rotate(-12deg); opacity: 0; }
+  60%  { transform: scale(1.2) rotate(4deg); }
+  100% { transform: scale(1) rotate(0deg);   opacity: 1; }
+}
+.badge-new-track {
+  animation: new-badge-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* ── Stale draft — urgent pulse ──────────────────────────────────────────── */
+@keyframes stale-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.55; }
+}
+.badge-stale {
+  animation: stale-pulse 3s ease-in-out infinite;
+}
+
+/* ── Buffer loading shimmer on waveform ──────────────────────────────────── */
+@keyframes waveform-loading {
+  0%   { opacity: 0.3; }
+  50%  { opacity: 0.7; }
+  100% { opacity: 0.3; }
+}
+.waveform-loading {
+  animation: waveform-loading 1.2s ease-in-out infinite;
+}
+
+/* ── Volume slider: show percentage on group hover ───────────────────────── */
+.vol-pct-label {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  font-family: ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 9px;
+  color: rgba(255,255,255,0.35);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.group\/vol:hover .vol-pct-label {
+  opacity: 1;
+}
+
+/* ── Track "currently loading" shimmer overlay ───────────────────────────── */
+.track-loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, hsl(var(--primary) / 0.08) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* ── Mobile player: full-width touch scrub area ──────────────────────────── */
+@media (max-width: 640px) {
+  .player-progress-track {
+    height: 4px;
+  }
+  .player-progress-wrap:active .player-progress-track {
+    height: 6px;
+  }
+}
+
+/* ── Queue item: hover state improvement ─────────────────────────────────── */
+.queue-item-hover {
+  transition: background 0.12s ease, padding-left 0.15s ease;
+}
+.queue-item-hover:hover {
+  padding-left: 20px;
+}
+
+/* ── Waveform comment marker tooltip ─────────────────────────────────────── */
+.marker-tooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(234, 179, 8, 0.95);
+  color: rgba(0,0,0,0.85);
+  font-size: 9px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 5px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 20;
+}
+.waveform-marker:hover .marker-tooltip {
+  opacity: 1;
+}
+
+/* ── Liked track row: subtle left-gold accent ────────────────────────────── */
+.row-liked {
+  border-left: 2px solid rgba(239, 68, 68, 0.4) !important;
+}
+
+/* ── Player controls: gap improvement on mobile ──────────────────────────── */
+@media (max-width: 768px) {
+  .player-right-controls {
+    display: none;
+  }
+}
+
+/* ── "Share copied" toast-in-place ───────────────────────────────────────── */
+@keyframes share-toast {
+  0%   { transform: translateY(4px); opacity: 0; }
+  20%  { transform: translateY(0);   opacity: 1; }
+  80%  { transform: translateY(0);   opacity: 1; }
+  100% { transform: translateY(-4px); opacity: 0; }
+}
+.share-toast {
+  animation: share-toast 1.8s ease-in-out both;
+}
+
+/* ── Discografia: genre filter active pill — stronger glow ───────────────── */
+.genre-pill-active {
+  background: linear-gradient(135deg, var(--genre-bg, hsl(var(--primary) / 0.18)) 0%, transparent 100%) !important;
+  border-color: var(--genre-color, hsl(var(--primary) / 0.4)) !important;
+  color: var(--genre-color, hsl(var(--primary))) !important;
+  box-shadow: 0 0 0 1px var(--genre-color, hsl(var(--primary) / 0.2)), 0 0 12px var(--genre-color, hsl(var(--primary) / 0.1));
+}
+
+/* ── Maquetas: stale border flash ────────────────────────────────────────── */
+.border-stale {
+  border-left-color: hsl(25 95% 60% / 0.6) !important;
+}
+
+/* ── Meta-chip size refinement ───────────────────────────────────────────── */
+.meta-chip {
+  font-size: 9.5px;
+  line-height: 1.2;
+}

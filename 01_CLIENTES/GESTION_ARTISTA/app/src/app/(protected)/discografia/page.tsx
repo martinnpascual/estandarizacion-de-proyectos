@@ -73,6 +73,12 @@ const GENRE_HEX: Record<string, string> = {
   "Afrobeats": "#f59e0b",
 };
 
+function isRecentSong(song: Song): boolean {
+  if (!song.created_at) return false;
+  const days = (Date.now() - new Date(song.created_at).getTime()) / 86_400_000;
+  return days <= 30;
+}
+
 export default function DiscografiaPage() {
   const player = useAudioPlayerContext();
   const { user, profile } = useUser();
@@ -996,12 +1002,12 @@ export default function DiscografiaPage() {
                         </span>
                       )}
                       {song.bpm && (
-                        <span className="text-[10px] text-blue-400/70 font-mono tabular-nums" title="BPM">
-                          {song.bpm}bpm
+                        <span className="meta-chip meta-chip-bpm" title="BPM">
+                          {song.bpm} BPM
                         </span>
                       )}
                       {song.key_signature && (
-                        <span className="text-[10px] text-purple-400/70 font-medium" title="Tonalidad">
+                        <span className="meta-chip meta-chip-key" title="Tonalidad">
                           {song.key_signature}
                         </span>
                       )}
@@ -1450,9 +1456,16 @@ const SongRow = memo(function SongRow({
         onClick={() => onAction("detail", song)}
         className="flex-1 min-w-0 text-left"
       >
-        <p className={cn("text-[13px] font-black truncate leading-tight", isPlaying ? "text-primary" : "text-foreground/90")}>
-          {song.title}
-        </p>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <p className={cn("text-[13px] font-black truncate leading-tight min-w-0", isPlaying ? "text-primary" : "text-foreground/90")}>
+            {song.title}
+          </p>
+          {isRecentSong(song) && (
+            <span className="flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-black bg-green-500/15 text-green-400 border border-green-500/20">
+              NEW
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           <span className="text-[11px] text-muted-foreground/70 truncate">
             {song.artist_name}
@@ -1468,12 +1481,12 @@ const SongRow = memo(function SongRow({
             <span className="text-xs text-muted-foreground"> · {song.genre}</span>
           )}
           {song.bpm && (
-            <span className="text-[10px] text-blue-400/70 font-mono tabular-nums flex-shrink-0" title="BPM">
-              {song.bpm}bpm
+            <span className="meta-chip meta-chip-bpm flex-shrink-0" title="BPM">
+              {song.bpm} BPM
             </span>
           )}
           {song.key_signature && (
-            <span className="text-[10px] text-purple-400/70 font-medium flex-shrink-0" title="Tonalidad">
+            <span className="meta-chip meta-chip-key flex-shrink-0" title="Tonalidad">
               {song.key_signature}
             </span>
           )}

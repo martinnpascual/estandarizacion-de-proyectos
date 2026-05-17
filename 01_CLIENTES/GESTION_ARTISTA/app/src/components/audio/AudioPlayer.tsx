@@ -4,7 +4,7 @@ import { useRef, useEffect, useCallback, useState } from "react";
 import {
   Play, Pause, Volume2, VolumeX,
   SkipBack, SkipForward, Music, List, X, Shuffle, Repeat, Repeat1, ChevronDown, ChevronUp,
-  Heart, Timer,
+  Heart, Timer, Share2, Check,
 } from "lucide-react";
 import { formatTime } from "@/lib/utils";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
@@ -496,6 +496,8 @@ export default function AudioPlayer() {
 
   // ── Sleep dropdown state ──────────────────────────────────────────────
   const [showSleepMenu, setShowSleepMenu] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
 
   // ── Keyboard shortcuts ────────────────────────────────────────────
   useEffect(() => {
@@ -514,15 +516,17 @@ export default function AudioPlayer() {
         case "KeyM": player.setVolume(volume > 0 ? 0 : 0.8); break;
         case "KeyL": toggleLike(); break;
         case "KeyQ": if (e.altKey) setShowQueue(v => !v); break;
+        case "Slash": if (e.shiftKey) { e.preventDefault(); setShowShortcuts(v => !v); } break;
         case "Escape":
           if (showQueue) setShowQueue(false);
           if (showSleepMenu) setShowSleepMenu(false);
+          if (showShortcuts) setShowShortcuts(false);
           break;
       }
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [player, currentTime, duration, volume, showQueue, resumeAudioContext]);
+  }, [player, currentTime, duration, volume, showQueue, showSleepMenu, showShortcuts, resumeAudioContext]);
 
   if (!currentTrack) return null;
 
@@ -884,6 +888,38 @@ export default function AudioPlayer() {
                 )}
               </div>
 
+              {/* Share current track */}
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    if (!currentTrack) return;
+                    const url = `${window.location.origin}/discografia?song=${currentTrack.id}`;
+                    navigator.clipboard.writeText(url).then(() => {
+                      setShareCopied(true);
+                      setTimeout(() => setShareCopied(false), 2000);
+                    }).catch(() => {});
+                  }}
+                  data-tooltip={shareCopied ? "¡Copiado!" : "Copiar enlace de pista"}
+                  className={cn(
+                    "p-1.5 rounded-xl transition-all active:scale-95 border",
+                    shareCopied
+                      ? "text-green-400 bg-green-400/12 border-green-400/25"
+                      : "text-white/25 border-transparent hover:text-white/60 hover:bg-white/8 hover:border-white/8"
+                  )}
+                >
+                  {shareCopied ? <Check className="h-3.5 w-3.5" /> : <Share2 className="h-3.5 w-3.5" />}
+                </button>
+              </div>
+
+              {/* Keyboard shortcuts hint */}
+              <button
+                onClick={() => setShowShortcuts(v => !v)}
+                data-tooltip="Atajos de teclado (Shift+?)"
+                className="hidden lg:flex p-1.5 rounded-xl transition-all active:scale-95 border text-white/20 border-transparent hover:text-white/50 hover:bg-white/8 hover:border-white/8 text-[10px] font-black items-center justify-center w-6 h-6"
+              >
+                ?
+              </button>
+
               {/* Speed */}
               <button onClick={cycleSpeed} data-tooltip={`Velocidad: ${playbackRate}x`}
                 className={cn(
@@ -966,6 +1002,48 @@ export default function AudioPlayer() {
           </div>
         )}
       </div>
+
+      {/* Keyboard shortcuts modal */}
+      {showShortcuts && (
+        <>
+          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm" onClick={() => setShowShortcuts(false)} />
+          <div className="fixed z-[61] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md rounded-2xl border border-white/12 shadow-2xl overflow-hidden"
+            style={{ background: "rgba(10,10,18,0.98)", backdropFilter: "blur(32px)" }}>
+            <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/8">
+              <div>
+                <p className="text-sm font-black text-white/90">Atajos de teclado</p>
+                <p className="text-[11px] text-white/30 mt-0.5">Disponibles cuando el reproductor está activo</p>
+              </div>
+              <button onClick={() => setShowShortcuts(false)} className="p-1.5 rounded-xl hover:bg-white/8 text-white/30 hover:text-white/80 transition-all">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="p-4 grid grid-cols-2 gap-2 max-h-[60vh] overflow-y-auto">
+              {[
+                ["Espacio", "Reproducir / Pausar"],
+                ["←", "Retroceder 10s"],
+                ["→", "Adelantar 10s"],
+                ["Alt + ←", "Pista anterior"],
+                ["Alt + →", "Pista siguiente"],
+                ["L", "Me gusta / Quitar"],
+                ["M", "Silenciar"],
+                ["Alt + Q", "Abrir cola"],
+                ["Shift + ?", "Mostrar atajos"],
+              ].map(([key, desc]) => (
+                <div key={key} className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl bg-white/4 border border-white/6">
+                  <span className="text-[11px] text-white/50">{desc}</span>
+                  <kbd className="text-[10px] font-mono font-black bg-white/10 text-white/70 px-2 py-0.5 rounded-lg border border-white/15 flex-shrink-0">{key}</kbd>
+                </div>
+              ))}
+            </div>
+            <div className="px-5 py-3 border-t border-white/8 flex items-center justify-between">
+              <span className="text-[10px] text-white/25">Solo funcionan fuera de campos de texto</span>
+              <button onClick={() => setShowShortcuts(false)} className="text-[11px] text-primary hover:text-primary/80 font-black transition-colors">Cerrar</button>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }

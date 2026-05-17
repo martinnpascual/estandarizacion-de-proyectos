@@ -1126,12 +1126,12 @@ function DraftRow({
             </span>
           )}
           {draft.bpm && (
-            <span className="text-[10px] text-blue-400/70 font-mono tabular-nums" title="BPM">
-              {draft.bpm}bpm
+            <span className="meta-chip meta-chip-bpm" title="BPM">
+              {draft.bpm} BPM
             </span>
           )}
           {draft.key_signature && (
-            <span className="text-[10px] text-purple-400/70 font-medium" title="Tonalidad">
+            <span className="meta-chip meta-chip-key" title="Tonalidad">
               {draft.key_signature}
             </span>
           )}
@@ -1150,6 +1150,18 @@ function DraftRow({
                 title={`Última actualización: ${new Date(draft.updated_at).toLocaleString("es-AR")}`}
               >
                 ↑ {label}
+              </span>
+            );
+          })()}
+          {(() => {
+            const daysSince = Math.floor((Date.now() - new Date(draft.updated_at).getTime()) / 86_400_000);
+            if (daysSince < 60 || draft.status === "lista_para_publicar") return null;
+            return (
+              <span
+                className="text-[10px] bg-orange-500/10 text-orange-400 border border-orange-500/20 px-1.5 py-0.5 rounded-full flex-shrink-0"
+                title={`Sin actualizar hace ${daysSince} días`}
+              >
+                ⏸ {daysSince}d
               </span>
             );
           })()}
