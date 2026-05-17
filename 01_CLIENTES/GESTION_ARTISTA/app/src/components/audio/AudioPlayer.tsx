@@ -33,14 +33,14 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
 // ══════════════════════════════════════════════════════════════════════════════
 // ── Real-time Spectrum Analyzer — SoundCloud aesthetic, canvas 60fps ─────
 // ══════════════════════════════════════════════════════════════════════════════
-const BAR_COUNT   = 128;          // many thin bars like SoundCloud
-const BAR_GAP     = 1.5;         // px between bars
-const MIN_FREQ_HZ = 30;
-const MAX_FREQ_HZ = 16000;
+const BAR_COUNT   = 260;          // dense fine bars for precision texture
+const BAR_GAP     = 0.55;        // minimal gap for ultra-thin look
+const MIN_FREQ_HZ = 20;
+const MAX_FREQ_HZ = 18000;
 const NYQUIST     = 22050;
-const ALPHA_UP    = 0.40;        // fast rise — snappy to beats
-const ALPHA_DOWN  = 0.10;        // slow fall — smooth tail
-const MIN_AMP     = 0.05;        // minimum bar height (never fully flat)
+const ALPHA_UP    = 0.62;        // very snappy to transients & beats
+const ALPHA_DOWN  = 0.060;       // long musical tail on decay
+const MIN_AMP     = 0.022;       // nearly flat floor when truly silent
 
 function barToFreq(i: number, count: number): number {
   return MIN_FREQ_HZ * Math.pow(MAX_FREQ_HZ / MIN_FREQ_HZ, i / (count - 1));
@@ -155,35 +155,49 @@ function SpectrumAnalyzer({
       const pct        = duration > 0 ? currentTime / duration : 0;
       const playheadX  = pct * W;
 
-      // Pre-build gradients for played / unplayed (reused every frame)
-      const gradPlayed = ctx.createLinearGradient(0, midY - halfH, 0, midY + halfH);
-      gradPlayed.addColorStop(0,   `hsla(${pH - 8}, ${pS + 5}%, ${Math.min(pL + 22, 90)}%, 0.92)`);
-      gradPlayed.addColorStop(0.45,`hsla(${pH},     ${pS}%,       ${pL}%,                  0.88)`);
-      gradPlayed.addColorStop(0.55,`hsla(${pH},     ${pS}%,       ${pL}%,                  0.88)`);
-      gradPlayed.addColorStop(1,   `hsla(${pH - 8}, ${pS + 5}%, ${Math.min(pL + 22, 90)}%, 0.92)`);
+      // ── Pre-build 3 amplitude-tier gradients + paused  (reused every frame) ──
+      // Low amplitude — subtle glow
+      const gradLow = ctx.createLinearGradient(0, midY - halfH * 0.5, 0, midY + halfH * 0.5);
+      gradLow.addColorStop(0,   `hsla(${pH},     ${pS}%,       ${pL + 10}%, 0.78)`);
+      gradLow.addColorStop(0.5, `hsla(${pH},     ${pS}%,       ${pL}%,      0.68)`);
+      gradLow.addColorStop(1,   `hsla(${pH},     ${pS}%,       ${pL + 10}%, 0.78)`);
+      // Mid amplitude — vivid primary
+      const gradMid = ctx.createLinearGradient(0, midY - halfH * 0.75, 0, midY + halfH * 0.75);
+      gradMid.addColorStop(0,   `hsla(${pH + 5}, ${pS + 5}%, ${Math.min(pL + 22, 90)}%, 0.92)`);
+      gradMid.addColorStop(0.5, `hsla(${pH},     ${pS}%,     ${pL}%,                    0.85)`);
+      gradMid.addColorStop(1,   `hsla(${pH + 5}, ${pS + 5}%, ${Math.min(pL + 22, 90)}%, 0.92)`);
+      // Peak amplitude — bright near-white tips
+      const gradPeak = ctx.createLinearGradient(0, midY - halfH, 0, midY + halfH);
+      gradPeak.addColorStop(0,   `hsla(${pH + 12}, ${pS + 8}%, ${Math.min(pL + 34, 95)}%, 0.98)`);
+      gradPeak.addColorStop(0.38,`hsla(${pH + 4},  ${pS + 4}%, ${pL + 8}%,               0.92)`);
+      gradPeak.addColorStop(0.62,`hsla(${pH + 4},  ${pS + 4}%, ${pL + 8}%,               0.92)`);
+      gradPeak.addColorStop(1,   `hsla(${pH + 12}, ${pS + 8}%, ${Math.min(pL + 34, 95)}%, 0.98)`);
 
       const gradPaused = ctx.createLinearGradient(0, midY - halfH, 0, midY + halfH);
-      gradPaused.addColorStop(0,   `hsla(${pH}, ${pS}%, ${pL + 12}%, 0.50)`);
-      gradPaused.addColorStop(0.5, `hsla(${pH}, ${pS}%, ${pL}%,      0.38)`);
-      gradPaused.addColorStop(1,   `hsla(${pH}, ${pS}%, ${pL + 12}%, 0.50)`);
+      gradPaused.addColorStop(0,   `hsla(${pH}, ${pS}%, ${pL + 12}%, 0.48)`);
+      gradPaused.addColorStop(0.5, `hsla(${pH}, ${pS}%, ${pL}%,      0.36)`);
+      gradPaused.addColorStop(1,   `hsla(${pH}, ${pS}%, ${pL + 12}%, 0.48)`);
 
       // ── Draw bars (symmetric: grow up + down from midY) ─────────────
       for (let i = 0; i < BAR_COUNT; i++) {
         const x      = i * (barW + BAR_GAP);
         const cx     = x + barW / 2;
         const val    = smoothed.current[i];
-        const arm    = Math.max(1.5, val * halfH);  // half-height of this bar
-        const radius = Math.min(barW / 2, 1.5);
+        const arm    = Math.max(1, val * halfH);
+        const radius = Math.min(barW / 2, 1.2);
 
         const barFrac  = cx / W;
         const isFilled = barFrac <= pct;
 
-        if (isFilled) {
-          ctx.fillStyle = isPlaying ? gradPlayed : gradPaused;
+        if (isFilled && isPlaying) {
+          // Amplitude-tiered color response
+          if (val > 0.72) ctx.fillStyle = gradPeak;
+          else if (val > 0.40) ctx.fillStyle = gradMid;
+          else ctx.fillStyle = gradLow;
+        } else if (isFilled) {
+          ctx.fillStyle = gradPaused;
         } else {
-          // Unplayed: very subtle, slightly hinted
-          const alpha = isPlaying ? 0.18 : 0.12;
-          ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+          ctx.fillStyle = `rgba(255,255,255,${isPlaying ? 0.13 : 0.09})`;
         }
 
         // Top arm (up from center)
@@ -195,6 +209,21 @@ function SpectrumAnalyzer({
         ctx.beginPath();
         ctx.roundRect(x, midY, barW, arm, [0, 0, radius, radius]);
         ctx.fill();
+
+        // ── Peak glow dot at tips of very loud bars ─────────────────
+        if (isFilled && isPlaying && val > 0.62) {
+          const dotPct   = Math.min((val - 0.62) / 0.38, 1);
+          const dotAlpha = dotPct * 0.90;
+          const dotL     = Math.min(pL + 42, 96);
+          const dotR     = barW * 0.60;
+          ctx.fillStyle  = `hsla(${pH + 10}, ${pS}%, ${dotL}%, ${dotAlpha})`;
+          ctx.beginPath();
+          ctx.arc(cx, midY - arm, dotR, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(cx, midY + arm, dotR, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
 
       // ── Playhead ─────────────────────────────────────────────────────
@@ -248,7 +277,7 @@ function SpectrumAnalyzer({
   }, [analyserRef, isPlaying, currentTime, duration, commentMarkers]);
 
   return (
-    <div className="relative w-full" style={{ height: 40 }}>
+    <div className="relative w-full" style={{ height: 26 }}>
       {/* Timestamp hover tooltip */}
       {hoverTime !== null && hoverPct !== null && (
         <div
@@ -400,10 +429,10 @@ function CtrlBtn({
       className={cn(
         "p-1.5 rounded-xl transition-all active:scale-95 flex items-center justify-center",
         active
-          ? "text-primary bg-primary/18 shadow-[0_0_12px_hsl(var(--primary)/0.30)] border border-primary/25 player-ctrl-active"
+          ? "text-primary bg-primary/16 shadow-[0_0_14px_hsl(var(--primary)/0.35),inset_0_1px_0_hsl(var(--primary)/0.28)] border border-primary/32 player-ctrl-active"
           : disabled
-          ? "text-white/12 cursor-not-allowed"
-          : "text-white/40 hover:text-white/90 hover:bg-white/8 border border-transparent hover:border-white/8",
+          ? "text-white/10 cursor-not-allowed"
+          : "text-white/38 hover:text-white/95 hover:bg-white/9 border border-transparent hover:border-white/10 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_1px_3px_rgba(0,0,0,0.28)]",
         className
       )}
     >
@@ -651,11 +680,20 @@ export default function AudioPlayer() {
                   }} />
                 )}
                 {isPlaying && (
-                  <div className="absolute -inset-[7px] rounded-full pointer-events-none player-ring-spin" style={{
-                    background: "conic-gradient(from 0deg, hsl(var(--primary)/0.65) 0%, transparent 40%, hsl(var(--primary)/0.35) 70%, transparent 100%)",
-                    WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 2px), black calc(100% - 2px))",
-                    mask: "radial-gradient(farthest-side, transparent calc(100% - 2px), black calc(100% - 2px))",
-                  }} />
+                  <>
+                    {/* Inner ring — primary CW fast */}
+                    <div className="absolute -inset-[5px] rounded-full pointer-events-none player-ring-spin" style={{
+                      background: "conic-gradient(from 0deg, hsl(var(--primary)) 0%, transparent 32%, hsl(var(--primary)/0.55) 62%, transparent 100%)",
+                      WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 2px), black calc(100% - 2px))",
+                      mask: "radial-gradient(farthest-side, transparent calc(100% - 2px), black calc(100% - 2px))",
+                    }} />
+                    {/* Outer ring — lighter CCW slow */}
+                    <div className="absolute -inset-[10px] rounded-full pointer-events-none player-ring-spin-ccw" style={{
+                      background: "conic-gradient(from 180deg, transparent 0%, hsl(262 80% 80%/0.60) 22%, transparent 48%, hsl(var(--primary)/0.32) 76%, transparent 100%)",
+                      WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 1.5px), black calc(100% - 1.5px))",
+                      mask: "radial-gradient(farthest-side, transparent calc(100% - 1.5px), black calc(100% - 1.5px))",
+                    }} />
+                  </>
                 )}
                 <div className={cn(
                   "relative w-16 h-16 rounded-xl overflow-hidden flex items-center justify-center transition-all duration-500",
@@ -672,24 +710,40 @@ export default function AudioPlayer() {
                     )} />
                   ) : (
                     <>
-                      <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-primary/12 to-violet-900/40" />
-                      <div className={cn(
-                        "relative z-[2] w-7 h-7 rounded-full flex items-center justify-center border border-primary/40",
-                        "bg-gradient-to-br from-primary/60 to-primary/30",
-                        isPlaying && "player-vinyl-spin shadow-[0_0_12px_hsl(var(--primary)/0.5)]"
-                      )}>
+                      {/* Base dark fill */}
+                      <div className="absolute inset-0" style={{ background: "hsl(262 55% 7%)" }} />
+                      {/* Spinning vinyl groove texture (only spins, no EQ inside) */}
+                      <div className={cn("absolute inset-0", isPlaying && "player-grooves-spin")} style={{
+                        background: `
+                          radial-gradient(circle at center, hsl(var(--primary)/0.22) 0%, transparent 65%),
+                          repeating-radial-gradient(circle at center, transparent 0px, transparent 4px, rgba(0,0,0,0.18) 4px, rgba(0,0,0,0.18) 5px)
+                        `,
+                      }} />
+                      {/* Static center label — doesn't spin */}
+                      <div className="relative z-[2] w-9 h-9 rounded-full flex items-center justify-center" style={{
+                        background: "radial-gradient(circle at 32% 28%, hsl(var(--primary)/0.90) 0%, hsl(262 72% 30%) 50%, hsl(262 55% 13%) 100%)",
+                        border: "1px solid hsl(var(--primary)/0.50)",
+                        boxShadow: isPlaying
+                          ? "0 0 0 1px hsl(var(--primary)/0.18), 0 0 20px hsl(var(--primary)/0.60), inset 0 1px 0 rgba(255,255,255,0.18)"
+                          : "0 0 8px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.07)",
+                      }}>
+                        {/* Center hole */}
+                        <div className="absolute w-2.5 h-2.5 rounded-full" style={{
+                          background: "rgba(0,0,0,0.75)",
+                          border: "1px solid rgba(255,255,255,0.14)",
+                        }} />
                         {isPlaying ? (
-                          <div className="flex gap-[2px] items-end h-3.5">
-                            {[1,2,3,4,5].map((i) => (
-                              <div key={i} className="eq-bar rounded-full" style={{
+                          <div className="relative z-[1] flex gap-[2px] items-end h-3.5">
+                            {[1,2,3,4,5].map((idx) => (
+                              <div key={idx} className="eq-bar rounded-full" style={{
                                 width: "2px",
-                                height: `${[55,100,40,75,50][i-1]}%`,
-                                background: "linear-gradient(to top, hsl(var(--primary)), hsl(262 80% 80%))",
+                                height: `${[55,100,40,75,50][idx - 1]}%`,
+                                background: "linear-gradient(to top, hsl(var(--primary)/0.9), rgba(255,255,255,0.92))",
                               }} />
                             ))}
                           </div>
                         ) : (
-                          <Music className="h-3.5 w-3.5 text-primary/70" />
+                          <Music className="h-3 w-3 text-white/40 relative z-[1]" />
                         )}
                       </div>
                     </>
@@ -786,7 +840,10 @@ export default function AudioPlayer() {
                 </CtrlBtn>
 
                 <CtrlBtn onClick={() => player.seek(Math.max(0, currentTime - 10))} title="Retroceder 10s (←)" className="hidden sm:flex w-8 h-8">
-                  <span className="text-[9px] font-black tabular-nums leading-none">-10s</span>
+                  <span className="flex flex-col items-center gap-px leading-none">
+                    <span className="text-[8px] font-black tabular-nums opacity-90">-10</span>
+                    <span className="text-[6px] font-bold tracking-wider opacity-55">SEC</span>
+                  </span>
                 </CtrlBtn>
 
                 {/* ── Play / Pause ─────────────────────────────────── */}
@@ -803,7 +860,10 @@ export default function AudioPlayer() {
                 </div>
 
                 <CtrlBtn onClick={() => player.seek(Math.min(duration, currentTime + 10))} title="Adelantar 10s (→)" className="hidden sm:flex w-8 h-8">
-                  <span className="text-[9px] font-black tabular-nums leading-none">+10s</span>
+                  <span className="flex flex-col items-center gap-px leading-none">
+                    <span className="text-[8px] font-black tabular-nums opacity-90">+10</span>
+                    <span className="text-[6px] font-bold tracking-wider opacity-55">SEC</span>
+                  </span>
                 </CtrlBtn>
 
                 <CtrlBtn onClick={player.playNext} disabled={!hasNext} title="Siguiente (Alt+→)">
