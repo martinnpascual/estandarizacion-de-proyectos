@@ -1,5 +1,6 @@
 "use client";
 
+import confetti from "canvas-confetti";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import {
@@ -262,7 +263,8 @@ export default function ProyectosPage() {
     setExpandedId(project.id);
     if (!tracks[project.id]) {
       setLoadingTracks(project.id);
-      const { data } = await getProjectTracks(project.id);
+      const { data, error } = await getProjectTracks(project.id);
+      if (error) toast.error("Error cargando tracks: " + error);
       setTracks((prev) => ({ ...prev, [project.id]: data ?? [] }));
       setLoadingTracks(null);
     }
@@ -291,7 +293,12 @@ export default function ProyectosPage() {
       draft_id: type === "draft" ? item.id : undefined,
       track_order: currentTracks.length + 1,
     });
-    if (!result.error && result.data) {
+    if (result.error) {
+      toast.error(result.error);
+      setAddingTrack(false);
+      return;
+    }
+    if (result.data) {
       const newTrack: TrackWithMeta = {
         ...result.data,
         song: type === "song" ? {
@@ -306,8 +313,6 @@ export default function ProyectosPage() {
           title: item.title,
           drive_file_id: (item as Draft).drive_file_id ?? null,
           drive_file_url: (item as Draft).drive_file_url ?? null,
-          cover_art_url: (item as Draft).cover_art_url ?? null,
-          duration_seconds: null,
         } : null,
       };
       setTracks((prev) => ({
@@ -320,7 +325,8 @@ export default function ProyectosPage() {
   }
 
   async function handleRemoveTrack(projectId: string, trackId: string) {
-    await removeTrackFromProject(trackId);
+    const { error } = await removeTrackFromProject(trackId);
+    if (error) { toast.error(error); return; }
     setTracks((prev) => ({
       ...prev,
       [projectId]: prev[projectId]?.filter((t) => t.id !== trackId) ?? [],
@@ -477,6 +483,15 @@ export default function ProyectosPage() {
         prev.map((p) => (p.id === project.id ? { ...p, status: next } : p))
       );
       toast.success(`"${project.name}" → ${STATUS_OPTIONS.find(s => s.value === next)?.label}`);
+      // Celebrate when a project is published!
+      if (next === "publicado") {
+        confetti({
+          particleCount: 120,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ["#c084fc", "#818cf8", "#4ade80", "#facc15", "#f472b6"],
+        });
+      }
     }
     setAdvancingId(null);
   }
@@ -517,15 +532,13 @@ export default function ProyectosPage() {
       };
     }
     if (track.draft) {
-      const { drive_file_id, drive_file_url, cover_art_url, title, duration_seconds } = track.draft;
+      const { drive_file_id, drive_file_url, title } = track.draft;
       if (!drive_file_id && !drive_file_url) return null;
       return {
         id: track.id,
         title,
         artist: "Maqueta",
         url: drive_file_id ? `/api/drive/stream/${drive_file_id}` : drive_file_url!,
-        coverArt: cover_art_url ?? undefined,
-        duration: duration_seconds ?? undefined,
       };
     }
     return null;
@@ -613,16 +626,17 @@ export default function ProyectosPage() {
 
   return (
     <div className="space-y-6">
-      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card">
+      <div className="card-premium relative overflow-hidden rounded-2xl">
         <div className="absolute inset-0 bg-gradient-to-br from-purple-500/8 via-transparent to-transparent pointer-events-none" />
-        <div className="absolute -top-10 -right-10 w-40 h-40 bg-purple-500/6 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-purple-500/8 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-8 -left-8 w-28 h-28 bg-violet-400/5 rounded-full blur-2xl pointer-events-none" />
         <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-5">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/30 to-purple-600/10 border border-purple-500/20 flex items-center justify-center flex-shrink-0">
               <FolderOpen className="h-5 w-5 text-purple-400" />
             </div>
             <div>
-              <h1 className="text-lg font-bold leading-tight">Proyectos</h1>
+              <h1 className="text-xl font-black tracking-tight leading-tight gradient-text">Proyectos</h1>
               <p className="text-muted-foreground text-xs mt-0.5">Ideas y proyectos musicales</p>
             </div>
           </div>
@@ -662,7 +676,7 @@ export default function ProyectosPage() {
             )}
             <button
               onClick={() => openCreate()}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-500/90 hover:bg-purple-500 text-white rounded-xl transition-all active:scale-95 text-sm font-semibold shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30"
+              className="flex items-center gap-2 px-4 py-2 bg-purple-500/90 hover:bg-purple-500 text-white rounded-xl transition-all active:scale-95 text-sm font-black shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 btn-shine"
             >
               <Plus className="h-4 w-4" />
               Nuevo proyecto
@@ -687,8 +701,8 @@ export default function ProyectosPage() {
                 className={cn(
                   "flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all active:scale-95",
                   typeFilter === t.value
-                    ? "bg-purple-500/20 text-purple-400 border border-purple-500/30 font-semibold"
-                    : "bg-secondary text-muted-foreground hover:text-foreground"
+                    ? "bg-purple-500/18 text-purple-400 border border-purple-500/40 font-black shadow-[0_0_10px_hsl(260_80%_60%/0.15)]"
+                    : "font-medium bg-secondary text-muted-foreground hover:text-foreground hover:border hover:border-purple-500/20"
                 )}
               >
                 {t.label}
@@ -802,7 +816,6 @@ export default function ProyectosPage() {
           {} as Record<ProjectStatus, number>
         );
         projects.forEach((p) => { statusCounts[p.status] = (statusCounts[p.status] ?? 0) + 1; });
-        const total = projects.length;
 
         const typeCounts: Record<string, number> = {};
         projects.forEach((p) => { typeCounts[p.type] = (typeCounts[p.type] ?? 0) + 1; });
@@ -815,8 +828,63 @@ export default function ProyectosPage() {
           return info?.urgency === "overdue";
         }).length;
 
+        // Pipeline — most advanced status reached across all projects
+        const statusOrder: ProjectStatus[] = ["idea", "en_produccion", "en_mezcla", "master", "listo", "publicado"];
+        const maxStatusIdx = Math.max(...projects.map((p) => statusOrder.indexOf(p.status)));
+
         return (
           <div className="space-y-3">
+            {/* Visual pipeline strip */}
+            <div className="card-premium rounded-2xl px-5 py-4">
+              <p className="text-[10px] font-black text-muted-foreground/50 uppercase tracking-widest mb-3">Pipeline de proyectos</p>
+              <div className="pipeline-track">
+                {STATUS_OPTIONS.map((s, idx) => {
+                  const count = statusCounts[s.value] ?? 0;
+                  const barColor = STATUS_BAR_COLORS[s.value];
+                  const isReached = idx <= maxStatusIdx;
+                  const isCurrent = projects.some((p) => p.status === s.value);
+                  return (
+                    <div key={s.value} className="flex items-center flex-1 min-w-0">
+                      {/* Dot node */}
+                      <div className="flex flex-col items-center gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => setStatusFilter(statusFilter === s.value ? "todos" : s.value)}
+                          className={cn(
+                            "pipeline-dot-node transition-all",
+                            isReached ? "reached" : "opacity-25",
+                            isCurrent && "current"
+                          )}
+                          style={{
+                            color: barColor,
+                            borderColor: isReached ? barColor : "hsl(var(--border))",
+                            background: isReached ? `${barColor}22` : "transparent",
+                          }}
+                          title={`${s.label}${count > 0 ? ` (${count})` : ""}`}
+                        />
+                        <span className={cn(
+                          "text-[8px] font-bold truncate max-w-[44px] text-center leading-tight hidden sm:block",
+                          isCurrent ? "font-black" : "text-muted-foreground/50"
+                        )} style={{ color: isCurrent ? barColor : undefined }}>
+                          {s.label}
+                          {count > 0 && <span className="block opacity-70">{count}</span>}
+                        </span>
+                      </div>
+                      {/* Connector (not after last) */}
+                      {idx < STATUS_OPTIONS.length - 1 && (
+                        <div
+                          className="pipeline-connector mx-1"
+                          style={{
+                            background: idx < maxStatusIdx
+                              ? `linear-gradient(90deg, ${STATUS_BAR_COLORS[STATUS_OPTIONS[idx].value]}, ${STATUS_BAR_COLORS[STATUS_OPTIONS[idx + 1].value]})`
+                              : "hsl(var(--border) / 0.4)",
+                          }}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
 
             {/* Chips row */}
             <div className="flex flex-wrap items-center gap-2">
@@ -834,7 +902,10 @@ export default function ProyectosPage() {
                 </span>
               )}
               {overdueCount > 0 && (
-                <span className="flex items-center gap-1.5 text-[11px] bg-red-500/10 text-red-400 px-2.5 py-1 rounded-full border border-red-500/20">
+                <span className={cn(
+                  "flex items-center gap-1.5 text-[11px] bg-red-500/10 text-red-400 px-2.5 py-1 rounded-full border border-red-500/20",
+                  "badge-overdue"
+                )}>
                   <AlertTriangle className="h-3 w-3 flex-shrink-0" />
                   <span>{overdueCount} vencido{overdueCount !== 1 ? "s" : ""}</span>
                 </span>
@@ -871,9 +942,9 @@ export default function ProyectosPage() {
             <div className="flex gap-4">
               {STATUS_OPTIONS.map((s) => (
                 <div key={s.value} className="flex-shrink-0 w-60">
-                  <div className="h-6 w-24 bg-secondary rounded animate-pulse mb-2" />
+                  <div className="h-6 w-24 skeleton rounded mb-2" />
                   <div className="space-y-2">
-                    {[1,2].map(i => <div key={i} className="h-24 bg-secondary rounded-xl animate-pulse" />)}
+                    {[1,2].map(i => <div key={i} className="h-24 skeleton rounded-xl" />)}
                   </div>
                 </div>
               ))}
@@ -888,8 +959,8 @@ export default function ProyectosPage() {
                     {/* Column header */}
                     <div className="flex items-center justify-between mb-2.5 px-1">
                       <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: barColor }} />
-                        <span className="text-xs font-semibold">{status.label}</span>
+                        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-[0_0_6px_currentColor]" style={{ backgroundColor: barColor }} />
+                        <span className="text-xs font-black tracking-tight">{status.label}</span>
                       </div>
                       <span className="text-[10px] font-medium text-muted-foreground bg-secondary px-1.5 py-0.5 rounded-full tabular-nums">
                         {colProjects.length}
@@ -928,15 +999,15 @@ export default function ProyectosPage() {
       {/* Lista */}
       {viewMode === "list" && <div className="space-y-3">
         {loading ? (
-          <div className="bg-card rounded-2xl border border-border/60 flex items-center justify-center py-16">
+          <div className="card-premium rounded-2xl flex items-center justify-center py-16">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : error ? (
-          <div className="bg-card rounded-2xl border border-border/60 flex flex-col items-center justify-center py-16 text-center px-4">
+          <div className="card-premium rounded-2xl flex flex-col items-center justify-center py-16 text-center px-4">
             <p className="text-sm text-red-500">{error}</p>
           </div>
         ) : projects.length === 0 ? (
-          <div className="bg-card rounded-2xl border border-border/60 flex flex-col items-center justify-center py-20 text-center px-6">
+          <div className="card-premium rounded-2xl flex flex-col items-center justify-center py-20 text-center px-6">
             {/* SVG illustration */}
             <div className="relative mb-6">
               <div className="absolute inset-0 bg-purple-500/10 rounded-full blur-2xl scale-150" />
@@ -958,7 +1029,7 @@ export default function ProyectosPage() {
                 <circle cx="78" cy="34" r="2" fill="#c084fc" opacity="0.3" />
               </svg>
             </div>
-            <h3 className="text-base font-semibold mb-1">Sin proyectos todavía</h3>
+            <h3 className="text-base font-black mb-1">Sin proyectos todavía</h3>
             <p className="text-muted-foreground text-sm max-w-xs leading-relaxed">
               Organizá tus lanzamientos, EPs, álbumes y metas en proyectos para darle seguimiento.
             </p>
@@ -971,7 +1042,7 @@ export default function ProyectosPage() {
             </button>
           </div>
         ) : displayedProjects.length === 0 ? (
-          <div className="bg-card rounded-2xl border border-border/60 flex flex-col items-center justify-center py-16 text-center px-4">
+          <div className="card-premium rounded-2xl flex flex-col items-center justify-center py-16 text-center px-4">
             {noDateFilter ? (
               <>
                 <CalendarClock className="h-10 w-10 text-green-400/40 mb-4" />
@@ -1000,10 +1071,17 @@ export default function ProyectosPage() {
           </div>
         ) : (
           displayedProjects.map((project) => (
-            <div key={project.id} className="bg-card rounded-2xl border border-border/60 overflow-hidden">
+            <div
+              key={project.id}
+              className="card-premium card-accent-top rounded-2xl overflow-hidden"
+              style={{ "--card-accent": STATUS_BAR_COLORS[project.status] } as React.CSSProperties}
+            >
               {/* Header del proyecto */}
               <div
-                className="flex items-center gap-3 px-4 py-3.5 group"
+                className={cn(
+                  "flex items-center gap-3 px-4 py-3.5 group row-interactive",
+                  expandedId === project.id && "project-row-expanded"
+                )}
                 onDoubleClick={() => openEdit(project)}
               >
                 <button onClick={() => toggleExpanded(project)} className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-all active:scale-95">
@@ -1027,7 +1105,7 @@ export default function ProyectosPage() {
 
                 <div className="flex-1 min-w-0" onClick={() => toggleExpanded(project)} role="button">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold truncate">{project.name}</p>
+                    <p className="text-sm font-black truncate">{project.name}</p>
                     <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 flex-shrink-0">
                       {PROJECT_TYPE_LABEL[project.type] ?? project.type}
                     </span>
@@ -1109,7 +1187,27 @@ export default function ProyectosPage() {
                   </button>
                 )}
 
-                <span className={cn("px-2 py-0.5 rounded-full text-[11px] font-medium flex-shrink-0", STATUS_COLORS[project.status])}>
+                {/* Mini pipeline progress arc */}
+                {(() => {
+                  const statusIdx = STATUS_OPTIONS.findIndex(s => s.value === project.status);
+                  const pct = statusIdx >= 0 ? (statusIdx + 1) / STATUS_OPTIONS.length : 0;
+                  const r = 10; const circ = 2 * Math.PI * r;
+                  const offset = circ - pct * circ;
+                  return (
+                    <svg width="26" height="26" viewBox="0 0 26 26" className="flex-shrink-0 hidden sm:block -rotate-90 opacity-70">
+                      <circle cx="13" cy="13" r={r} fill="none" stroke="hsl(var(--border)/0.5)" strokeWidth="2.5" />
+                      <circle cx="13" cy="13" r={r} fill="none" stroke={STATUS_BAR_COLORS[project.status]}
+                        strokeWidth="2.5" strokeDasharray={circ} strokeDashoffset={offset}
+                        strokeLinecap="round" style={{ transition: "stroke-dashoffset 0.6s ease" }} />
+                    </svg>
+                  );
+                })()}
+
+                <span
+                  key={project.status}
+                  className={cn("px-2 py-0.5 rounded-full text-[11px] font-medium flex-shrink-0 badge-animated", STATUS_COLORS[project.status])}
+                  style={{ boxShadow: `0 0 8px ${STATUS_BAR_COLORS[project.status]}50` }}
+                >
                   {STATUS_OPTIONS.find((s) => s.value === project.status)?.label}
                 </span>
 
@@ -1251,18 +1349,18 @@ export default function ProyectosPage() {
 
       {/* Modal formulario proyecto */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop"
           onClick={() => { setShowForm(false); setEditingProject(undefined); }}>
           <div className="relative w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             {/* Glow ring */}
             <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-purple-500/20 via-transparent to-purple-600/10 pointer-events-none" />
-          <div className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl max-h-[90vh] overflow-y-auto shadow-2xl shadow-black/40">
-            <div className="flex items-center justify-between p-5 border-b border-border/60 sticky top-0 bg-card/95 backdrop-blur-xl z-10 rounded-t-2xl">
+          <div className="relative glass-panel rounded-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-border/60 sticky top-0 sticky-frosted z-10 rounded-t-2xl">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-xl bg-purple-500/15 border border-purple-500/20 flex items-center justify-center flex-shrink-0">
                   <FolderOpen className="h-4 w-4 text-purple-400" />
                 </div>
-                <h2 className="text-base font-semibold">
+                <h2 className="text-base font-black">
                   {editingProject ? "Editar proyecto" : "Nuevo proyecto"}
                 </h2>
               </div>
@@ -1311,8 +1409,8 @@ export default function ProyectosPage() {
                 <input type="date" value={form.target_date ?? ""} onChange={(e) => setField("target_date", e.target.value || null)} className={`${iClass(false)} [color-scheme:dark]`} />
               </FormField>
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => { setShowForm(false); setEditingProject(undefined); }} className="flex-1 py-2.5 rounded-xl border border-border/60 text-sm font-medium hover:bg-secondary/60 transition-all active:scale-95">Cancelar</button>
-                <button type="submit" disabled={submitting} className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                <button type="button" onClick={() => { setShowForm(false); setEditingProject(undefined); }} className="flex-1 py-2.5 rounded-xl border border-border/60 text-sm font-black hover:bg-secondary/60 transition-all active:scale-95">Cancelar</button>
+                <button type="submit" disabled={submitting} className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-black hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                   {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
                   {editingProject ? "Guardar" : "Crear"}
                 </button>
@@ -1335,11 +1433,11 @@ export default function ProyectosPage() {
         const currentList = pickerTab === "songs" ? filteredSongs : filteredDrafts;
 
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowPicker(false)}>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop" onClick={() => setShowPicker(false)}>
             <div className="relative w-full max-w-md" onClick={(e) => e.stopPropagation()}>
               {/* Glow ring */}
               <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-primary/20 via-transparent to-purple-500/10 pointer-events-none" />
-            <div className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl max-h-[80vh] flex flex-col shadow-2xl shadow-black/40">
+            <div className="relative glass-panel rounded-2xl max-h-[80vh] flex flex-col">
               {/* Header */}
               <div className="flex items-center justify-between px-4 py-3.5 border-b border-border/60">
                 <div className="flex items-center gap-2.5">
@@ -1481,19 +1579,22 @@ function BoardCard({
     });
   }
   return (
-    <div className="bg-card border border-border/60 rounded-2xl p-3 group hover:border-primary/20 hover:shadow-sm hover:-translate-y-0.5 transition-all">
+    <div
+      className="card-premium card-accent-top card-gradient-border rounded-2xl p-3 group hover:border-primary/20 hover:shadow-sm hover:-translate-y-0.5 transition-all"
+      style={{ "--card-accent": STATUS_BAR_COLORS[project.status] } as React.CSSProperties}
+    >
       {/* Top: cover + name */}
       <div className="flex items-start gap-2 mb-2">
         {project.cover_art_url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={project.cover_art_url} alt="" className="w-8 h-8 rounded-xl object-cover flex-shrink-0 border border-border/60" />
+          <img src={project.cover_art_url} alt="" className="w-10 h-10 rounded-xl object-cover flex-shrink-0 border border-border/60" />
         ) : (
-          <div className="w-8 h-8 rounded bg-purple-500/10 flex items-center justify-center flex-shrink-0">
-            <FolderOpen className="h-3.5 w-3.5 text-purple-400" />
+          <div className="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-500/20 flex items-center justify-center flex-shrink-0 shadow-[0_0_10px_hsl(262_80%_62%/0.15)]">
+            <FolderOpen className="h-4 w-4 text-purple-400" />
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold leading-tight line-clamp-2">{project.name}</p>
+          <p className="text-sm font-black leading-tight line-clamp-2">{project.name}</p>
           <span className="text-[10px] font-medium text-purple-400">
             {PROJECT_TYPE_LABEL[project.type] ?? project.type}
           </span>

@@ -48,8 +48,6 @@ export type TrackDraftMeta = {
   title: string;
   drive_file_id: string | null;
   drive_file_url: string | null;
-  cover_art_url: string | null;
-  duration_seconds: number | null;
 };
 
 export type TrackWithAudio = ProjectTrack & {
@@ -66,10 +64,9 @@ export async function getProjectTracks(projectId: string): Promise<{
   const { data, error } = await supabase
     .from("project_tracks")
     .select(
-      "*, song:songs(title, artist_name, drive_file_id, drive_file_url, cover_art_url, duration_seconds), draft:drafts(title, drive_file_id, drive_file_url, cover_art_url, duration_seconds)"
+      "*, song:songs(title, artist_name, drive_file_id, drive_file_url, cover_art_url, duration_seconds), draft:drafts(title, drive_file_id, drive_file_url)"
     )
     .eq("project_id", projectId)
-    .is("deleted_at", null)
     .order("track_order", { ascending: true });
 
   if (error) return { data: null, error: error.message };
@@ -175,13 +172,9 @@ export async function removeTrackFromProject(
   } = await supabase.auth.getUser();
   if (!user) return { error: "No autenticado" };
 
-  const admin = createAdminSupabaseClient();
-  const { error } = await admin
+  const { error } = await supabase
     .from("project_tracks")
-    .update({
-      deleted_at: new Date().toISOString(),
-      deleted_by: user.id,
-    })
+    .delete()
     .eq("id", trackId);
 
   if (error) return { error: error.message };
