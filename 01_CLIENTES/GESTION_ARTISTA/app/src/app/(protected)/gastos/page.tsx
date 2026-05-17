@@ -7,6 +7,7 @@ import {
   updateExpense,
   deleteExpense,
 } from "@/lib/actions/expenses";
+import { getRoyaltySummary } from "@/lib/actions/royalties";
 import type { Expense } from "@/types/database";
 import type { ExpenseFormData } from "@/lib/actions/expenses";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -208,7 +209,7 @@ function ExpenseFormModal({ title = "Nuevo gasto", onClose, onSave, initial }: E
 
         <form
           onSubmit={handleSubmit}
-          className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl shadow-2xl w-full p-6 space-y-4"
+          className="relative glass-panel rounded-2xl w-full p-6 space-y-4"
         >
           {/* Header */}
           <div className="flex items-center justify-between">
@@ -216,7 +217,7 @@ function ExpenseFormModal({ title = "Nuevo gasto", onClose, onSave, initial }: E
               <div className="w-8 h-8 rounded-xl bg-red-500/15 border border-red-500/20 flex items-center justify-center">
                 <Receipt className="h-4 w-4 text-red-400" />
               </div>
-              <h2 className="font-semibold text-base">{title}</h2>
+              <h2 className="font-black text-base">{title}</h2>
             </div>
             <button
               type="button"
@@ -348,7 +349,7 @@ function ExpenseFormModal({ title = "Nuevo gasto", onClose, onSave, initial }: E
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 bg-primary text-primary-foreground rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex-1 bg-primary text-primary-foreground rounded-xl px-4 py-2.5 text-sm font-black hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {saving ? (
                 <><Loader2 className="h-4 w-4 animate-spin" /> Guardando...</>
@@ -378,6 +379,7 @@ export default function GastosPage() {
       : CURRENT_YEAR
   );
   const [deletingId, setDeletingId]       = useState<string | null>(null);
+  const [totalIngresos, setTotalIngresos] = useState<number | null>(null);
   const { error: toastError, success: toastSuccess } = useToast();
   const { confirm, ConfirmDialog } = useConfirm();
 
@@ -406,6 +408,11 @@ export default function GastosPage() {
   useEffect(() => { loadYear(); }, [loadYear]);
   useEffect(() => { loadAll();  }, [loadAll]);
   useEffect(() => { localStorage.setItem("gastos-year", String(selectedYear)); }, [selectedYear]);
+  useEffect(() => {
+    getRoyaltySummary().then(res => {
+      if (!res.error && res.data) setTotalIngresos(res.data.total_all_time);
+    }).catch(() => {});
+  }, []);
 
   // ── CSV export ───────────────────────────────────────────────────────────────
   function handleExportCSV() {
@@ -451,10 +458,19 @@ export default function GastosPage() {
     const now       = new Date();
     const thisYear  = now.getFullYear().toString();
     const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const prevDate  = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}`;
+    const thisMonthTotal = allExpenses.filter((e) => e.period_month === thisMonth).reduce((s, e) => s + Number(e.amount), 0);
+    const prevMonthTotal = allExpenses.filter((e) => e.period_month === prevMonth).reduce((s, e) => s + Number(e.amount), 0);
+    const monthTrend = prevMonthTotal > 0
+      ? Math.round(((thisMonthTotal - prevMonthTotal) / prevMonthTotal) * 100)
+      : null;
     return {
       total_all_time:  allExpenses.reduce((s, e) => s + Number(e.amount), 0),
       total_this_year: allExpenses.filter((e) => e.period_month?.startsWith(thisYear)).reduce((s, e) => s + Number(e.amount), 0),
-      total_this_month: allExpenses.filter((e) => e.period_month === thisMonth).reduce((s, e) => s + Number(e.amount), 0),
+      total_this_month: thisMonthTotal,
+      prev_month_total: prevMonthTotal,
+      month_trend: monthTrend,
     };
   }, [allExpenses]);
 
@@ -503,16 +519,17 @@ export default function GastosPage() {
       <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
 
         {/* ── Header ─────────────────────────────────────────────────────────── */}
-        <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card">
+        <div className="card-premium relative overflow-hidden rounded-2xl">
           <div className="absolute inset-0 bg-gradient-to-br from-red-500/8 via-transparent to-transparent pointer-events-none" />
-          <div className="absolute -top-10 -right-10 w-40 h-40 bg-red-500/6 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -top-10 -right-10 w-40 h-40 bg-red-500/8 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-orange-400/6 rounded-full blur-2xl pointer-events-none" />
           <div className="relative flex items-center justify-between gap-4 flex-wrap px-6 py-5">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500/30 to-orange-500/10 border border-red-500/20 flex items-center justify-center flex-shrink-0">
                 <Receipt className="h-5 w-5 text-red-400" />
               </div>
               <div>
-                <h1 className="text-lg font-bold leading-tight">Gastos</h1>
+                <h1 className="text-xl font-black tracking-tight leading-tight gradient-text">Gastos</h1>
                 <p className="text-muted-foreground text-xs mt-0.5">Control de gastos del estudio</p>
               </div>
             </div>
@@ -544,7 +561,7 @@ export default function GastosPage() {
               <button
                 onClick={() => setShowForm(true)}
                 title="Nuevo gasto (N)"
-                className="flex items-center gap-2 bg-red-500/90 hover:bg-red-500 text-white rounded-xl px-4 py-2 text-sm font-semibold transition-all active:scale-95 shadow-lg shadow-red-500/20 hover:shadow-red-500/30"
+                className="flex items-center gap-2 bg-red-500/90 hover:bg-red-500 text-white rounded-xl px-4 py-2 text-sm font-black transition-all active:scale-95 shadow-lg shadow-red-500/20 hover:shadow-red-500/30 btn-shine"
               >
                 <Plus className="h-4 w-4" /> Nuevo gasto
                 <kbd className="hidden md:inline-flex ml-1 text-[9px] bg-white/20 px-1 py-0.5 rounded font-mono">N</kbd>
@@ -557,54 +574,107 @@ export default function GastosPage() {
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl p-5 animate-pulse space-y-3">
-                <div className="h-3.5 w-28 bg-muted rounded-xl" />
-                <div className="h-8 w-36 bg-muted rounded-xl" />
-                <div className="h-3 w-20 bg-muted rounded-xl" />
+              <div key={i} className="card-premium rounded-2xl p-5 skeleton-shimmer space-y-3">
+                <div className="h-3.5 w-28 skeleton rounded-xl" />
+                <div className="h-8 w-36 skeleton rounded-xl" />
+                <div className="h-3 w-20 skeleton rounded-xl" />
               </div>
             ))}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {/* Total acumulado */}
-            <div className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl p-5 relative overflow-hidden group hover:border-red-500/30 hover:-translate-y-0.5 hover:shadow-md transition-all">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-full -translate-y-8 translate-x-8 group-hover:bg-red-500/10 transition-colors" />
-              <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium mb-3 uppercase tracking-wide">
-                <DollarSign className="h-3.5 w-3.5 group-hover:scale-110 transition-transform" /> Total gastos
+            <div className="card-premium rounded-2xl p-5 relative overflow-hidden group hover:border-red-500/40 hover:-translate-y-1 hover:shadow-[0_12px_32px_hsl(0_0%_0%/0.3),0_0_20px_rgba(248,113,113,0.08)] transition-all">
+              <div className="absolute top-0 right-0 w-28 h-28 bg-red-500/8 rounded-full -translate-y-10 translate-x-10 group-hover:bg-red-500/14 transition-colors blur-sm" />
+              <div className="absolute bottom-0 left-0 w-16 h-16 bg-red-500/5 rounded-full translate-y-6 -translate-x-6 blur-md" />
+              <div className="flex items-center gap-2 text-muted-foreground/70 text-xs font-black mb-3 uppercase tracking-wider relative">
+                <DollarSign className="h-3.5 w-3.5 text-red-400 drop-shadow-[0_0_5px_rgba(248,113,113,0.9)] group-hover:scale-110 transition-transform" /> Total gastos
               </div>
-              <div className="text-2xl font-bold text-red-400 tabular-nums">
+              <div className="text-3xl font-black text-red-400 tabular-nums tracking-tight drop-shadow-[0_0_18px_rgba(248,113,113,0.45)] relative">
                 <AnimatedCounter value={stats.total_all_time} prefix="$" decimals={2} />
               </div>
-              <div className="text-xs text-muted-foreground mt-1">Histórico acumulado</div>
+              <div className="text-xs text-muted-foreground/60 mt-1.5">Histórico acumulado</div>
             </div>
 
             {/* Este año */}
-            <div className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl p-5 relative overflow-hidden group hover:border-orange-500/30 hover:-translate-y-0.5 hover:shadow-md transition-all">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/5 rounded-full -translate-y-8 translate-x-8 group-hover:bg-orange-500/10 transition-colors" />
-              <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium mb-3 uppercase tracking-wide">
-                <TrendingDown className="h-3.5 w-3.5 group-hover:scale-110 transition-transform" /> Este año
+            <div className="card-premium rounded-2xl p-5 relative overflow-hidden group hover:border-orange-500/40 hover:-translate-y-1 hover:shadow-[0_12px_32px_hsl(0_0%_0%/0.3),0_0_20px_rgba(251,146,60,0.08)] transition-all">
+              <div className="absolute top-0 right-0 w-28 h-28 bg-orange-500/8 rounded-full -translate-y-10 translate-x-10 group-hover:bg-orange-500/14 transition-colors blur-sm" />
+              <div className="absolute bottom-0 left-0 w-16 h-16 bg-orange-500/5 rounded-full translate-y-6 -translate-x-6 blur-md" />
+              <div className="flex items-center gap-2 text-muted-foreground/70 text-xs font-black mb-3 uppercase tracking-wider relative">
+                <TrendingDown className="h-3.5 w-3.5 text-orange-400 drop-shadow-[0_0_5px_rgba(251,146,60,0.9)] group-hover:scale-110 transition-transform" /> Este año
               </div>
-              <div className="text-2xl font-bold text-orange-400 tabular-nums">
+              <div className="text-2xl font-black text-orange-400 tabular-nums drop-shadow-[0_0_14px_rgba(251,146,60,0.45)] relative">
                 <AnimatedCounter value={stats.total_this_year} prefix="$" decimals={2} />
               </div>
-              <div className="text-xs text-muted-foreground mt-1">{CURRENT_YEAR}</div>
+              <div className="text-xs text-muted-foreground/60 mt-1.5">{CURRENT_YEAR}</div>
             </div>
 
             {/* Este mes */}
-            <div className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl p-5 relative overflow-hidden group hover:border-yellow-500/30 hover:-translate-y-0.5 hover:shadow-md transition-all">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-yellow-500/5 rounded-full -translate-y-8 translate-x-8 group-hover:bg-yellow-500/10 transition-colors" />
-              <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium mb-3 uppercase tracking-wide">
-                <Receipt className="h-3.5 w-3.5 group-hover:scale-110 transition-transform" /> Este mes
+            <div className="card-premium rounded-2xl p-5 relative overflow-hidden group hover:border-yellow-500/40 hover:-translate-y-1 hover:shadow-[0_12px_32px_hsl(0_0%_0%/0.3),0_0_20px_rgba(234,179,8,0.08)] transition-all">
+              <div className="absolute top-0 right-0 w-28 h-28 bg-yellow-500/8 rounded-full -translate-y-10 translate-x-10 group-hover:bg-yellow-500/14 transition-colors blur-sm" />
+              <div className="absolute bottom-0 left-0 w-16 h-16 bg-yellow-500/5 rounded-full translate-y-6 -translate-x-6 blur-md" />
+              <div className="flex items-center gap-2 text-muted-foreground/70 text-xs font-black mb-3 uppercase tracking-wider relative">
+                <Receipt className="h-3.5 w-3.5 text-yellow-400 drop-shadow-[0_0_5px_rgba(234,179,8,0.9)] group-hover:scale-110 transition-transform" /> Este mes
               </div>
-              <div className="text-2xl font-bold text-yellow-400 tabular-nums">
-                <AnimatedCounter value={stats.total_this_month} prefix="$" decimals={2} />
+              <div className="flex items-end gap-2 relative">
+                <div className="text-2xl font-black text-yellow-400 tabular-nums drop-shadow-[0_0_14px_rgba(234,179,8,0.40)]">
+                  <AnimatedCounter value={stats.total_this_month} prefix="$" decimals={2} />
+                </div>
+                {stats.month_trend !== null && (
+                  <span className={`flex items-center gap-0.5 text-[11px] font-black mb-0.5 ${
+                    stats.month_trend > 0 ? "text-red-400" : "text-green-400"
+                  }`}>
+                    {stats.month_trend > 0
+                      ? <TrendingUp className="h-3 w-3" />
+                      : <TrendingDown className="h-3 w-3" />}
+                    {Math.abs(stats.month_trend)}%
+                  </span>
+                )}
               </div>
-              <div className="text-xs text-muted-foreground mt-1">
+              <div className="text-xs text-muted-foreground/60 mt-1.5">
                 {new Date().toLocaleDateString("es", { month: "long" })}
+                {stats.month_trend !== null && (
+                  <span className="ml-1 opacity-60">vs mes anterior</span>
+                )}
               </div>
             </div>
           </div>
         )}
+
+        {/* ── Balance neto (Ingresos − Gastos) ───────────────────────────────── */}
+        {!loading && totalIngresos !== null && (() => {
+          const balance = totalIngresos - stats.total_all_time;
+          const isPositive = balance >= 0;
+          return (
+            <div className={`card-premium rounded-2xl px-5 py-3.5 flex flex-wrap items-center gap-3 border ${
+              isPositive ? "border-green-500/25 bg-green-500/5" : "border-red-500/20 bg-red-500/5"
+            }`}>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <div className={`w-7 h-7 rounded-xl flex items-center justify-center ${
+                  isPositive ? "bg-green-500/15 border border-green-500/20" : "bg-red-500/15 border border-red-500/20"
+                }`}>
+                  {isPositive
+                    ? <TrendingUp className="h-3.5 w-3.5 text-green-400" />
+                    : <TrendingDown className="h-3.5 w-3.5 text-red-400" />}
+                </div>
+                <span className="text-xs font-black uppercase tracking-wider text-muted-foreground/70">Balance neto</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 ml-auto text-sm">
+                <span className="text-muted-foreground text-xs">
+                  Ingresos <span className="font-black text-green-400 tabular-nums">${totalIngresos.toFixed(2)}</span>
+                </span>
+                <span className="text-muted-foreground/40 text-xs">−</span>
+                <span className="text-muted-foreground text-xs">
+                  Gastos <span className="font-black text-red-400 tabular-nums">${stats.total_all_time.toFixed(2)}</span>
+                </span>
+                <span className="text-muted-foreground/40 text-xs">=</span>
+                <span className={`text-lg font-black tabular-nums ${isPositive ? "text-green-400" : "text-red-400"}`}>
+                  {isPositive ? "+" : ""}${balance.toFixed(2)}
+                </span>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ── Error banner ────────────────────────────────────────────────────── */}
         {error && !loading && (
@@ -631,10 +701,10 @@ export default function GastosPage() {
               {loading ? (
                 <ChartSkeleton height="h-72" />
               ) : (
-                <div className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl p-5">
+                <div className="card-premium rounded-2xl p-5">
                   <div className="flex items-center justify-between mb-5">
-                    <h3 className="font-semibold text-sm flex items-center gap-2">
-                      <TrendingDown className="h-4 w-4 text-red-400" />
+                    <h3 className="font-black text-sm flex items-center gap-2">
+                      <TrendingDown className="h-4 w-4 text-red-400 drop-shadow-[0_0_5px_rgba(248,113,113,0.8)]" />
                       Gastos mensuales — {selectedYear}
                     </h3>
                     <span className="text-xs text-muted-foreground bg-muted/50 rounded-xl px-2.5 py-1 font-mono tabular-nums">
@@ -647,11 +717,12 @@ export default function GastosPage() {
                       <AreaChart data={monthlyData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
                         <defs>
                           <linearGradient id="expGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%"  stopColor="#ef4444" stopOpacity={0.35} />
-                            <stop offset="95%" stopColor="#ef4444" stopOpacity={0}    />
+                            <stop offset="0%"  stopColor="#ef4444" stopOpacity={0.55} />
+                            <stop offset="50%" stopColor="#ef4444" stopOpacity={0.18} />
+                            <stop offset="100%" stopColor="#ef4444" stopOpacity={0}    />
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.35} />
                         <XAxis
                           dataKey="period_month"
                           tickFormatter={monthLabel}
@@ -677,10 +748,10 @@ export default function GastosPage() {
                           type="monotone"
                           dataKey="total"
                           stroke="#ef4444"
-                          strokeWidth={2}
+                          strokeWidth={2.5}
                           fill="url(#expGrad)"
-                          dot={{ fill: "#ef4444", r: 3, strokeWidth: 0 }}
-                          activeDot={{ r: 5, fill: "#ef4444" }}
+                          dot={false}
+                          activeDot={{ r: 5, fill: "#ef4444", stroke: "#ef4444", strokeWidth: 2, filter: "drop-shadow(0 0 6px #ef4444)" }}
                         />
                       </AreaChart>
                     </ResponsiveContainer>
@@ -694,7 +765,7 @@ export default function GastosPage() {
               )}
 
               {/* Expense list */}
-              <div className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl overflow-hidden">
+              <div className="card-premium rounded-2xl overflow-hidden">
                 <div className="px-5 py-3.5 border-b border-border/60 bg-muted/20 flex items-center justify-between">
                   <span className="font-medium text-sm">
                     {loading
@@ -724,7 +795,7 @@ export default function GastosPage() {
                         <text x="58" y="66" textAnchor="middle" dominantBaseline="middle" fill="#ef4444" fontSize="11" fontWeight="bold" opacity="0.65">$</text>
                       </svg>
                     </div>
-                    <h3 className="text-base font-semibold mb-1">Sin gastos registrados</h3>
+                    <h3 className="text-base font-black mb-1">Sin gastos registrados</h3>
                     <p className="text-muted-foreground text-sm max-w-xs leading-relaxed">
                       Registrá los gastos de estudio, mezcla, marketing y todo lo relacionado a tu carrera musical.
                     </p>
@@ -742,16 +813,17 @@ export default function GastosPage() {
                       return (
                         <StaggerItem key={exp.id}>
                           <div
-                            className="flex items-center gap-4 px-5 py-3.5 border-b border-border/40 last:border-0 hover:bg-muted/20 transition-all group cursor-pointer"
+                            className="row-interactive flex items-center gap-4 px-5 py-3.5 border-b border-border/40 last:border-0 hover:bg-muted/20 transition-all group cursor-pointer"
                             onDoubleClick={() => setEditingExpense(exp)}
                           >
                             {/* Category badge icon */}
                             <div
-                              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold"
+                              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-xs font-black group-hover:scale-110 transition-transform"
                               style={{
-                                backgroundColor: `${cat.color}1a`,
-                                border: `1.5px solid ${cat.color}50`,
+                                backgroundColor: `${cat.color}18`,
+                                border: `1.5px solid ${cat.color}55`,
                                 color: cat.color,
+                                boxShadow: `0 0 14px ${cat.color}30, inset 0 1px 0 ${cat.color}25`,
                               }}
                             >
                               {cat.label.slice(0, 2).toUpperCase()}
@@ -759,13 +831,13 @@ export default function GastosPage() {
 
                             {/* Info */}
                             <div className="flex-1 min-w-0">
-                              <div className="font-medium text-sm truncate">{exp.description}</div>
+                              <div className="font-black text-sm truncate">{exp.description}</div>
                               <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                                 <span
-                                  className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium"
-                                  style={{ backgroundColor: `${cat.color}18`, color: cat.color }}
+                                  className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-black border"
+                                  style={{ backgroundColor: `${cat.color}15`, color: cat.color, borderColor: `${cat.color}35` }}
                                 >
-                                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: cat.color }} />
+                                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: cat.color, boxShadow: `0 0 4px ${cat.color}` }} />
                                   {cat.label}
                                 </span>
                                 {exp.period_month && (
@@ -782,7 +854,7 @@ export default function GastosPage() {
                             </div>
 
                             {/* Amount */}
-                            <div className="font-semibold text-red-400 text-sm shrink-0 font-mono tabular-nums">
+                            <div className="font-black text-red-400 text-sm shrink-0 font-mono tabular-nums">
                               {formatCurrency(Number(exp.amount))}
                             </div>
 
@@ -822,9 +894,9 @@ export default function GastosPage() {
               {loading ? (
                 <ChartSkeleton height="h-80" />
               ) : (
-                <div className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl p-5">
-                  <h3 className="font-semibold text-sm mb-4 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-purple-400" />
+                <div className="card-premium rounded-2xl p-5">
+                  <h3 className="font-black text-sm mb-4 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-purple-400 shadow-[0_0_6px_rgba(192,132,252,0.9)]" />
                     Gastos por categoría
                   </h3>
 
@@ -882,7 +954,7 @@ export default function GastosPage() {
               )}
 
               {/* Net balance card */}
-              <div className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl p-5 space-y-3">
+              <div className="card-premium rounded-2xl p-5 space-y-3">
                 <h3 className="font-semibold text-sm flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-indigo-400" />
                   Balance neto — {selectedYear}
@@ -908,11 +980,11 @@ export default function GastosPage() {
                   <div className="h-px bg-border/60" />
 
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold">
+                    <span className="text-sm font-black">
                       {0 - totalYear >= 0 ? "Ganancia" : "Pérdida"}
                     </span>
                     <span
-                      className={`text-lg font-bold font-mono tabular-nums ${
+                      className={`text-lg font-black font-mono tabular-nums ${
                         0 - totalYear >= 0 ? "text-green-400" : "text-red-400"
                       }`}
                     >
@@ -928,9 +1000,9 @@ export default function GastosPage() {
 
               {/* Top categories bar chart */}
               {!loading && categoryData.length > 0 && (
-                <div className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl p-5">
-                  <h3 className="font-semibold text-sm mb-4 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-cyan-400" />
+                <div className="card-premium rounded-2xl p-5">
+                  <h3 className="font-black text-sm mb-4 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.9)]" />
                     Top categorías
                   </h3>
                   <div className="space-y-3">
@@ -939,13 +1011,17 @@ export default function GastosPage() {
                       return (
                         <div key={entry.category}>
                           <div className="flex justify-between text-xs mb-1.5">
-                            <span className="text-muted-foreground">{entry.label}</span>
-                            <span className="font-mono font-medium">{pct.toFixed(0)}%</span>
+                            <span className="text-muted-foreground font-medium">{entry.label}</span>
+                            <span className="font-black tabular-nums" style={{ color: entry.color }}>{pct.toFixed(0)}%</span>
                           </div>
-                          <div className="h-1.5 rounded-full bg-muted/50 overflow-hidden">
+                          <div className="h-2 rounded-full bg-muted/40 overflow-hidden">
                             <div
                               className="h-full rounded-full transition-all duration-700"
-                              style={{ width: `${pct}%`, backgroundColor: entry.color }}
+                              style={{
+                                width: `${pct}%`,
+                                backgroundColor: entry.color,
+                                boxShadow: `0 0 8px ${entry.color}60, inset 0 1px 0 ${entry.color}40`,
+                              }}
                             />
                           </div>
                         </div>

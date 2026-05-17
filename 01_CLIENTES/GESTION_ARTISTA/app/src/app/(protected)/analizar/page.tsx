@@ -136,6 +136,19 @@ export default function AnalizarPage() {
   const [showDrafts, setShowDrafts] = useState(true);
   const abortRef = useRef(false);
 
+  // ── pre-load context stats (mount only, lightweight) ─────────────────────────
+  const [preStats, setPreStats] = useState<{ total: number; withoutBpm: number; songs: number; drafts: number } | null>(null);
+  useEffect(() => {
+    Promise.all([getSongsByYear(), getDrafts()]).then(([songsRes, draftsRes]) => {
+      const songs  = (songsRes.data  ?? []).filter((s) => audioUrl(s));
+      const drafts = (draftsRes.data ?? []).filter((d) => audioUrl(d));
+      const total  = songs.length + drafts.length;
+      const withoutBpm = [...songs, ...drafts].filter((x) => !x.bpm || !x.key_signature).length;
+      setPreStats({ total, withoutBpm, songs: songs.length, drafts: drafts.length });
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ── load items ──────────────────────────────────────────────────────────────
 
   async function loadItems() {
@@ -298,7 +311,7 @@ export default function AnalizarPage() {
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       {/* Header */}
-      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card">
+      <div className="card-premium relative overflow-hidden rounded-2xl">
         <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/8 via-transparent to-transparent pointer-events-none" />
         <div className="absolute -top-10 -right-10 w-40 h-40 bg-yellow-500/6 rounded-full blur-3xl pointer-events-none" />
         <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-5">
@@ -307,7 +320,7 @@ export default function AnalizarPage() {
               <Zap className="h-5 w-5 text-yellow-400" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">Análisis de BPM y tonalidad</h1>
+              <h1 className="text-xl font-black tracking-tight gradient-text">Análisis de BPM y tonalidad</h1>
               <p className="text-muted-foreground text-xs mt-0.5">
                 Detectá el BPM y la tonalidad de tus canciones y maquetas automáticamente
               </p>
@@ -337,7 +350,7 @@ export default function AnalizarPage() {
       </div>
 
       {/* Controls card */}
-      <div className="bg-card border border-border/60 rounded-2xl p-5 space-y-4">
+      <div className="card-premium rounded-2xl p-5 space-y-4">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
           {/* Skip existing toggle */}
           <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -368,7 +381,7 @@ export default function AnalizarPage() {
                   className={cn(
                     "w-8 h-7 rounded-xl text-xs font-medium transition-all active:scale-95",
                     batchSize === n
-                      ? "bg-primary text-primary-foreground font-semibold"
+                      ? "bg-primary text-primary-foreground font-black shadow-[0_0_10px_hsl(var(--primary)/0.4)]"
                       : "bg-secondary text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -385,7 +398,7 @@ export default function AnalizarPage() {
             <button
               onClick={loadItems}
               disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-black hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
               {loading ? "Cargando…" : "Cargar canciones y maquetas"}
@@ -405,7 +418,7 @@ export default function AnalizarPage() {
                   <button
                     onClick={() => runBatch(results)}
                     disabled={remaining === 0}
-                    className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-black hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Play className="h-4 w-4 fill-current" />
                     {remaining === 0
@@ -467,7 +480,7 @@ export default function AnalizarPage() {
             <div className="h-2.5 bg-secondary rounded-full overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-yellow-500 to-primary rounded-full transition-all duration-500"
-                style={{ width: `${progress}%` }}
+                style={{ width: `${progress}%`, boxShadow: progress > 0 ? "0 0 8px hsl(var(--primary)/0.5)" : undefined }}
               />
             </div>
           </div>
@@ -479,7 +492,7 @@ export default function AnalizarPage() {
         <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-green-500/10 border border-green-500/25 text-green-400">
           <CheckCircle2 className="h-5 w-5 flex-shrink-0" />
           <div className="flex-1 text-sm">
-            <span className="font-semibold">¡Análisis completo!</span>
+            <span className="font-black">¡Análisis completo!</span>
             {" "}
             <span className="text-green-400/80">
               {done > 0 && `${done} analizadas`}
@@ -492,13 +505,13 @@ export default function AnalizarPage() {
 
       {/* Songs section */}
       {songs.length > 0 && (
-        <div className="bg-card border border-border/60 rounded-2xl overflow-hidden">
+        <div className="card-premium rounded-2xl overflow-hidden">
           <button
             onClick={() => setShowSongs(v => !v)}
             className="w-full flex items-center justify-between px-4 py-3 hover:bg-secondary/30 transition-all active:scale-[0.99]"
           >
-            <div className="flex items-center gap-2 text-sm font-semibold">
-              <Music className="h-4 w-4 text-primary" />
+            <div className="flex items-center gap-2 text-sm font-black">
+              <Music className="h-4 w-4 text-primary drop-shadow-[0_0_4px_currentColor]" />
               Canciones ({songs.length})
             </div>
             {showSongs ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
@@ -521,13 +534,13 @@ export default function AnalizarPage() {
 
       {/* Drafts section */}
       {drafts.length > 0 && (
-        <div className="bg-card border border-border/60 rounded-2xl overflow-hidden">
+        <div className="card-premium rounded-2xl overflow-hidden">
           <button
             onClick={() => setShowDrafts(v => !v)}
             className="w-full flex items-center justify-between px-4 py-3 hover:bg-secondary/30 transition-all active:scale-[0.99]"
           >
-            <div className="flex items-center gap-2 text-sm font-semibold">
-              <Mic2 className="h-4 w-4 text-blue-400" />
+            <div className="flex items-center gap-2 text-sm font-black">
+              <Mic2 className="h-4 w-4 text-blue-400 drop-shadow-[0_0_4px_currentColor]" />
               Maquetas ({drafts.length})
             </div>
             {showDrafts ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
@@ -549,8 +562,41 @@ export default function AnalizarPage() {
       )}
 
       {items.length === 0 && !loading && (
-        <div className="text-center py-16 text-muted-foreground text-sm">
-          Cargá las canciones y maquetas para empezar.
+        <div className="card-premium rounded-2xl px-6 py-10 text-center space-y-3">
+          {preStats ? (
+            <>
+              <div className="flex items-center justify-center gap-6 flex-wrap">
+                <div className="text-center">
+                  <p className="text-2xl font-black tabular-nums text-foreground">{preStats.total}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">con audio</p>
+                </div>
+                <div className="w-px h-8 bg-border/60" />
+                <div className="text-center">
+                  <p className={`text-2xl font-black tabular-nums ${preStats.withoutBpm > 0 ? "text-yellow-400" : "text-green-400"}`}>
+                    {preStats.withoutBpm}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">sin BPM detectado</p>
+                </div>
+                <div className="w-px h-8 bg-border/60" />
+                <div className="text-center">
+                  <p className="text-2xl font-black tabular-nums text-foreground">{preStats.songs}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">canciones</p>
+                </div>
+                <div className="w-px h-8 bg-border/60" />
+                <div className="text-center">
+                  <p className="text-2xl font-black tabular-nums text-foreground">{preStats.drafts}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">maquetas</p>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {preStats.withoutBpm === 0
+                  ? "✓ Todas las canciones y maquetas ya tienen BPM y tonalidad detectados."
+                  : `Cargá para analizar las ${preStats.withoutBpm} que aún no tienen BPM.`}
+              </p>
+            </>
+          ) : (
+            <p className="text-muted-foreground text-sm">Cargá las canciones y maquetas para empezar.</p>
+          )}
         </div>
       )}
     </div>
@@ -584,10 +630,10 @@ function ItemRow({
 
   return (
     <div ref={rowRef} className={cn(
-      "flex items-center gap-3 px-4 py-2.5 transition-colors text-sm",
-      isCurrent && "bg-blue-500/5 border-l-2 border-blue-400",
-      status === "done" && "bg-green-500/3",
-      status === "error" && "bg-red-500/5",
+      "row-interactive flex items-center gap-3 px-4 py-2.5 transition-all duration-300 text-sm",
+      isCurrent && "bg-blue-500/8 border-l-2 border-blue-400 shadow-[inset_4px_0_12px_hsl(220_80%_60%/0.06)]",
+      status === "done" && !isCurrent && "bg-green-500/4",
+      status === "error" && !isCurrent && "bg-red-500/5",
     )}>
       <span className="text-xs text-muted-foreground/50 w-5 text-right flex-shrink-0 tabular-nums">{idx}</span>
 

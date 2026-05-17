@@ -613,7 +613,7 @@ export default function MetasPage() {
                 <Target className="h-5 w-5 text-primary" />
               </div>
               <div className="text-3xl font-black text-primary tabular-nums animate-count-in">
-                <AnimatedCounter value={activeCount} />
+                {loading ? <span className="opacity-30 text-2xl">—</span> : activeCount}
               </div>
               <div className="text-[11px] text-muted-foreground mt-1.5 font-black uppercase tracking-wider">Activas</div>
             </div>
@@ -625,7 +625,7 @@ export default function MetasPage() {
                 <Trophy className="h-5 w-5 text-green-400" />
               </div>
               <div className="text-3xl font-black text-green-400 tabular-nums animate-count-in">
-                <AnimatedCounter value={doneCount} />
+                {loading ? <span className="opacity-30 text-2xl">—</span> : doneCount}
               </div>
               <div className="text-[11px] text-muted-foreground mt-1.5 font-black uppercase tracking-wider">Completadas</div>
             </div>
@@ -637,7 +637,7 @@ export default function MetasPage() {
                 <TrendingUp className="h-5 w-5 text-blue-400" />
               </div>
               <div className="text-3xl font-black tabular-nums animate-count-in">
-                <AnimatedCounter value={avgProgress} suffix="%" />
+                {loading ? <span className="opacity-30 text-2xl">—</span> : `${avgProgress}%`}
               </div>
               <div className="text-[11px] text-muted-foreground mt-1.5 font-black uppercase tracking-wider">Progreso prom.</div>
             </div>

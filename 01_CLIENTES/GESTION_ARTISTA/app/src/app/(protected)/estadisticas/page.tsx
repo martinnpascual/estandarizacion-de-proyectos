@@ -84,20 +84,23 @@ function StatCard({ icon: Icon, label, value, sub, color, href, delta }: {
   const numericValue = /^\d+$/.test(value.trim()) ? Number(value) : null;
   const inner = (
     <>
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</span>
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-secondary/60 group-hover:scale-110 transition-all">
-          <Icon className={cn("h-4 w-4", color)} />
+      {/* Top accent bar — uses currentColor from the color class */}
+      <span className={cn("block h-[3px] rounded-full mb-4 w-8", color)}
+        style={{ background: "currentColor", boxShadow: "0 0 8px currentColor" }} />
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.1em]">{label}</span>
+        <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center bg-secondary/60 group-hover:scale-110 transition-all border border-white/5 shadow-[0_2px_8px_hsl(0_0%_0%/0.2)]")}>
+          <Icon className={cn("h-[18px] w-[18px] drop-shadow-[0_0_4px_currentColor]", color)} />
         </div>
       </div>
       {numericValue !== null ? (
         <AnimatedCounter
           value={numericValue}
-          className="text-3xl font-bold leading-none tabular-nums block"
+          className="text-4xl font-black leading-none tabular-nums block"
           duration={1.4}
         />
       ) : (
-        <p className="text-3xl font-bold leading-none tabular-nums">{value}</p>
+        <p className="text-4xl font-black leading-none tabular-nums">{value}</p>
       )}
       {delta !== undefined && delta !== 0 && (
         <div className={cn(
@@ -113,13 +116,13 @@ function StatCard({ icon: Icon, label, value, sub, color, href, delta }: {
   );
   if (href) {
     return (
-      <a href={href} className="bg-card/80 backdrop-blur-sm border border-border/60 rounded-2xl p-5 block hover:border-primary/30 hover:bg-card transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] group">
+      <a href={href} className="card-premium rounded-2xl p-5 block hover:-translate-y-0.5 active:scale-[0.98] group transition-all duration-200">
         {inner}
       </a>
     );
   }
   return (
-    <div className="bg-card/80 backdrop-blur-sm border border-border/60 rounded-2xl p-5">
+    <div className="card-premium rounded-2xl p-5">
       {inner}
     </div>
   );
@@ -127,8 +130,8 @@ function StatCard({ icon: Icon, label, value, sub, color, href, delta }: {
 
 function SectionCard({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("bg-card/80 backdrop-blur-sm border border-border/60 rounded-2xl p-5", className)}>
-      <h2 className="text-[11px] font-bold mb-4 text-muted-foreground uppercase tracking-[0.1em]">
+    <div className={cn("card-premium rounded-2xl p-5", className)}>
+      <h2 className="text-[11px] font-black mb-4 text-muted-foreground uppercase tracking-[0.1em]">
         {title}
       </h2>
       {children}
@@ -171,17 +174,22 @@ function BarList({ items, colorKey = "color" }: {
           <span className="text-xs text-muted-foreground w-4 text-right flex-shrink-0">{i + 1}</span>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-medium truncate">{item.label}</span>
+              <span className="text-xs font-black truncate">{item.label}</span>
               <span className="text-xs text-muted-foreground flex-shrink-0 ml-2">{item.count}</span>
             </div>
-            <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+            <div className="h-1.5 bg-secondary/60 rounded-full overflow-hidden">
               <div
-                className="h-full rounded-full transition-all duration-700"
+                className="h-full rounded-full transition-all duration-700 relative overflow-hidden"
                 style={{
                   width: `${Math.round((item.count / max) * 100)}%`,
-                  background: item.color ?? "hsl(var(--primary))",
+                  background: item.color
+                    ? `linear-gradient(90deg, ${item.color}99, ${item.color})`
+                    : "linear-gradient(90deg, hsl(var(--primary)/0.7), hsl(var(--primary)))",
+                  boxShadow: `0 0 6px ${item.color ?? "hsl(var(--primary)/0.5)"}66`,
                 }}
-              />
+              >
+                <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent" />
+              </div>
             </div>
           </div>
         </div>
@@ -194,19 +202,19 @@ function Skeleton() {
   return (
     <div className="space-y-6">
       <div className="flex gap-2">
-        {[1,2,3,4].map(i => <div key={i} className="h-9 w-28 bg-secondary rounded-xl animate-pulse" />)}
+        {[1,2,3,4].map(i => <div key={i} className="h-9 w-28 skeleton rounded-xl" />)}
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="bg-card border border-border/60 rounded-2xl p-5">
-            <div className="h-3 bg-secondary rounded w-20 mb-3 animate-pulse" />
-            <div className="h-7 bg-secondary rounded w-16 animate-pulse" />
+          <div key={i} className="card-premium rounded-2xl p-5">
+            <div className="h-3 skeleton rounded w-20 mb-3" />
+            <div className="h-7 skeleton rounded w-16" />
           </div>
         ))}
       </div>
       <div className="grid md:grid-cols-2 gap-6">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="bg-card border border-border/60 rounded-2xl p-5 h-56 animate-pulse" />
+          <div key={i} className="card-premium rounded-2xl p-5 h-56 skeleton-shimmer" />
         ))}
       </div>
     </div>
@@ -270,14 +278,16 @@ function EstadisticasContent() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary/10 via-purple-500/5 to-blue-500/10 border border-border/60 p-6">
+      <div className="card-premium relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary/10 via-purple-500/5 to-blue-500/10 p-6">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none" />
+        <div className="absolute -top-10 -right-10 w-44 h-44 bg-primary/8 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-blue-500/6 rounded-full blur-2xl pointer-events-none" />
         <div className="relative flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center shadow-lg shadow-primary/25 flex-shrink-0">
             <BarChart2 className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">Estadísticas</h1>
+            <h1 className="text-2xl font-black tracking-tight gradient-text">Estadísticas</h1>
             <p className="text-muted-foreground text-sm mt-0.5">
               Análisis completo de tu actividad musical
             </p>
@@ -294,7 +304,7 @@ function EstadisticasContent() {
       ) : (
         <>
           {/* Tabs */}
-          <div className="flex gap-1 overflow-x-auto pb-1 bg-secondary/40 rounded-xl p-1 w-fit">
+          <div className="flex gap-1 overflow-x-auto pb-1 bg-secondary/40 backdrop-blur-md rounded-2xl p-1.5 max-w-full border border-border/30 scrollbar-none">
             {TABS.map((t, i) => {
               const Icon = t.icon;
               const isActive = tab === t.id;
@@ -304,19 +314,24 @@ function EstadisticasContent() {
                   onClick={() => setTab(t.id)}
                   title={`${t.label} (tecla ${i + 1})`}
                   className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-200 active:scale-95",
+                    "tab-indicator flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm whitespace-nowrap transition-all duration-200 active:scale-95",
                     isActive
-                      ? "bg-card shadow-sm border border-border/60 text-foreground font-semibold"
-                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                      ? "active card-premium text-foreground font-black shadow-[0_2px_10px_hsl(0_0%_0%/0.25),inset_0_1px_0_hsl(0_0%_100%/0.10)] border-primary/15"
+                      : "font-medium text-muted-foreground hover:text-foreground hover:bg-white/5"
                   )}
                 >
-                  <Icon className={cn("h-4 w-4", isActive ? t.color : "")} />
-                  {t.label}
+                  <Icon className={cn(
+                    "h-4 w-4 transition-all duration-200",
+                    isActive
+                      ? cn(t.color, "drop-shadow-[0_0_6px_currentColor] scale-110")
+                      : "opacity-50 group-hover:opacity-80"
+                  )} />
+                  <span className={isActive ? "gradient-text" : ""}>{t.label}</span>
                   <kbd className={cn(
                     "hidden sm:inline-flex items-center justify-center w-4 h-4 text-[9px] font-mono rounded border transition-colors ml-0.5",
                     isActive
-                      ? "border-border/60 text-muted-foreground bg-background/50"
-                      : "border-border/30 text-muted-foreground/50 bg-secondary/30"
+                      ? "border-primary/30 text-primary/70 bg-primary/8"
+                      : "border-border/30 text-muted-foreground/35 bg-secondary/30"
                   )}>{i + 1}</kbd>
                 </button>
               );
@@ -375,6 +390,12 @@ function DiscografiaTab({ stats }: { stats: AllStats["discografia"] }) {
         <SectionCard title="Canciones por año">
           <ResponsiveContainer width="100%" height={200}>
             <ComposedChart data={stats.songsByYear} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="statsBarGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="hsl(var(--section-hsl, 262 80% 62%))" stopOpacity={1} />
+                  <stop offset="100%" stopColor="hsl(var(--section-hsl, 262 80% 62%))" stopOpacity={0.55} />
+                </linearGradient>
+              </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="year" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} />
               <YAxis yAxisId="left" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} allowDecimals={false} />
@@ -392,7 +413,7 @@ function DiscografiaTab({ stats }: { stats: AllStats["discografia"] }) {
                   return [num, String(name)];
                 }}
               />
-              <Bar yAxisId="left" dataKey="count" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} maxBarSize={40} />
+              <Bar yAxisId="left" dataKey="count" fill="url(#statsBarGrad)" radius={[6, 6, 0, 0]} maxBarSize={40} />
               <Line yAxisId="right" type="monotone" dataKey="avgDurationSeconds" stroke="#fb923c"
                 strokeWidth={2} dot={{ fill: "#fb923c", r: 3 }} activeDot={{ r: 5 }} />
             </ComposedChart>
@@ -537,12 +558,18 @@ function MaquetasTab({ stats }: { stats: AllStats["maquetas"] }) {
           <SectionCard title="Creación mensual">
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={stats.byMonth} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="maquetasBarGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#60a5fa" stopOpacity={1} />
+                    <stop offset="100%" stopColor="#60a5fa" stopOpacity={0.45} />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                 <XAxis dataKey="month" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} />
                 <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} allowDecimals={false} />
                 <Tooltip contentStyle={TOOLTIP_STYLE}
                   formatter={(v) => [v as number, "maquetas"]} />
-                <Bar dataKey="count" fill="#60a5fa" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                <Bar dataKey="count" fill="url(#maquetasBarGrad)" radius={[4, 4, 0, 0]} maxBarSize={32} />
               </BarChart>
             </ResponsiveContainer>
           </SectionCard>
@@ -562,7 +589,7 @@ function MaquetasTab({ stats }: { stats: AllStats["maquetas"] }) {
               <div key={label} className="flex items-center gap-3">
                 <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
                 <span className="text-sm flex-1">{label}</span>
-                <span className="text-sm font-semibold tabular-nums">{count}</span>
+                <span className="text-sm font-black tabular-nums">{count}</span>
                 <div className="w-20 h-1.5 bg-secondary rounded-full overflow-hidden flex-shrink-0">
                   <div className="h-full rounded-full" style={{ width: `${Math.round((count / stats.total) * 100)}%`, background: color }} />
                 </div>
@@ -590,7 +617,7 @@ function CompletionRing({ pct, size = 120 }: { pct: number; size?: number }) {
           style={{ transition: "stroke-dasharray 1s ease" }} />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold tabular-nums">{pct}%</span>
+        <span className="text-2xl font-black tabular-nums">{pct}%</span>
         <span className="text-[10px] text-muted-foreground">completadas</span>
       </div>
     </div>
@@ -641,7 +668,7 @@ function CollabsTab({ stats }: { stats: AllStats["collabs"] }) {
                 </RadialBarChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-xl font-bold tabular-nums leading-none">{completionPct}%</span>
+                <span className="text-xl font-black tabular-nums leading-none">{completionPct}%</span>
                 <span className="text-[9px] text-muted-foreground">listas</span>
               </div>
             </div>
@@ -660,7 +687,7 @@ function CollabsTab({ stats }: { stats: AllStats["collabs"] }) {
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="w-2.5 h-2.5 text-red-400 flex-shrink-0" />
                   <span className="text-sm flex-1 text-red-400">Deadline vencido</span>
-                  <span className="text-sm font-semibold tabular-nums text-red-400">{stats.overdueCount}</span>
+                  <span className="text-sm font-black tabular-nums text-red-400">{stats.overdueCount}</span>
                 </div>
               )}
               {stats.withDeadline > 0 && (
@@ -679,7 +706,7 @@ function CollabsTab({ stats }: { stats: AllStats["collabs"] }) {
               <div key={label} className="flex items-center gap-3">
                 <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
                 <span className="text-sm flex-1">{label}</span>
-                <span className="text-sm font-semibold tabular-nums">{count}</span>
+                <span className="text-sm font-black tabular-nums">{count}</span>
                 <div className="w-20 h-1.5 bg-secondary rounded-full overflow-hidden flex-shrink-0">
                   <div className="h-full rounded-full" style={{ width: `${Math.round((count / stats.total) * 100)}%`, background: color }} />
                 </div>
@@ -693,12 +720,18 @@ function CollabsTab({ stats }: { stats: AllStats["collabs"] }) {
           <SectionCard title="Actividad mensual">
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={stats.byMonth} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="collabsBarGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#facc15" stopOpacity={1} />
+                    <stop offset="100%" stopColor="#facc15" stopOpacity={0.4} />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                 <XAxis dataKey="month" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} />
                 <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} allowDecimals={false} />
                 <Tooltip contentStyle={TOOLTIP_STYLE}
                   formatter={(v) => [v as number, "collabs"]} />
-                <Bar dataKey="count" fill="#facc15" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                <Bar dataKey="count" fill="url(#collabsBarGrad)" radius={[4, 4, 0, 0]} maxBarSize={32} />
               </BarChart>
             </ResponsiveContainer>
           </SectionCard>
@@ -795,8 +828,8 @@ function ResumenTab({ stats }: { stats: AllStats }) {
           .sort((a, b) => a.year - b.year);
         const maxCount = Math.max(...recent.map(y => y.count), 1);
         return (
-          <div className="bg-card border border-border/60 rounded-2xl p-5">
-            <h2 className="text-xs font-semibold mb-4 text-muted-foreground uppercase tracking-wide">
+          <div className="card-premium rounded-2xl p-5">
+            <h2 className="text-xs font-black mb-4 text-muted-foreground uppercase tracking-wide">
               Ritmo de producción anual
             </h2>
             <div className="flex items-end gap-6">
@@ -822,15 +855,15 @@ function ResumenTab({ stats }: { stats: AllStats }) {
               {/* Numbers */}
               <div className="flex items-center gap-5 flex-1 flex-wrap">
                 <div>
-                  <p className="text-3xl font-bold tabular-nums leading-none">{thisYear}</p>
+                  <p className="text-3xl font-black tabular-nums leading-none">{thisYear}</p>
                   <p className="text-xs text-muted-foreground mt-1">{currentYear}</p>
                 </div>
                 {lastYear > 0 && (
                   <div className={cn(
-                    "flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full self-center",
-                    delta > 0 ? "text-green-400 bg-green-400/10" :
-                    delta < 0 ? "text-red-400 bg-red-400/10" :
-                    "text-muted-foreground bg-secondary"
+                    "flex items-center gap-1 text-xs font-black px-2 py-1 rounded-full self-center border",
+                    delta > 0 ? "text-green-400 bg-green-400/12 border-green-400/30 shadow-[0_0_8px_hsl(142_70%_45%/0.12)]" :
+                    delta < 0 ? "text-red-400 bg-red-400/12 border-red-400/30 shadow-[0_0_8px_hsl(0_84%_60%/0.12)]" :
+                    "text-muted-foreground bg-secondary border-border/50"
                   )}>
                     {delta > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : delta < 0 ? <TrendingDown className="h-3.5 w-3.5" /> : null}
                     {delta > 0 ? "+" : ""}{delta}
@@ -838,12 +871,12 @@ function ResumenTab({ stats }: { stats: AllStats }) {
                   </div>
                 )}
                 <div>
-                  <p className="text-3xl font-bold tabular-nums leading-none text-muted-foreground">{lastYear}</p>
+                  <p className="text-3xl font-black tabular-nums leading-none text-muted-foreground">{lastYear}</p>
                   <p className="text-xs text-muted-foreground mt-1">{currentYear - 1}</p>
                 </div>
                 {twoYearsAgo > 0 && (
                   <div>
-                    <p className="text-xl font-bold tabular-nums leading-none text-muted-foreground/50">{twoYearsAgo}</p>
+                    <p className="text-xl font-black tabular-nums leading-none text-muted-foreground/50">{twoYearsAgo}</p>
                     <p className="text-xs text-muted-foreground/50 mt-1">{currentYear - 2}</p>
                   </div>
                 )}
@@ -946,9 +979,9 @@ function ResumenTab({ stats }: { stats: AllStats }) {
       {(bestYear || topGenre || topArtist) && (
         <div className={cn("grid gap-4", bestYear && topGenre && topArtist ? "md:grid-cols-3" : "md:grid-cols-2")}>
           {bestYear && (
-            <div className="bg-card border border-border/60 rounded-2xl p-5">
+            <div className="card-premium rounded-2xl p-5">
               <p className="text-xs text-muted-foreground mb-3 flex items-center gap-1.5">
-                <Award className="h-3.5 w-3.5" />
+                <Award className="h-3.5 w-3.5 text-yellow-400" />
                 Año más productivo
               </p>
               <p className="text-4xl font-bold tabular-nums">{bestYear.year}</p>
@@ -959,12 +992,12 @@ function ResumenTab({ stats }: { stats: AllStats }) {
             </div>
           )}
           {topGenre && (
-            <div className="bg-card border border-border/60 rounded-2xl p-5">
+            <div className="card-premium rounded-2xl p-5">
               <p className="text-xs text-muted-foreground mb-3 flex items-center gap-1.5">
-                <Music2 className="h-3.5 w-3.5" />
+                <Music2 className="h-3.5 w-3.5 text-primary" />
                 Género principal
               </p>
-              <p className="text-3xl font-bold truncate">{topGenre.genre}</p>
+              <p className="text-3xl font-black truncate tracking-tight">{topGenre.genre}</p>
               <p className="text-sm text-muted-foreground mt-1.5">
                 {topGenre.count} canción{topGenre.count !== 1 ? "es" : ""}
                 {disco && disco.totalSongs > 0 ? ` · ${Math.round((topGenre.count / disco.totalSongs) * 100)}% del catálogo` : ""}
@@ -972,12 +1005,12 @@ function ResumenTab({ stats }: { stats: AllStats }) {
             </div>
           )}
           {topArtist && (
-            <div className="bg-card border border-border/60 rounded-2xl p-5">
+            <div className="card-premium rounded-2xl p-5">
               <p className="text-xs text-muted-foreground mb-3 flex items-center gap-1.5">
-                <Users2 className="h-3.5 w-3.5" />
+                <Users2 className="h-3.5 w-3.5 text-blue-400" />
                 Artista frecuente
               </p>
-              <p className="text-3xl font-bold truncate">{topArtist.artist}</p>
+              <p className="text-3xl font-black truncate tracking-tight">{topArtist.artist}</p>
               <p className="text-sm text-muted-foreground mt-1.5">
                 {topArtist.count} colaboración{topArtist.count !== 1 ? "es" : ""}
               </p>
@@ -1114,7 +1147,7 @@ function ResumenTab({ stats }: { stats: AllStats }) {
                 >
                   <span className={cn("text-2xl leading-none", !a.earned && "grayscale opacity-50")}>{a.emoji}</span>
                   <div className="w-full">
-                    <p className={cn("text-xs font-semibold leading-tight", !a.earned && "text-muted-foreground")}>{a.label}</p>
+                    <p className={cn("text-xs font-black leading-tight", !a.earned && "text-muted-foreground")}>{a.label}</p>
                     <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{a.desc}</p>
                   </div>
                   {a.earned ? (
@@ -1199,12 +1232,18 @@ function ProyectosTab({ stats }: { stats: AllStats["projects"] }) {
         <SectionCard title="Proyectos por tipo">
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={stats.byType} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="proyectosTypeGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#c084fc" stopOpacity={1} />
+                  <stop offset="100%" stopColor="#c084fc" stopOpacity={0.4} />
+                </linearGradient>
+              </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} />
               <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} allowDecimals={false} />
               <Tooltip contentStyle={TOOLTIP_STYLE}
                 formatter={(v) => [v as number, "proyectos"]} />
-              <Bar dataKey="count" fill="#c084fc" radius={[4, 4, 0, 0]} maxBarSize={40} />
+              <Bar dataKey="count" fill="url(#proyectosTypeGrad)" radius={[4, 4, 0, 0]} maxBarSize={40} />
             </BarChart>
           </ResponsiveContainer>
         </SectionCard>
@@ -1216,7 +1255,7 @@ function ProyectosTab({ stats }: { stats: AllStats["projects"] }) {
               <div key={label} className="flex items-center gap-3">
                 <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
                 <span className="text-sm flex-1">{label}</span>
-                <span className="text-sm font-semibold tabular-nums">{count}</span>
+                <span className="text-sm font-black tabular-nums">{count}</span>
                 <div className="w-20 h-1.5 bg-secondary rounded-full overflow-hidden flex-shrink-0">
                   <div className="h-full rounded-full" style={{ width: `${Math.round((count / stats.total) * 100)}%`, background: color }} />
                 </div>
@@ -1230,12 +1269,18 @@ function ProyectosTab({ stats }: { stats: AllStats["projects"] }) {
           <SectionCard title="Creación mensual">
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={stats.byMonth} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="proyectosMonthGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#c084fc" stopOpacity={1} />
+                    <stop offset="100%" stopColor="#c084fc" stopOpacity={0.4} />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                 <XAxis dataKey="month" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} />
                 <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} allowDecimals={false} />
                 <Tooltip contentStyle={TOOLTIP_STYLE}
                   formatter={(v) => [v as number, "proyectos"]} />
-                <Bar dataKey="count" fill="#c084fc" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                <Bar dataKey="count" fill="url(#proyectosMonthGrad)" radius={[4, 4, 0, 0]} maxBarSize={32} />
               </BarChart>
             </ResponsiveContainer>
           </SectionCard>
@@ -1260,9 +1305,9 @@ function RedesTab({ links, loading }: { links: SocialLinkWithLatestStat[]; loadi
       <div className="space-y-6">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[1,2,3,4].map(i => (
-            <div key={i} className="bg-card border border-border/60 rounded-2xl p-5 animate-pulse">
-              <div className="h-3 bg-secondary rounded w-20 mb-3" />
-              <div className="h-7 bg-secondary rounded w-16" />
+            <div key={i} className="card-premium rounded-2xl p-5 skeleton-shimmer">
+              <div className="h-3 skeleton rounded w-20 mb-3" />
+              <div className="h-7 skeleton rounded w-16" />
             </div>
           ))}
         </div>
@@ -1416,7 +1461,7 @@ function RedesTab({ links, loading }: { links: SocialLinkWithLatestStat[]; loadi
                 <span className={`w-3 h-3 rounded-full flex-shrink-0 mt-1 ${meta?.color ?? "bg-muted-foreground"}`} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 mb-2">
-                    <p className="text-sm font-semibold">{meta?.label ?? link.platform}</p>
+                    <p className="text-sm font-black">{meta?.label ?? link.platform}</p>
                     {link.username && <span className="text-xs text-muted-foreground">@{link.username}</span>}
                   </div>
                   <div className="space-y-1">
