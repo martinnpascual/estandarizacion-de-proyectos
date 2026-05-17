@@ -1023,6 +1023,48 @@ export default function RedesPage() {
             </div>
           )}
 
+          {/* Total reach summary */}
+          {links.length > 0 && (() => {
+            const withFollowers = links.filter(l => l.latest_stat?.followers != null);
+            const withPlays = links.filter(l => l.latest_stat?.monthly_plays != null);
+            if (withFollowers.length === 0 && withPlays.length === 0) return null;
+            const totalFollowers = withFollowers.reduce((sum, l) => sum + (l.latest_stat!.followers ?? 0), 0);
+            const totalPlays = withPlays.reduce((sum, l) => sum + (l.latest_stat!.monthly_plays ?? 0), 0);
+            return (
+              <div className="card-premium rounded-2xl px-5 py-4 flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center flex-shrink-0">
+                    <Users className="h-4 w-4 text-primary" />
+                  </div>
+                  <p className="text-xs text-muted-foreground font-black uppercase tracking-wider">Alcance total</p>
+                </div>
+                <div className="flex flex-wrap gap-4 ml-auto">
+                  {totalFollowers > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Seguidores totales</span>
+                      <span className="text-lg font-black tabular-nums text-foreground">{formatNumber(totalFollowers)}</span>
+                      <span className="text-[10px] text-muted-foreground/60 ml-0.5">
+                        en {withFollowers.length} plataforma{withFollowers.length !== 1 ? "s" : ""}
+                      </span>
+                    </div>
+                  )}
+                  {totalFollowers > 0 && totalPlays > 0 && (
+                    <div className="w-px h-5 bg-border/60 self-center" />
+                  )}
+                  {totalPlays > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Reproducciones/mes</span>
+                      <span className="text-lg font-black tabular-nums text-foreground">{formatNumber(totalPlays)}</span>
+                      <span className="text-[10px] text-muted-foreground/60 ml-0.5">
+                        en {withPlays.length} plataforma{withPlays.length !== 1 ? "s" : ""}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
           {missingPlatforms.length > 0 && (
             <div>
               <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-3">

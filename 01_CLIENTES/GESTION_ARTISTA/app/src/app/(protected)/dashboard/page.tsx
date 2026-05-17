@@ -7,6 +7,7 @@ import {
   CheckCircle, AlertCircle, FolderOpen, ChevronRight, Music,
   Zap, Rocket, Share2, FolderPlus, AlertTriangle, CalendarDays, Activity,
   Settings, Eye, EyeOff, ChevronUp, ChevronDown, X, RotateCcw,
+  Target,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -20,9 +21,10 @@ import {
   type ActivityItem,
 } from "@/lib/actions/dashboard";
 import { getUpcomingEvents, getUpcomingReleases } from "@/lib/actions/calendar";
+import { getGoals } from "@/lib/actions/goals";
 import { useUser } from "@/hooks/useUser";
 import { cn } from "@/lib/utils";
-import type { CalendarEvent, CalendarEventType, Draft, Collaboration, Project, ProjectStatus } from "@/types/database";
+import type { CalendarEvent, CalendarEventType, Draft, Collaboration, Project, ProjectStatus, Goal } from "@/types/database";
 
 // ── tipos ──────────────────────────────────────────────────────────────
 const EVENT_TYPE_DOTS: Record<CalendarEventType, string> = {
@@ -128,6 +130,7 @@ const WIDGET_DEFS = [
   { id: "charts",   label: "Estadísticas",           icon: TrendingUp,   description: "Canciones por año y por género" },
   { id: "activity", label: "Actividad reciente",     icon: Zap,          description: "Historial de acciones recientes" },
   { id: "heatmap",  label: "Mapa de actividad",      icon: Activity,     description: "Heatmap de las últimas 16 semanas" },
+  { id: "goals",    label: "Metas activas",          icon: Target,       description: "Tus metas artísticas con progreso" },
 ] as const;
 
 type WidgetId = (typeof WIDGET_DEFS)[number]["id"];
@@ -135,11 +138,11 @@ type WidgetId = (typeof WIDGET_DEFS)[number]["id"];
 const WIDGET_SIZES: Record<WidgetId, "full" | "half"> = {
   stats: "full", agenda: "full", releases: "full",
   drafts: "half", events: "half", collabs: "half", projects: "half", charts: "half",
-  activity: "full", heatmap: "full",
+  activity: "full", heatmap: "full", goals: "half",
 };
 
 const DEFAULT_WIDGET_ORDER: WidgetId[] = [
-  "stats", "agenda", "releases", "drafts", "events", "collabs", "projects", "charts", "activity", "heatmap",
+  "stats", "agenda", "releases", "drafts", "events", "collabs", "projects", "goals", "charts", "activity", "heatmap",
 ];
 
 type DashboardConfig = { order: WidgetId[]; hidden: WidgetId[] };
@@ -193,6 +196,7 @@ export default function DashboardPage() {
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [releases, setReleases] = useState<CalendarEvent[]>([]);
   const [activeProjects, setActiveProjects] = useState<Project[]>([]);
+  const [activeGoals, setActiveGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [googleLinked, setGoogleLinked] = useState<boolean | null>(null);
   const [activityFilter, setActivityFilter] = useState<ActivityItem["type"] | "all">(() =>
@@ -207,7 +211,7 @@ export default function DashboardPage() {
 
   const load = useCallback(async () => {
     try {
-      const [statsRes, draftsRes, collabsRes, eventsRes, chartRes, activityRes, releasesRes, projectsRes] = await Promise.all([
+      const [statsRes, draftsRes, collabsRes, eventsRes, chartRes, activityRes, releasesRes, projectsRes, goalsRes] = await Promise.all([
         getDashboardStats(),
         getLatestDrafts(4),
         getActiveCollabs(4),
@@ -216,6 +220,7 @@ export default function DashboardPage() {
         getRecentActivity(30),
         getUpcomingReleases(5),
         getActiveProjects(4),
+        getGoals({ is_completed: false }),
       ]);
       setStats(statsRes.data);
       setDrafts(draftsRes.data ?? []);
@@ -226,6 +231,7 @@ export default function DashboardPage() {
       setActivity(activityRes.data ?? []);
       setReleases(releasesRes.data ?? []);
       setActiveProjects(projectsRes.data ?? []);
+      setActiveGoals(goalsRes.data ?? []);
     } catch (e) {
       console.error("Dashboard load error:", e);
     } finally {
@@ -824,6 +830,57 @@ export default function DashboardPage() {
                             </div>
                             {targetDate && <span className={cn("text-xs flex-shrink-0", targetDate.cls)}>{targetDate.label}</span>}
                             <span className={cn("text-xs flex-shrink-0", PROJECT_STATUS_COLOR[p.status])}>{PROJECT_STATUS_LABEL[p.status]}</span>
+                          </a>
+                        );
+                      })}
+                    </div>
+                  )}
+                </Widget>
+              );
+
+            case "goals":
+              return (
+                <Widget title="Metas activas" icon={Target} href="/metas" accentColor="bg-primary">
+                  {loading ? <WidgetSkeleton /> : activeGoals.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-6">Sin metas activas</p>
+                  ) : (
+                    <div className="divide-y divide-border/50 -mx-5">
+                      {activeGoals.slice(0, 4).map((goal) => {
+                        const percent = Math.min(100, Math.round((goal.current_value / goal.target_value) * 100));
+                        const daysLeft = goal.target_date
+                          ? Math.ceil((new Date(goal.target_date + "T00:00:00").getTime() - Date.now()) / 86400000)
+                          : null;
+                        return (
+                          <a key={goal.id} href="/metas"
+                            className="row-interactive flex flex-col gap-1.5 px-5 py-2.5 hover:bg-secondary/40 transition-all active:scale-[0.99] group">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-black truncate group-hover:text-primary transition-colors">{goal.title}</p>
+                              {daysLeft !== null && (
+                                <span className={cn(
+                                  "text-[10px] font-medium flex-shrink-0 px-1.5 py-0.5 rounded-full",
+                                  daysLeft < 0 ? "bg-red-500/15 text-red-400" :
+                                  daysLeft <= 7 ? "bg-orange-500/15 text-orange-400" :
+                                  "bg-secondary text-muted-foreground"
+                                )}>
+                                  {daysLeft < 0 ? "Vencida" : daysLeft === 0 ? "Hoy" : `${daysLeft}d`}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                                <div
+                                  className={cn(
+                                    "h-full rounded-full transition-all duration-700",
+                                    percent >= 100 ? "bg-green-400" :
+                                    percent >= 70  ? "bg-primary" :
+                                    percent >= 40  ? "bg-yellow-500" :
+                                    "bg-primary/60"
+                                  )}
+                                  style={{ width: `${percent}%` }}
+                                />
+                              </div>
+                              <span className="text-[10px] text-muted-foreground tabular-nums w-7 text-right">{percent}%</span>
+                            </div>
                           </a>
                         );
                       })}

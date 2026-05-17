@@ -22,6 +22,7 @@ import {
   Loader2,
   Pencil,
   Download,
+  ChevronRight,
 } from "lucide-react";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -111,7 +112,7 @@ function GoalForm({ onClose, onSave, initial, isEditing }: GoalFormProps & { isE
 
         <form
           onSubmit={handleSubmit}
-          className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl shadow-2xl w-full p-6 space-y-4"
+          className="relative glass-panel rounded-2xl w-full p-6 space-y-4"
         >
           {/* Header */}
           <div className="flex items-center justify-between">
@@ -119,7 +120,7 @@ function GoalForm({ onClose, onSave, initial, isEditing }: GoalFormProps & { isE
               <div className="w-8 h-8 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center">
                 <Target className="h-4 w-4 text-primary" />
               </div>
-              <h2 className="font-semibold text-base">{isEditing ? "Editar meta" : "Nueva meta"}</h2>
+              <h2 className="font-black text-base">{isEditing ? "Editar meta" : "Nueva meta"}</h2>
             </div>
             <button
               type="button"
@@ -224,7 +225,7 @@ function GoalForm({ onClose, onSave, initial, isEditing }: GoalFormProps & { isE
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 bg-primary text-primary-foreground rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 flex items-center justify-center gap-2"
+              className="flex-1 bg-primary text-primary-foreground rounded-xl px-4 py-2.5 text-sm font-black hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 flex items-center justify-center gap-2"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : isEditing ? "Actualizar meta" : "Guardar meta"}
             </button>
@@ -260,18 +261,18 @@ function GoalCard({ goal, onToggle, onDelete, onUpdateProgress, onEdit }: GoalCa
     : null;
 
   return (
-    <div className={`relative overflow-hidden rounded-2xl border border-border/60 bg-card transition-all group ${goal.is_completed ? "opacity-60" : "hover:shadow-lg hover:shadow-black/10 hover:border-border/80 hover:-translate-y-0.5"}`}>
+    <div className={`card-premium card-gradient-border relative overflow-hidden rounded-2xl transition-all group ${goal.is_completed ? "opacity-60" : "hover:-translate-y-0.5 hover:shadow-[0_8px_24px_hsl(0_0%_0%/0.25)]"}`}>
       {/* Category accent bar */}
-      <div className={`absolute left-0 top-0 bottom-0 w-1 ${CATEGORY_COLORS[goal.category]} opacity-70`} />
+      <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${CATEGORY_COLORS[goal.category]} opacity-90 shadow-[2px_0_8px_currentColor]`} />
 
-      <div className="pl-4 pr-4 pt-4 pb-3 space-y-3">
+      <div className="pl-5 pr-4 pt-4 pb-3 space-y-3">
         <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-2.5 flex-1 min-w-0">
-            <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-white shrink-0 group-hover:scale-110 transition-transform ${CATEGORY_COLORS[goal.category]}`}>
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 group-hover:scale-110 transition-transform shadow-[0_0_12px_currentColor] ${CATEGORY_COLORS[goal.category]}`}>
               {CATEGORY_ICONS[goal.category]}
             </div>
             <div className="min-w-0">
-              <p className={`font-semibold text-sm leading-snug ${goal.is_completed ? "line-through text-muted-foreground" : ""}`}>
+              <p className={`font-black text-sm leading-snug ${goal.is_completed ? "line-through text-muted-foreground" : ""}`}>
                 {goal.title}
               </p>
               <p className="text-[11px] text-muted-foreground">{CATEGORY_LABELS[goal.category]}</p>
@@ -310,14 +311,17 @@ function GoalCard({ goal, onToggle, onDelete, onUpdateProgress, onEdit }: GoalCa
         <div>
           <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
             <span>Progreso</span>
-            <span className={`font-bold tabular-nums ${percent >= 100 ? "text-green-400" : percent >= 75 ? "text-primary" : "text-foreground"}`}>
+            <span className={`font-black tabular-nums ${percent >= 100 ? "text-green-400 drop-shadow-[0_0_6px_rgba(74,222,128,0.6)]" : percent >= 75 ? "text-primary drop-shadow-[0_0_6px_hsl(var(--primary)/0.5)]" : "text-foreground"}`}>
               {percent}%
             </span>
           </div>
           <div className="h-2.5 rounded-full bg-muted overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-700 ${
-                percent >= 100 ? "bg-green-500" : CATEGORY_COLORS[goal.category]
+                percent >= 100 ? "goal-bar-green shadow-[0_0_10px_hsl(142_70%_45%/0.7)]"
+                : percent >= 70 ? "goal-bar-green"
+                : percent >= 40 ? "goal-bar-yellow"
+                : "goal-bar-red"
               }`}
               style={{ width: `${percent}%` }}
             />
@@ -349,13 +353,20 @@ function GoalCard({ goal, onToggle, onDelete, onUpdateProgress, onEdit }: GoalCa
               <span className={`flex-shrink-0 px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
                 daysLeft < 0
                   ? "bg-red-500/15 text-red-400"
-                  : daysLeft < 7
+                  : daysLeft === 0
+                  ? "bg-orange-500/15 text-orange-400 animate-pulse"
+                  : daysLeft === 1
                   ? "bg-orange-500/15 text-orange-400"
-                  : daysLeft < 30
+                  : daysLeft < 7
                   ? "bg-amber-500/15 text-amber-400"
+                  : daysLeft < 30
+                  ? "bg-yellow-500/10 text-yellow-500"
                   : "bg-secondary text-muted-foreground"
               }`}>
-                {daysLeft < 0 ? `Vencida hace ${Math.abs(daysLeft)}d` : `${daysLeft}d restantes`}
+                {daysLeft < 0 ? `Vencida hace ${Math.abs(daysLeft)}d`
+                  : daysLeft === 0 ? "Hoy"
+                  : daysLeft === 1 ? "Mañana"
+                  : `${daysLeft}d restantes`}
               </span>
             )}
           </div>
@@ -515,16 +526,17 @@ export default function MetasPage() {
     <PageTransition className="min-h-screen">
       <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
         {/* Header */}
-        <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card">
+        <div className="card-premium relative overflow-hidden rounded-2xl">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-transparent to-transparent pointer-events-none" />
-          <div className="absolute -top-10 -right-10 w-40 h-40 bg-primary/6 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -top-10 -right-10 w-40 h-40 bg-primary/8 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-violet-400/6 rounded-full blur-2xl pointer-events-none" />
           <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-5">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/30 to-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
                 <Target className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <h1 className="text-xl font-bold tracking-tight">Metas & Objetivos</h1>
+                <h1 className="text-xl font-black tracking-tight gradient-text">Metas & Objetivos</h1>
                 <p className="text-muted-foreground text-xs mt-0.5">
                   Definí y seguí tus metas artísticas
                 </p>
@@ -544,7 +556,7 @@ export default function MetasPage() {
               <button
                 onClick={() => setShowForm(true)}
                 title="Nueva meta (N)"
-                className="flex items-center gap-2 bg-primary text-primary-foreground rounded-xl px-4 py-2 text-sm font-semibold hover:bg-primary/90 transition-all active:scale-95 shadow-[0_0_16px_hsl(var(--primary)/0.25)]"
+                className="flex items-center gap-2 bg-primary text-primary-foreground rounded-xl px-4 py-2 text-sm font-black hover:bg-primary/90 transition-all active:scale-95 shadow-[0_0_16px_hsl(var(--primary)/0.25)] btn-shine"
               >
                 <Plus className="h-4 w-4" /> Nueva meta
                 <kbd className="hidden md:inline-flex ml-1 text-[9px] bg-primary-foreground/20 px-1 py-0.5 rounded font-mono">N</kbd>
@@ -553,25 +565,82 @@ export default function MetasPage() {
           </div>
         </div>
 
+        {/* Near-deadline urgency banner */}
+        {!loading && (() => {
+          const urgent = goals.filter((g) => {
+            if (g.is_completed || !g.target_date) return false;
+            const days = Math.ceil((new Date(g.target_date + "T00:00:00").getTime() - Date.now()) / 86400000);
+            return days >= 0 && days <= 7;
+          });
+          if (urgent.length === 0) return null;
+          const next = urgent.sort((a, b) => {
+            const da = Math.ceil((new Date(a.target_date! + "T00:00:00").getTime() - Date.now()) / 86400000);
+            const db = Math.ceil((new Date(b.target_date! + "T00:00:00").getTime() - Date.now()) / 86400000);
+            return da - db;
+          })[0];
+          const daysLeft = Math.ceil((new Date(next.target_date! + "T00:00:00").getTime() - Date.now()) / 86400000);
+          return (
+            <button
+              onClick={() => setFilter("activas")}
+              className="flex items-center justify-between px-4 py-3 rounded-2xl bg-orange-500/10 border border-orange-500/30 hover:bg-orange-500/15 hover:-translate-y-0.5 hover:shadow-sm transition-all w-full group text-left"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-orange-500/15 border border-orange-500/20 flex items-center justify-center flex-shrink-0">
+                  <Zap className="h-4 w-4 text-orange-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-black text-orange-400">
+                    {urgent.length === 1
+                      ? `"${next.title}" vence ${daysLeft === 0 ? "hoy" : `en ${daysLeft} día${daysLeft !== 1 ? "s" : ""}`}`
+                      : `${urgent.length} metas con fecha límite esta semana`}
+                  </p>
+                  <p className="text-xs text-orange-400/70 mt-0.5">
+                    {urgent.length > 1 ? `La próxima: "${next.title}" — ${daysLeft === 0 ? "hoy" : `${daysLeft}d`}` : "¡Actualizá tu progreso!"}
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-orange-400 flex-shrink-0 group-hover:translate-x-0.5 transition-transform" />
+            </button>
+          );
+        })()}
+
         {/* Summary */}
         <div className="grid grid-cols-3 gap-4">
-          <div className="rounded-2xl border border-border/60 bg-card/90 p-4 text-center hover:-translate-y-0.5 hover:shadow-sm transition-all">
-            <div className="text-2xl font-bold text-primary tabular-nums">
-              <AnimatedCounter value={activeCount} />
+          <div className="card-premium rounded-2xl p-5 text-center hover:-translate-y-1 transition-all relative overflow-hidden group">
+            <div className="absolute inset-0 bg-gradient-to-b from-primary/10 to-transparent pointer-events-none" />
+            <div className="relative">
+              <div className="w-10 h-10 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform shadow-[0_0_14px_hsl(var(--primary)/0.2)]">
+                <Target className="h-5 w-5 text-primary" />
+              </div>
+              <div className="text-3xl font-black text-primary tabular-nums animate-count-in">
+                <AnimatedCounter value={activeCount} />
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-1.5 font-black uppercase tracking-wider">Activas</div>
             </div>
-            <div className="text-xs text-muted-foreground mt-1">Activas</div>
           </div>
-          <div className="rounded-2xl border border-border/60 bg-card/90 p-4 text-center hover:-translate-y-0.5 hover:shadow-sm transition-all">
-            <div className="text-2xl font-bold text-green-400 tabular-nums">
-              <AnimatedCounter value={doneCount} />
+          <div className="card-premium rounded-2xl p-5 text-center hover:-translate-y-1 transition-all relative overflow-hidden group">
+            <div className="absolute inset-0 bg-gradient-to-b from-green-500/10 to-transparent pointer-events-none" />
+            <div className="relative">
+              <div className="w-10 h-10 rounded-xl bg-green-500/15 border border-green-500/20 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform shadow-[0_0_14px_hsl(142_72%_55%/0.2)]">
+                <Trophy className="h-5 w-5 text-green-400" />
+              </div>
+              <div className="text-3xl font-black text-green-400 tabular-nums animate-count-in">
+                <AnimatedCounter value={doneCount} />
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-1.5 font-black uppercase tracking-wider">Completadas</div>
             </div>
-            <div className="text-xs text-muted-foreground mt-1">Completadas</div>
           </div>
-          <div className="rounded-2xl border border-border/60 bg-card/90 p-4 text-center hover:-translate-y-0.5 hover:shadow-sm transition-all">
-            <div className="text-2xl font-bold tabular-nums">
-              <AnimatedCounter value={avgProgress} suffix="%" />
+          <div className="card-premium rounded-2xl p-5 text-center hover:-translate-y-1 transition-all relative overflow-hidden group">
+            <div className="absolute inset-0 bg-gradient-to-b from-blue-500/8 to-transparent pointer-events-none" />
+            <div className="relative">
+              <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-500/20 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform shadow-[0_0_14px_hsl(220_90%_60%/0.2)]">
+                <TrendingUp className="h-5 w-5 text-blue-400" />
+              </div>
+              <div className="text-3xl font-black tabular-nums animate-count-in">
+                <AnimatedCounter value={avgProgress} suffix="%" />
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-1.5 font-black uppercase tracking-wider">Progreso prom.</div>
             </div>
-            <div className="text-xs text-muted-foreground mt-1">Progreso prom.</div>
           </div>
         </div>
 
@@ -588,13 +657,13 @@ export default function MetasPage() {
                 onClick={() => setFilter(f)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all active:scale-95 ${
                   filter === f
-                    ? "bg-card shadow-sm border border-border/60 text-foreground font-semibold"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "bg-card shadow-[0_2px_8px_hsl(0_0%_0%/0.2),0_0_12px_hsl(var(--primary)/0.12),inset_0_1px_0_hsl(0_0%_100%/0.08)] border border-primary/20 text-foreground font-black"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                 }`}
               >
                 {label}
                 <span className={`text-[10px] px-1.5 py-0.5 rounded-full tabular-nums ${
-                  filter === f ? "bg-primary/15 text-primary" : "bg-secondary text-muted-foreground"
+                  filter === f ? "bg-primary/18 text-primary border border-primary/25 shadow-[0_0_6px_hsl(var(--primary)/0.3)]" : "bg-secondary text-muted-foreground"
                 }`}>{count}</span>
               </button>
             ))}
