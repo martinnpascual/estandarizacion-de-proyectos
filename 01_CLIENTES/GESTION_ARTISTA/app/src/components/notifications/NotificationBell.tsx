@@ -2,19 +2,20 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Bell, Calendar, Users, Upload, X, ChevronRight, AlertTriangle, FolderOpen, RefreshCw } from "lucide-react";
+import { Bell, Calendar, Users, Upload, X, ChevronRight, AlertTriangle, FolderOpen, RefreshCw, Target } from "lucide-react";
 import { getNotifications, type AppNotification, type NotifType } from "@/lib/actions/notifications";
 import { cn } from "@/lib/utils";
 
 const TYPE_CONFIG: Record<
   NotifType,
-  { icon: React.ElementType; color: string; dot: string }
+  { icon: React.ElementType; color: string; dot: string; iconBg: string }
 > = {
-  event:            { icon: Calendar,      color: "text-green-400",  dot: "bg-green-400"  },
-  collab_deadline:  { icon: Users,         color: "text-yellow-400", dot: "bg-yellow-400" },
-  draft_ready:      { icon: Upload,        color: "text-blue-400",   dot: "bg-blue-400"   },
-  overdue:          { icon: AlertTriangle, color: "text-red-400",    dot: "bg-red-400"    },
-  project_deadline: { icon: FolderOpen,   color: "text-purple-400", dot: "bg-purple-400" },
+  event:            { icon: Calendar,      color: "text-green-400",  dot: "bg-green-400",  iconBg: "bg-green-400/15 border-green-400/30"   },
+  collab_deadline:  { icon: Users,         color: "text-yellow-400", dot: "bg-yellow-400", iconBg: "bg-yellow-400/15 border-yellow-400/30" },
+  draft_ready:      { icon: Upload,        color: "text-blue-400",   dot: "bg-blue-400",   iconBg: "bg-blue-400/15 border-blue-400/30"     },
+  overdue:          { icon: AlertTriangle, color: "text-red-400",    dot: "bg-red-400",    iconBg: "bg-red-400/15 border-red-400/30"       },
+  project_deadline: { icon: FolderOpen,    color: "text-purple-400", dot: "bg-purple-400", iconBg: "bg-purple-400/15 border-purple-400/30" },
+  goal_deadline:    { icon: Target,        color: "text-pink-400",   dot: "bg-pink-400",   iconBg: "bg-pink-400/15 border-pink-400/30"     },
 };
 
 function daysAwayLabel(daysAway: number | undefined): { text: string; cls: string } | null {
@@ -93,7 +94,7 @@ export default function NotificationBell() {
         <Bell className={cn("h-4 w-4", hasOverdue && !open && "text-red-400")} />
         {!loading && count > 0 && (
           <span className={cn(
-            "absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full text-[9px] font-bold flex items-center justify-center tabular-nums leading-none",
+            "absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full text-[9px] font-bold flex items-center justify-center tabular-nums leading-none badge-shimmer",
             hasOverdue
               ? "bg-red-500 text-white animate-pulse"
               : "bg-primary text-primary-foreground"
@@ -107,13 +108,13 @@ export default function NotificationBell() {
       {open && (
         <div
           ref={panelRef}
-          className="absolute bottom-full left-0 mb-2 w-80 bg-card border border-border/60 rounded-2xl shadow-2xl shadow-black/30 overflow-hidden z-50"
+          className="absolute bottom-full left-0 mb-2 w-80 card-premium rounded-2xl shadow-2xl shadow-black/30 overflow-hidden z-50"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
             <div className="flex items-center gap-2">
-              <Bell className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-sm font-semibold">Notificaciones</span>
+              <Bell className="h-3.5 w-3.5 text-primary/60 drop-shadow-[0_0_3px_currentColor]" />
+              <span className="text-sm font-black">Notificaciones</span>
               {count > 0 && (
                 <span className="text-xs bg-primary/15 text-primary px-1.5 py-0.5 rounded-full">
                   {count}
@@ -143,11 +144,11 @@ export default function NotificationBell() {
             {loading ? (
               <div className="space-y-3 p-3">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex gap-3 animate-pulse">
-                    <div className="w-7 h-7 rounded-full bg-secondary flex-shrink-0" />
+                  <div key={i} className="flex gap-3">
+                    <div className="w-7 h-7 rounded-full skeleton flex-shrink-0" />
                     <div className="flex-1 space-y-1.5">
-                      <div className="h-3 bg-secondary rounded w-3/4" />
-                      <div className="h-2.5 bg-secondary rounded w-1/2" />
+                      <div className="h-3 skeleton rounded w-3/4" />
+                      <div className="h-2.5 skeleton rounded w-1/2" />
                     </div>
                   </div>
                 ))}
@@ -171,14 +172,14 @@ export default function NotificationBell() {
                     >
                       <div
                         className={cn(
-                          "w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5",
-                          "bg-secondary"
+                          "w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 border group-hover:scale-110 transition-transform",
+                          cfg.iconBg
                         )}
                       >
-                        <Icon className={cn("h-3.5 w-3.5", cfg.color)} />
+                        <Icon className={cn("h-3.5 w-3.5 drop-shadow-[0_0_4px_currentColor]", cfg.color)} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium truncate leading-snug">
+                        <p className="text-xs font-semibold truncate leading-snug">
                           {n.title}
                         </p>
                         <p className="text-[11px] text-muted-foreground mt-0.5">

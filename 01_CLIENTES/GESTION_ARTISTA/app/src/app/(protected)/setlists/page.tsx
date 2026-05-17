@@ -111,6 +111,9 @@ export default function SetlistsPage() {
     setLoading(false);
   }, [toast]);
 
+  // ─── Trigger load on mount ──────────────────────────────────────────────────
+  useEffect(() => { loadSetlists(); }, [loadSetlists]);
+
   // Persist selected setlist ID so it's restored on next visit
   useEffect(() => {
     if (selectedSetlist) {
@@ -324,16 +327,16 @@ export default function SetlistsPage() {
   return (
     <div className="flex flex-col gap-6 h-full">
       {/* Header */}
-      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card">
+      <div className="card-premium relative overflow-hidden rounded-2xl">
         <div className="absolute inset-0 bg-gradient-to-br from-violet-500/8 via-transparent to-transparent" />
         <div className="absolute -top-16 -right-16 w-48 h-48 bg-violet-500/6 rounded-full blur-3xl" />
         <div className="relative px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500/30 to-violet-600/10 border border-violet-500/20 flex items-center justify-center flex-shrink-0">
-              <ListMusic className="h-5 w-5 text-violet-400" />
+              <ListMusic className="h-5 w-5 text-violet-400 drop-shadow-[0_0_6px_currentColor]" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">Setlists</h1>
+              <h1 className="text-xl font-black tracking-tight gradient-text">Setlists</h1>
               <p className="text-muted-foreground text-xs mt-0.5">
                 Armá y organizá los tracklists de tus shows ·{" "}
                 <span className="text-foreground/60 font-medium tabular-nums">
@@ -359,7 +362,7 @@ export default function SetlistsPage() {
                 setShowFormModal(true);
               }}
               title="Nueva setlist (N)"
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-all active:scale-95 text-sm font-semibold shadow-[0_0_16px_hsl(var(--primary)/0.25)]"
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-all active:scale-95 text-sm font-black shadow-[0_0_16px_hsl(var(--primary)/0.25)] btn-shine"
             >
               <Plus className="h-4 w-4" />
               Nueva setlist
@@ -401,13 +404,13 @@ export default function SetlistsPage() {
               {Array.from({ length: 4 }).map((_, i) => (
                 <div
                   key={i}
-                  className="h-24 rounded-2xl bg-card/60 border border-border/40 animate-pulse"
+                  className="h-24 card-premium rounded-2xl skeleton-shimmer"
                 />
               ))}
             </div>
           ) : setlists.length === 0 ? (
             // Empty state
-            <div className="flex flex-col items-center justify-center py-20 text-center bg-card/60 border border-border/40 rounded-2xl px-6">
+            <div className="card-premium flex flex-col items-center justify-center py-20 text-center rounded-2xl px-6">
               <div className="relative mb-5">
                 <div className="absolute inset-0 bg-violet-500/20 rounded-2xl blur-xl scale-125" />
                 <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500/20 to-violet-700/10 border border-violet-500/20 flex items-center justify-center">
@@ -452,7 +455,7 @@ export default function SetlistsPage() {
         </div>
 
         {/* ── Right panel: Tracklist (2/3) ── */}
-        <div className="flex-1 flex flex-col bg-card/60 backdrop-blur-sm border border-border/60 rounded-2xl overflow-hidden">
+        <div className="flex-1 flex flex-col card-premium rounded-2xl overflow-hidden">
           {!selectedSetlist ? (
             <div className="flex flex-col items-center justify-center h-full text-center p-8">
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500/15 to-violet-700/5 border border-violet-500/15 flex items-center justify-center mb-4">
@@ -467,7 +470,7 @@ export default function SetlistsPage() {
               {/* Right panel header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-border/50">
                 <div>
-                  <h2 className="text-base font-semibold">{selectedSetlist.name}</h2>
+                  <h2 className="text-base font-black gradient-text">{selectedSetlist.name}</h2>
                   <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                     {selectedSetlist.venue && (
                       <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -485,7 +488,7 @@ export default function SetlistsPage() {
                 </div>
                 <button
                   onClick={() => setShowSongPicker(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-500/15 border border-violet-500/20 text-violet-400 text-xs font-semibold hover:bg-violet-500/25 transition-all active:scale-95"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-500/15 border border-violet-500/20 text-violet-400 text-xs font-black hover:bg-violet-500/25 transition-all active:scale-95"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   Agregar canción
@@ -506,7 +509,7 @@ export default function SetlistsPage() {
                     </p>
                     <button
                       onClick={() => setShowSongPicker(true)}
-                      className="mt-4 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-500/15 border border-violet-500/20 text-violet-400 text-xs font-semibold hover:bg-violet-500/25 transition-all active:scale-95"
+                      className="mt-4 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-500/15 border border-violet-500/20 text-violet-400 text-xs font-black hover:bg-violet-500/25 transition-all active:scale-95"
                     >
                       <Plus className="h-3.5 w-3.5" />
                       Agregar canción
@@ -522,7 +525,7 @@ export default function SetlistsPage() {
                         onDragEnter={() => handleDragEnter(index)}
                         onDragEnd={handleDragEnd}
                         onDragOver={(e) => e.preventDefault()}
-                        className="flex items-center gap-3 px-4 py-3 hover:bg-secondary/20 transition-all group cursor-grab active:cursor-grabbing select-none"
+                        className="row-interactive flex items-center gap-3 px-4 py-3 hover:bg-secondary/30 transition-all group cursor-grab active:cursor-grabbing select-none"
                       >
                         {/* Track number + drag handle */}
                         <div className="flex items-center gap-1.5 w-7 flex-shrink-0">
@@ -548,7 +551,7 @@ export default function SetlistsPage() {
 
                         {/* Song info */}
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">
+                          <p className="text-sm font-semibold truncate">
                             {getTrackTitle(item)}
                           </p>
                           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -673,29 +676,29 @@ function SetlistCard({
       )}
     >
       {isSelected && (
-        <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-violet-500/70 rounded-r" />
+        <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-violet-500/80 rounded-r shadow-[0_0_12px_hsl(271_81%_66%/0.6),0_0_24px_hsl(271_81%_66%/0.3)]" />
       )}
       <div className="px-4 py-3.5">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
             <div
               className={cn(
-                "w-8 h-8 flex-shrink-0 rounded-xl border flex items-center justify-center",
+                "w-9 h-9 flex-shrink-0 rounded-xl border flex items-center justify-center transition-all",
                 isSelected
-                  ? "bg-violet-500/25 border-violet-500/30"
-                  : "bg-violet-500/10 border-violet-500/15"
+                  ? "bg-violet-500/25 border-violet-500/40 shadow-[0_0_12px_hsl(271_81%_66%/0.25)]"
+                  : "bg-violet-500/10 border-violet-500/15 group-hover:bg-violet-500/15"
               )}
             >
               <ListMusic
                 className={cn(
                   "h-4 w-4",
-                  isSelected ? "text-violet-400" : "text-violet-400/50"
+                  isSelected ? "text-violet-400 drop-shadow-[0_0_4px_hsl(271_81%_66%/0.8)]" : "text-violet-400/50"
                 )}
               />
             </div>
             <p
               className={cn(
-                "text-sm font-semibold truncate",
+                "text-sm font-black truncate",
                 isSelected ? "text-foreground" : "text-foreground/80"
               )}
             >
@@ -801,14 +804,14 @@ function SetlistFormModal({ setlist, onClose, onSaved }: SetlistFormModalProps) 
       <div className="relative w-full max-w-md" onClick={(e) => e.stopPropagation()}>
         {/* Glow ring */}
         <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-violet-500/20 via-transparent to-violet-600/10 pointer-events-none" />
-        <div className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl shadow-2xl shadow-black/40 overflow-hidden">
+        <div className="relative glass-panel rounded-2xl overflow-hidden">
         {/* Modal header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border/60">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-violet-500/15 border border-violet-500/20 flex items-center justify-center flex-shrink-0">
               <ListMusic className="h-4 w-4 text-violet-400" />
             </div>
-            <h2 className="text-base font-semibold">
+            <h2 className="text-base font-black">
               {isEditing ? "Editar setlist" : "Nueva setlist"}
             </h2>
           </div>
@@ -881,7 +884,7 @@ function SetlistFormModal({ setlist, onClose, onSaved }: SetlistFormModalProps) 
             <button
               type="submit"
               disabled={saving || !form.name.trim()}
-              className="flex-1 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-black hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {saving ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -931,14 +934,14 @@ function SongPickerModal({
       <div className="relative w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
         {/* Glow ring */}
         <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-violet-500/20 via-transparent to-violet-600/10 pointer-events-none" />
-        <div className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl shadow-2xl shadow-black/40 overflow-hidden flex flex-col max-h-[80vh]">
+        <div className="relative glass-panel rounded-2xl overflow-hidden flex flex-col max-h-[80vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border/60 flex-shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-violet-500/15 border border-violet-500/20 flex items-center justify-center flex-shrink-0">
               <Music className="h-4 w-4 text-violet-400" />
             </div>
-            <h2 className="text-base font-semibold">Agregar canción</h2>
+            <h2 className="text-base font-black">Agregar canción</h2>
           </div>
           <button
             onClick={onClose}
@@ -1002,7 +1005,7 @@ function SongPickerModal({
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{song.title}</p>
+                  <p className="text-sm font-semibold truncate">{song.title}</p>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     {song.bpm && (
                       <span className="text-[10px] text-blue-400/70 tabular-nums font-mono">

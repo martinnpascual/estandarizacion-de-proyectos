@@ -6,7 +6,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import {
   Bell, Calendar, Users, Upload, AlertTriangle,
   ChevronRight, RefreshCw, CheckCircle2, Clock, FolderOpen,
-  Search, X, ArrowUpDown,
+  Search, X, ArrowUpDown, Target,
 } from "lucide-react";
 import {
   getNotifications,
@@ -28,7 +28,8 @@ const TYPE_CONFIG: Record<NotifType, {
   collab_deadline:  { icon: Users,         color: "text-yellow-400", bg: "bg-yellow-400/10", label: "Deadline" },
   draft_ready:      { icon: Upload,        color: "text-blue-400",   bg: "bg-blue-400/10",   label: "Lista" },
   overdue:          { icon: AlertTriangle, color: "text-red-400",    bg: "bg-red-400/10",    label: "Vencido" },
-  project_deadline: { icon: FolderOpen,   color: "text-purple-400", bg: "bg-purple-400/10", label: "Proyecto" },
+  project_deadline: { icon: FolderOpen,    color: "text-purple-400", bg: "bg-purple-400/10", label: "Proyecto" },
+  goal_deadline:    { icon: Target,        color: "text-pink-400",   bg: "bg-pink-400/10",   label: "Meta" },
 };
 
 const URGENCY_CONFIG: Record<NotifUrgency, {
@@ -50,6 +51,7 @@ const FILTER_TABS: { id: FilterTab; label: string; icon: React.ElementType }[] =
   { id: "overdue",          label: "Vencidos",  icon: AlertTriangle },
   { id: "event",            label: "Eventos",   icon: Calendar },
   { id: "collab_deadline",  label: "Deadlines", icon: Users },
+  { id: "goal_deadline",    label: "Metas",     icon: Target },
   { id: "project_deadline", label: "Proyectos", icon: FolderOpen },
   { id: "draft_ready",      label: "Maquetas",  icon: Upload },
 ];
@@ -64,48 +66,66 @@ const URGENCY_GROUPS: { key: NotifUrgency; label: string; icon: React.ElementTyp
 ];
 
 // ── Notification card ─────────────────────────────────────────────────────────
-function NotifCard({ notif }: { notif: AppNotification }) {
+function NotifCard({ notif, onDismiss }: { notif: AppNotification; onDismiss: () => void }) {
   const type = TYPE_CONFIG[notif.type];
   const urgency = URGENCY_CONFIG[notif.urgency];
   const Icon = type.icon;
+  const [dismissing, setDismissing] = useState(false);
+
+  function handleDismiss(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDismissing(true);
+    setTimeout(() => onDismiss(), 280);
+  }
 
   return (
-    <Link
-      href={notif.href}
-      className={cn(
-        "flex items-start gap-4 p-4 rounded-2xl border transition-all group active:scale-[0.99]",
-        "bg-card hover:bg-secondary/40 hover:shadow-sm hover:-translate-y-0.5",
-        urgency.border,
-      )}
-    >
-      <div className={cn("w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5", type.bg)}>
-        <Icon className={cn("h-4 w-4", type.color)} />
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-medium leading-snug">{notif.title}</p>
-          <span className={cn("flex-shrink-0 text-[10px] px-2 py-0.5 rounded-full font-medium", urgency.badge)}>
-            {urgency.label}
-          </span>
-        </div>
-        <p className="text-xs text-muted-foreground mt-0.5">{notif.body}</p>
-        {notif.daysAway !== undefined && (
-          <p className="text-[11px] text-muted-foreground/60 mt-1.5 flex items-center gap-1">
-            <Clock className="h-3 w-3 flex-shrink-0" />
-            {notif.daysAway < 0
-              ? `Hace ${Math.abs(notif.daysAway)} día${Math.abs(notif.daysAway) === 1 ? "" : "s"}`
-              : notif.daysAway === 0
-              ? "Hoy"
-              : notif.daysAway === 1
-              ? "Mañana"
-              : `En ${notif.daysAway} días`}
-          </p>
+    <div className={cn("relative group/card", dismissing && "notif-dismissing")}>
+      <Link
+        href={notif.href}
+        className={cn(
+          "card-premium row-interactive flex items-start gap-4 p-4 rounded-2xl transition-all group active:scale-[0.99]",
+          "hover:-translate-y-0.5 hover:shadow-[0_8px_24px_hsl(0_0%_0%/0.25)]",
+          urgency.border,
         )}
-      </div>
+      >
+        <div className={cn("w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 border border-white/5 group-hover:scale-110 transition-transform", type.bg)}>
+          <Icon className={cn("h-4 w-4 drop-shadow-[0_0_4px_currentColor]", type.color)} />
+        </div>
 
-      <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-2.5 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
-    </Link>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm font-black leading-snug group-hover:text-primary transition-colors">{notif.title}</p>
+            <span className={cn("flex-shrink-0 text-[10px] px-2 py-0.5 rounded-full font-medium", urgency.badge)}>
+              {urgency.label}
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">{notif.body}</p>
+          {notif.daysAway !== undefined && (
+            <p className="text-[11px] text-muted-foreground/60 mt-1.5 flex items-center gap-1">
+              <Clock className="h-3 w-3 flex-shrink-0" />
+              {notif.daysAway < 0
+                ? `Hace ${Math.abs(notif.daysAway)} día${Math.abs(notif.daysAway) === 1 ? "" : "s"}`
+                : notif.daysAway === 0
+                ? "Hoy"
+                : notif.daysAway === 1
+                ? "Mañana"
+                : `En ${notif.daysAway} días`}
+            </p>
+          )}
+        </div>
+
+        <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-2.5 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+      </Link>
+      {/* Dismiss button */}
+      <button
+        onClick={handleDismiss}
+        title="Descartar"
+        className="absolute top-2.5 right-2.5 p-1 rounded-full opacity-0 group-hover/card:opacity-100 hover:bg-secondary text-muted-foreground hover:text-foreground transition-all active:scale-90 z-10"
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </div>
   );
 }
 
@@ -114,7 +134,7 @@ function Skeleton() {
   return (
     <div className="space-y-3">
       {[1, 2, 3, 4, 5].map((i) => (
-        <div key={i} className="flex items-start gap-4 p-4 rounded-2xl border border-border/60 bg-card animate-pulse">
+        <div key={i} className="card-premium flex items-start gap-4 p-4 rounded-2xl skeleton-shimmer">
           <div className="w-9 h-9 rounded-full bg-secondary flex-shrink-0" />
           <div className="flex-1 space-y-2">
             <div className="flex justify-between gap-4">
@@ -142,6 +162,7 @@ function NotificacionesContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [notifs, setNotifs] = useState<AppNotification[]>([]);
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [urgencyFilter, setUrgencyFilter] = useState<NotifUrgency | "all">(() =>
@@ -204,6 +225,7 @@ function NotificacionesContent() {
   }, []);
 
   const filtered = notifs
+    .filter(n => !dismissed.has(n.id))
     .filter(n => filter === "todos" || n.type === filter)
     .filter(n => urgencyFilter === "all" || n.urgency === urgencyFilter)
     .filter(n => {
@@ -226,6 +248,7 @@ function NotificacionesContent() {
     overdue: notifs.filter(n => n.type === "overdue").length,
     event: notifs.filter(n => n.type === "event").length,
     collab_deadline: notifs.filter(n => n.type === "collab_deadline").length,
+    goal_deadline: notifs.filter(n => n.type === "goal_deadline").length,
     project_deadline: notifs.filter(n => n.type === "project_deadline").length,
     draft_ready: notifs.filter(n => n.type === "draft_ready").length,
   };
@@ -239,16 +262,16 @@ function NotificacionesContent() {
   return (
     <div className="space-y-6 max-w-2xl">
       {/* Header */}
-      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card">
+      <div className="card-premium relative overflow-hidden rounded-2xl">
         <div className="absolute inset-0 bg-gradient-to-br from-violet-500/8 via-transparent to-transparent pointer-events-none" />
         <div className="absolute -top-10 -right-10 w-40 h-40 bg-violet-500/6 rounded-full blur-3xl pointer-events-none" />
         <div className="relative flex items-center justify-between px-6 py-5">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500/30 to-violet-600/10 border border-violet-500/20 flex items-center justify-center flex-shrink-0">
-              <Bell className="h-5 w-5 text-violet-400" />
+              <Bell className="h-5 w-5 text-violet-400 drop-shadow-[0_0_6px_currentColor]" />
             </div>
             <div>
-              <h1 className="text-lg font-bold leading-tight">Notificaciones</h1>
+              <h1 className="text-xl font-black tracking-tight leading-tight gradient-text">Notificaciones</h1>
               <p className="text-muted-foreground text-xs mt-0.5">
                 Eventos, deadlines y maquetas listas — próximos 30 días
               </p>
@@ -327,7 +350,7 @@ function NotificacionesContent() {
                   )}
                 >
                   <span className={cn("w-2 h-2 rounded-full flex-shrink-0", item.dot)} />
-                  <span className="tabular-nums font-bold">{item.count}</span>
+                  <span className="tabular-nums font-black">{item.count}</span>
                   <span className="text-xs font-normal opacity-80">{item.label}</span>
                   {isActive && <span className="text-[10px] opacity-70">✕</span>}
                 </button>
@@ -359,7 +382,7 @@ function NotificacionesContent() {
               className={cn(
                 "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-all active:scale-95",
                 active
-                  ? "bg-secondary border border-border/80 text-foreground shadow-sm font-semibold"
+                  ? "bg-secondary border border-border/80 text-foreground shadow-sm font-black"
                   : "text-muted-foreground hover:text-foreground hover:bg-secondary/60 border border-transparent"
               )}
             >
@@ -433,13 +456,13 @@ function NotificacionesContent() {
             <div key={key}>
               <div className="flex items-center gap-2 mb-3">
                 <Icon className={cn("h-3.5 w-3.5", iconColor)} />
-                <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                <h2 className="text-xs font-black uppercase tracking-widest">
                   {label}
                 </h2>
                 <span className="text-xs text-muted-foreground">({items.length})</span>
               </div>
               <div className="space-y-2">
-                {items.map(n => <NotifCard key={n.id} notif={n} />)}
+                {items.map(n => <NotifCard key={n.id} notif={n} onDismiss={() => setDismissed(prev => { const s = new Set(Array.from(prev)); s.add(n.id); return s; })} />)}
               </div>
             </div>
           ))}
@@ -447,7 +470,7 @@ function NotificacionesContent() {
       ) : (
         // Flat filtered view
         <div className="space-y-2">
-          {sortedFiltered.map(n => <NotifCard key={n.id} notif={n} />)}
+          {sortedFiltered.map(n => <NotifCard key={n.id} notif={n} onDismiss={() => setDismissed(prev => { const s = new Set(Array.from(prev)); s.add(n.id); return s; })} />)}
         </div>
       )}
     </div>

@@ -7,7 +7,7 @@ import {
   CheckCircle, AlertCircle, FolderOpen, ChevronRight, Music,
   Zap, Rocket, Share2, FolderPlus, AlertTriangle, CalendarDays, Activity,
   Settings, Eye, EyeOff, ChevronUp, ChevronDown, X, RotateCcw,
-  Target,
+  Target, Plus,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -692,7 +692,13 @@ export default function DashboardPage() {
                       {[1, 2, 3].map((i) => <div key={i} className="flex-shrink-0 w-44 h-24 rounded-xl skeleton" />)}
                     </div>
                   ) : releases.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-6">Sin lanzamientos próximos</p>
+                    <div className="flex flex-col items-center gap-2 py-5 text-center">
+                      <p className="text-sm text-muted-foreground">Sin lanzamientos próximos</p>
+                      <a href="/calendario?new=lanzamiento" className="flex items-center gap-1.5 text-xs font-medium text-primary/70 hover:text-primary transition-colors px-3 py-1.5 rounded-xl hover:bg-primary/8 active:scale-95">
+                        <Plus className="h-3.5 w-3.5" />
+                        Crear evento de lanzamiento
+                      </a>
+                    </div>
                   ) : (
                     <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin">
                       {releases.map((r) => <ReleaseCard key={r.id} release={r} />)}
@@ -744,7 +750,13 @@ export default function DashboardPage() {
               return (
                 <Widget title="Próximos eventos" icon={Calendar} href="/calendario" accentColor="bg-green-500">
                   {loading ? <WidgetSkeleton /> : events.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-6">Sin eventos próximos</p>
+                    <div className="flex flex-col items-center gap-2 py-5 text-center">
+                      <p className="text-sm text-muted-foreground">Sin eventos próximos</p>
+                      <a href="/calendario" className="flex items-center gap-1.5 text-xs font-medium text-primary/70 hover:text-primary transition-colors px-3 py-1.5 rounded-xl hover:bg-primary/8 active:scale-95">
+                        <Plus className="h-3.5 w-3.5" />
+                        Nuevo evento
+                      </a>
+                    </div>
                   ) : (
                     <div className="space-y-1 -mx-5">
                       {events.map((ev) => (
@@ -769,7 +781,13 @@ export default function DashboardPage() {
               return (
                 <Widget title="Featuring activos" icon={Users} href="/collabs" accentColor="bg-yellow-500">
                   {loading ? <WidgetSkeleton /> : collabs.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-6">Sin collabs activas</p>
+                    <div className="flex flex-col items-center gap-2 py-5 text-center">
+                      <p className="text-sm text-muted-foreground">Sin collabs activas</p>
+                      <a href="/collabs" className="flex items-center gap-1.5 text-xs font-medium text-primary/70 hover:text-primary transition-colors px-3 py-1.5 rounded-xl hover:bg-primary/8 active:scale-95">
+                        <Plus className="h-3.5 w-3.5" />
+                        Nueva colaboración
+                      </a>
+                    </div>
                   ) : (
                     <div className="divide-y divide-border/50 -mx-5">
                       {collabs.map((c) => {

@@ -2,7 +2,7 @@
 
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
-export type NotifType = "event" | "collab_deadline" | "draft_ready" | "overdue" | "project_deadline";
+export type NotifType = "event" | "collab_deadline" | "draft_ready" | "overdue" | "project_deadline" | "goal_deadline";
 export type NotifUrgency = "overdue" | "urgent" | "soon" | "upcoming" | "ready";
 
 export interface AppNotification {
@@ -35,7 +35,7 @@ export async function getNotifications(windowDays = 14): Promise<{
   past7.setDate(today.getDate() - 7);
   const past7Str = past7.toISOString().split("T")[0];
 
-  const [eventsRes, collabsRes, draftsRes, overdueCollabsRes, projectsRes, overdueProjectsRes] = await Promise.all([
+  const [eventsRes, collabsRes, draftsRes, overdueCollabsRes, projectsRes, overdueProjectsRes, goalsRes] = await Promise.all([
     // Upcoming events
     supabase
       .from("calendar_events")
@@ -102,6 +102,17 @@ export async function getNotifications(windowDays = 14): Promise<{
       .lt("target_date", todayStr)
       .order("target_date", { ascending: false })
       .limit(4),
+
+    // Goals with upcoming target_date (not completed)
+    supabase
+      .from("goals")
+      .select("id, title, category, target_date, current_value, target_value, is_completed")
+      .eq("is_completed", false)
+      .not("target_date", "is", null)
+      .gte("target_date", past7Str)
+      .lte("target_date", futureDateStr)
+      .order("target_date", { ascending: true })
+      .limit(10),
   ]);
 
   const notifs: AppNotification[] = [];
@@ -219,6 +230,34 @@ export async function getNotifications(windowDays = 14): Promise<{
     });
   }
 
+  // ── Goal deadlines ───────────────────────────────────────────────────────
+  for (const g of goalsRes.data ?? []) {
+    const daysAway = Math.round(
+      (new Date(g.target_date!).getTime() - today.getTime()) / 86_400_000
+    );
+    const isOverdue = daysAway < 0;
+    const when =
+      isOverdue     ? `Vencida hace ${Math.abs(daysAway)} día${Math.abs(daysAway) !== 1 ? "s" : ""}` :
+      daysAway === 0 ? "Vence hoy" :
+      daysAway === 1 ? "Vence mañana" :
+      `Vence en ${daysAway} días`;
+
+    const pct = g.target_value > 0
+      ? Math.round((g.current_value / g.target_value) * 100)
+      : 0;
+
+    notifs.push({
+      id: `goal_${g.id}`,
+      type: isOverdue ? "overdue" : "goal_deadline",
+      urgency: isOverdue ? "overdue" : daysAway <= 1 ? "urgent" : daysAway <= 3 ? "soon" : "upcoming",
+      title: g.title,
+      body: `${when} · ${pct}% completada`,
+      date: g.target_date!,
+      href: `/metas`,
+      daysAway,
+    });
+  }
+
   // Sort: overdue first, then by date ascending
   notifs.sort((a, b) => {
     const urgencyOrder: Record<NotifUrgency, number> = {
@@ -229,7 +268,7 @@ export async function getNotifications(windowDays = 14): Promise<{
     return new Date(a.date).getTime() - new Date(b.date).getTime();
   });
 
-  const firstError = eventsRes.error ?? collabsRes.error ?? draftsRes.error ?? projectsRes.error;
+  const firstError = eventsRes.error ?? collabsRes.error ?? draftsRes.error ?? projectsRes.error ?? goalsRes.error;
   return { data: notifs, error: firstError?.message ?? null };
 }
 

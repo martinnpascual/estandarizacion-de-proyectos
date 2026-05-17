@@ -29,6 +29,7 @@ import {
   Square,
   Zap,
   ListPlus,
+  Clock,
 } from "lucide-react";
 import DraftVersionsPanel from "@/components/drafts/DraftVersionsPanel";
 import LyricsPanel from "@/components/lyrics/LyricsPanel";
@@ -161,6 +162,7 @@ export default function MaquetasPage() {
   );
   const [missingAudioFilter, setMissingAudioFilter] = useState(false);
   const [missingBpmFilter, setMissingBpmFilter] = useState(false);
+  const [staleFilter, setStaleFilter] = useState(false);
   const [producerFilter, setProducerFilter] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -391,6 +393,12 @@ export default function MaquetasPage() {
     if (missingBpmFilter) {
       result = result.filter(d => (!!d.drive_file_id || !!d.drive_file_url) && (!d.bpm || !d.key_signature));
     }
+    if (staleFilter) {
+      result = result.filter(d =>
+        d.status === "borrador" && d.month_created != null &&
+        (Date.now() - new Date(d.month_created + "-01").getTime()) > 180 * 86_400_000
+      );
+    }
     if (producerFilter) {
       result = result.filter(d => d.producer === producerFilter);
     }
@@ -407,7 +415,7 @@ export default function MaquetasPage() {
   })();
 
   // Group by month_created for the "Recientes" view
-  const showMonthGroups = sortBy === "default" && !isSearching && statusFilter === "todos" && !missingAudioFilter && !missingBpmFilter;
+  const showMonthGroups = sortBy === "default" && !isSearching && statusFilter === "todos" && !missingAudioFilter && !missingBpmFilter && !staleFilter;
   const draftsByMonth: { month: string; label: string; drafts: Draft[] }[] = [];
   if (showMonthGroups) {
     const seen = new Map<string, Draft[]>();
@@ -694,12 +702,16 @@ export default function MaquetasPage() {
       {!loading && !isSearching && drafts.length > 0 && (() => {
         const withoutAudio = drafts.filter(d => !d.drive_file_id && !d.drive_file_url).length;
         const withoutBpm = drafts.filter(d => (!!d.drive_file_id || !!d.drive_file_url) && (!d.bpm || !d.key_signature)).length;
-        if (withoutAudio === 0 && withoutBpm === 0) return null;
+        const staleCount = drafts.filter(d =>
+          d.status === "borrador" && d.month_created != null &&
+          (Date.now() - new Date(d.month_created + "-01").getTime()) > 180 * 86_400_000
+        ).length;
+        if (withoutAudio === 0 && withoutBpm === 0 && staleCount === 0) return null;
         return (
           <div className="flex items-center gap-2 flex-wrap">
             {withoutAudio > 0 && (
               <button
-                onClick={() => { setMissingAudioFilter(!missingAudioFilter); setMissingBpmFilter(false); }}
+                onClick={() => { setMissingAudioFilter(!missingAudioFilter); setMissingBpmFilter(false); setStaleFilter(false); }}
                 className={cn(
                   "flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full transition-all active:scale-95",
                   missingAudioFilter
@@ -714,7 +726,7 @@ export default function MaquetasPage() {
             )}
             {withoutBpm > 0 && (
               <button
-                onClick={() => { setMissingBpmFilter(!missingBpmFilter); setMissingAudioFilter(false); }}
+                onClick={() => { setMissingBpmFilter(!missingBpmFilter); setMissingAudioFilter(false); setStaleFilter(false); }}
                 className={cn(
                   "flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full transition-all active:scale-95",
                   missingBpmFilter
@@ -725,6 +737,21 @@ export default function MaquetasPage() {
                 <Zap className="h-3 w-3 flex-shrink-0" />
                 {withoutBpm} sin BPM/key
                 {missingBpmFilter && <X className="h-2.5 w-2.5 ml-0.5 opacity-70" />}
+              </button>
+            )}
+            {staleCount > 0 && (
+              <button
+                onClick={() => { setStaleFilter(!staleFilter); setMissingAudioFilter(false); setMissingBpmFilter(false); }}
+                className={cn(
+                  "flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full transition-all active:scale-95",
+                  staleFilter
+                    ? "bg-orange-500/18 text-orange-400 border border-orange-500/40 font-black shadow-[0_0_10px_hsl(25_80%_50%/0.15)]"
+                    : "bg-secondary text-muted-foreground hover:text-foreground font-medium"
+                )}
+              >
+                <Clock className="h-3 w-3 flex-shrink-0" />
+                {staleCount} estancadas
+                {staleFilter && <X className="h-2.5 w-2.5 ml-0.5 opacity-70" />}
               </button>
             )}
           </div>
