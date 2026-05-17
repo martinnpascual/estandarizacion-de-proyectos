@@ -28,6 +28,7 @@ import {
   CheckSquare,
   Square,
   Zap,
+  ListPlus,
 } from "lucide-react";
 import DraftVersionsPanel from "@/components/drafts/DraftVersionsPanel";
 import LyricsPanel from "@/components/lyrics/LyricsPanel";
@@ -833,6 +834,7 @@ export default function MaquetasPage() {
                           onToggleVersions={() => setVersionsOpenId((prev) => prev === draft.id ? null : draft.id)}
                           onToggleComments={() => setCommentsOpenId((prev) => prev === draft.id ? null : draft.id)}
                           onOpenLyrics={() => setLyricsDraft(draft)}
+                          onAddToQueue={() => { player.addToQueue(draftToTrack(draft)); toast.success(`"${draft.title}" añadida a la cola`); }}
                         />
                         {versionsOpenId === draft.id && (
                           <DraftVersionsPanel draftId={draft.id} draftTitle={draft.title} />
@@ -997,6 +999,7 @@ interface DraftRowProps {
   onToggleVersions: () => void;
   onToggleComments: () => void;
   onOpenLyrics: () => void;
+  onAddToQueue?: () => void;
 }
 
 function DraftRow({
@@ -1017,6 +1020,7 @@ function DraftRow({
   onToggleVersions,
   onToggleComments,
   onOpenLyrics,
+  onAddToQueue,
 }: DraftRowProps) {
   const hasAudio = !!draft.drive_file_id || !!draft.drive_file_url;
   const canAdvance = STATUS_NEXT[draft.status] !== null;
@@ -1251,6 +1255,16 @@ function DraftRow({
 
       {/* Comentarios / Versiones / Copiar enlace / Letras / Editar / Eliminar */}
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+        {/* Add to queue */}
+        {hasAudio && onAddToQueue && (
+          <button
+            onClick={onAddToQueue}
+            title="Añadir a la cola"
+            className="p-1.5 rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all active:scale-95"
+          >
+            <ListPlus className="h-3.5 w-3.5" />
+          </button>
+        )}
         <button
           onClick={onToggleComments}
           title="Comentarios"

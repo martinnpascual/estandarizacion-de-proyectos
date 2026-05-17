@@ -32,6 +32,8 @@ import {
   ExternalLink,
   CalendarDays,
   Zap,
+  ListPlus,
+  Heart,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -228,6 +230,13 @@ export default function DiscografiaPage() {
     } else {
       player.play(songToTrack(song), playable.map(songToTrack));
     }
+  }
+
+  function handleAddToQueue(e: React.MouseEvent, song: Song) {
+    e.stopPropagation();
+    if (!song.drive_file_id && !song.drive_file_url) return;
+    player.addToQueue(songToTrack(song));
+    toast.success(`"${song.title}" añadida a la cola`);
   }
 
   function handleSelectSong(song: Song) {
@@ -437,7 +446,7 @@ export default function DiscografiaPage() {
   }, [songs]);
 
   // Stable dispatch — onAction no cambia entre renders → memo en SongRow funciona
-  type SongActionType = "play" | "select" | "edit" | "delete" | "detail" | "lyrics";
+  type SongActionType = "play" | "select" | "edit" | "delete" | "detail" | "lyrics" | "addToQueue";
   const onAction = useCallback((type: SongActionType, song: Song) => {
     if (type === "play")   handlePlaySongRef.current(song);
     else if (type === "select") setSelectedSong(prev => prev?.id === song.id ? null : song);
@@ -445,7 +454,13 @@ export default function DiscografiaPage() {
     else if (type === "delete") handleDeleteRef.current(song);
     else if (type === "detail") setDetailSong(song);
     else if (type === "lyrics") setLyricsSong(song);
-  }, []);
+    else if (type === "addToQueue") {
+      if (!song.drive_file_id && !song.drive_file_url) return;
+      player.addToQueue(songToTrack(song));
+      toast.success(`"${song.title}" añadida a la cola`);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [player, toast]);
 
   // Keep mutable refs in sync with latest values (used in keyboard / action handlers)
   displayedSongsRef.current = displayedSongs;
@@ -935,22 +950,34 @@ export default function DiscografiaPage() {
                 <div className="p-3">
                   <div className="flex items-start justify-between gap-1">
                     <p className="text-sm font-black truncate leading-tight flex-1">{song.title}</p>
-                    {/* Download button in grid card */}
-                    {(song.drive_file_id || song.drive_file_url) && (
-                      <a
-                        href={song.drive_file_id
-                          ? `/api/drive/stream/${song.drive_file_id}?dl=1&name=${encodeURIComponent(song.title)}`
-                          : song.drive_file_url!}
-                        download={song.drive_file_id ? song.title : undefined}
-                        target={song.drive_file_id ? undefined : "_blank"}
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        title="Descargar audio"
-                        className="flex-shrink-0 p-1 rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all active:scale-95 opacity-0 group-hover:opacity-100"
-                      >
-                        <ArrowDownToLine className="h-3 w-3" />
-                      </a>
-                    )}
+                    <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {/* Add to queue */}
+                      {hasAudio && (
+                        <button
+                          onClick={(e) => handleAddToQueue(e, song)}
+                          title="Añadir a la cola"
+                          className="p-1 rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all active:scale-95"
+                        >
+                          <ListPlus className="h-3 w-3" />
+                        </button>
+                      )}
+                      {/* Download button in grid card */}
+                      {(song.drive_file_id || song.drive_file_url) && (
+                        <a
+                          href={song.drive_file_id
+                            ? `/api/drive/stream/${song.drive_file_id}?dl=1&name=${encodeURIComponent(song.title)}`
+                            : song.drive_file_url!}
+                          download={song.drive_file_id ? song.title : undefined}
+                          target={song.drive_file_id ? undefined : "_blank"}
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          title="Descargar audio"
+                          className="p-1 rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all active:scale-95"
+                        >
+                          <ArrowDownToLine className="h-3 w-3" />
+                        </a>
+                      )}
+                    </div>
                   </div>
                   <p className="text-[11px] text-muted-foreground truncate mt-0.5">
                     {song.artist_name}
@@ -1299,7 +1326,7 @@ export default function DiscografiaPage() {
   );
 }
 
-type SongActionType = "play" | "select" | "edit" | "delete" | "detail" | "lyrics";
+type SongActionType = "play" | "select" | "edit" | "delete" | "detail" | "lyrics" | "addToQueue";
 interface SongRowProps {
   song: Song;
   index: number;
@@ -1529,6 +1556,16 @@ const SongRow = memo(function SongRow({
 
       {/* Acciones */}
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+        {/* Add to queue */}
+        {hasAudio && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onAction("addToQueue", song); }}
+            title="Añadir a la cola"
+            className="p-1.5 rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all active:scale-95"
+          >
+            <ListPlus className="h-3.5 w-3.5" />
+          </button>
+        )}
         {/* Open full detail page */}
         <Link
           href={`/discografia/${song.id}`}

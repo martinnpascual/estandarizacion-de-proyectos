@@ -4,6 +4,7 @@ import { useRef, useEffect, useCallback, useState } from "react";
 import {
   Play, Pause, Volume2, VolumeX,
   SkipBack, SkipForward, Music, List, X, Shuffle, Repeat, Repeat1, ChevronDown, ChevronUp,
+  Heart, Timer,
 } from "lucide-react";
 import { formatTime } from "@/lib/utils";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
@@ -423,11 +424,78 @@ export default function AudioPlayer() {
   const [showQueue, setShowQueue] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
+  // ── Like / heart ──────────────────────────────────────────────────────
+  const [likedIds, setLikedIds] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try { return new Set(JSON.parse(localStorage.getItem("liked_tracks") ?? "[]")); }
+    catch { return new Set(); }
+  });
+  const [likeAnimating, setLikeAnimating] = useState(false);
+  const isLiked = currentTrack ? likedIds.has(currentTrack.id) : false;
+
+  function toggleLike() {
+    if (!currentTrack) return;
+    const next = new Set(likedIds);
+    if (next.has(currentTrack.id)) { next.delete(currentTrack.id); }
+    else {
+      next.add(currentTrack.id);
+      setLikeAnimating(true);
+      setTimeout(() => setLikeAnimating(false), 800);
+    }
+    setLikedIds(next);
+    localStorage.setItem("liked_tracks", JSON.stringify(Array.from(next)));
+  }
+
+  // ── Remaining time toggle (Spotify-style) ─────────────────────────────
+  const [showRemaining, setShowRemaining] = useState(false);
+
+  // ── Sleep timer ───────────────────────────────────────────────────────
+  const [sleepMinutes, setSleepMinutes] = useState<number | null>(null);
+  const [sleepSecondsLeft, setSleepSecondsLeft] = useState<number | null>(null);
+  const sleepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  function activateSleep(minutes: number) {
+    if (sleepTimerRef.current) clearInterval(sleepTimerRef.current);
+    setSleepMinutes(minutes);
+    setSleepSecondsLeft(minutes * 60);
+    sleepTimerRef.current = setInterval(() => {
+      setSleepSecondsLeft(prev => {
+        if (prev === null || prev <= 1) {
+          clearInterval(sleepTimerRef.current!);
+          player.pause();
+          setSleepMinutes(null);
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }
+
+  function cancelSleep() {
+    if (sleepTimerRef.current) clearInterval(sleepTimerRef.current);
+    setSleepMinutes(null);
+    setSleepSecondsLeft(null);
+  }
+
+  useEffect(() => () => { if (sleepTimerRef.current) clearInterval(sleepTimerRef.current); }, []);
+
+  // ── Marquee: detect title overflow ───────────────────────────────────
+  const titleRef = useRef<HTMLParagraphElement>(null);
+  const [titleOverflows, setTitleOverflows] = useState(false);
+  useEffect(() => {
+    const el = titleRef.current;
+    if (!el) return;
+    setTitleOverflows(el.scrollWidth > el.clientWidth + 4);
+  }, [currentTrack?.title]);
+
   const SPEED_STEPS = [0.75, 1, 1.25, 1.5, 2];
   function cycleSpeed() {
     const idx = SPEED_STEPS.indexOf(playbackRate);
     setPlaybackRate(SPEED_STEPS[(idx + 1) % SPEED_STEPS.length]);
   }
+
+  // ── Sleep dropdown state ──────────────────────────────────────────────
+  const [showSleepMenu, setShowSleepMenu] = useState(false);
 
   // ── Keyboard shortcuts ────────────────────────────────────────────
   useEffect(() => {
@@ -444,8 +512,12 @@ export default function AudioPlayer() {
           if (e.altKey) { player.playPrev(); break; }
           e.preventDefault(); player.seek(Math.max(currentTime - 10, 0)); break;
         case "KeyM": player.setVolume(volume > 0 ? 0 : 0.8); break;
+        case "KeyL": toggleLike(); break;
         case "KeyQ": if (e.altKey) setShowQueue(v => !v); break;
-        case "Escape": if (showQueue) setShowQueue(false); break;
+        case "Escape":
+          if (showQueue) setShowQueue(false);
+          if (showSleepMenu) setShowSleepMenu(false);
+          break;
       }
     }
     window.addEventListener("keydown", handleKey);
@@ -501,9 +573,20 @@ export default function AudioPlayer() {
           />
           <div className="flex justify-between mt-0.5 px-0.5">
             <span className="text-[9px] tabular-nums font-mono text-white/30 select-none">{formatTime(currentTime)}</span>
-            <span className="text-[9px] tabular-nums font-mono text-white/18 select-none">
-              {duration > 0 ? formatTime(duration) : currentTrack.duration ? formatTime(currentTrack.duration) : "—"}
-            </span>
+            <button
+              onClick={() => setShowRemaining(v => !v)}
+              title={showRemaining ? "Mostrar duración total" : "Mostrar tiempo restante"}
+              className="text-[9px] tabular-nums font-mono text-white/18 hover:text-white/45 transition-colors select-none cursor-pointer"
+            >
+              {duration > 0
+                ? showRemaining
+                  ? `-${formatTime(Math.max(0, duration - currentTime))}`
+                  : formatTime(duration)
+                : currentTrack.duration
+                  ? formatTime(currentTrack.duration)
+                  : "—"
+              }
+            </button>
           </div>
         </div>
 
@@ -624,34 +707,63 @@ export default function AudioPlayer() {
                     <span className="text-[9px] font-black uppercase tracking-widest text-white/20">En pausa</span>
                   </div>
                 )}
-                <div className="player-marquee-wrap">
-                  <p className={cn(
-                    "text-sm font-black leading-tight transition-colors player-marquee-inner",
-                    isPlaying ? "text-white" : "text-white/65"
-                  )}>
+                {/* Marquee for long titles */}
+                <div className="player-marquee-wrap overflow-hidden">
+                  <p
+                    ref={titleRef}
+                    className={cn(
+                      "text-sm font-black leading-tight transition-colors",
+                      titleOverflows ? "player-marquee-inner" : "truncate",
+                      isPlaying ? "text-white" : "text-white/65"
+                    )}
+                    title={currentTrack.title}
+                  >
                     {currentTrack.title}
+                    {titleOverflows && <span className="mx-6 opacity-0 select-none">·</span>}
                   </p>
                 </div>
                 <p className="text-[11px] text-white/35 truncate leading-tight mt-0.5 font-medium">
                   {currentTrack.artist}
                 </p>
-                {/* BPM + Key badges */}
-                {(currentTrack.bpm || currentTrack.keySignature) && (
-                  <div className="flex items-center gap-1.5 mt-1.5">
-                    {currentTrack.bpm && (
-                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-black font-mono tabular-nums"
-                        style={{ background: "rgba(96,165,250,0.15)", color: "rgba(147,197,253,0.9)", border: "1px solid rgba(96,165,250,0.2)" }}>
-                        {currentTrack.bpm} BPM
-                      </span>
-                    )}
-                    {currentTrack.keySignature && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black"
-                        style={{ background: "rgba(192,132,252,0.15)", color: "rgba(216,180,254,0.9)", border: "1px solid rgba(192,132,252,0.2)" }}>
-                        {currentTrack.keySignature}
-                      </span>
+                {/* BPM + Key badges + Like button */}
+                <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                  {currentTrack.bpm && (
+                    <span className="meta-chip meta-chip-bpm">
+                      {currentTrack.bpm} BPM
+                    </span>
+                  )}
+                  {currentTrack.keySignature && (
+                    <span className="meta-chip meta-chip-key">
+                      {currentTrack.keySignature}
+                    </span>
+                  )}
+                  {/* Heart / like button */}
+                  <div className="relative ml-auto">
+                    <button
+                      onClick={toggleLike}
+                      data-tooltip={isLiked ? "Quitar de favoritos (L)" : "Añadir a favoritos (L)"}
+                      className={cn(
+                        "p-1 rounded-lg transition-all active:scale-90 flex-shrink-0",
+                        isLiked
+                          ? "text-red-400 hover:text-red-300"
+                          : "text-white/25 hover:text-white/60"
+                      )}
+                    >
+                      <Heart className={cn("h-3.5 w-3.5", isLiked ? "fill-current" : "")} />
+                    </button>
+                    {/* Burst particles on like */}
+                    {likeAnimating && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        {[...Array(8)].map((_, i) => (
+                          <div key={i} className="heart-burst-particle" style={{
+                            animationDelay: `${i * 30}ms`,
+                            transform: `rotate(${i * 45}deg)`,
+                          }} />
+                        ))}
+                      </div>
                     )}
                   </div>
-                )}
+                </div>
               </div>
             </div>
 
@@ -712,6 +824,65 @@ export default function AudioPlayer() {
 
             {/* ── RIGHT: Speed, volume, queue, collapse ─────────────── */}
             <div className="hidden sm:flex items-center gap-1.5 w-[250px] justify-end flex-shrink-0">
+
+              {/* Sleep timer */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowSleepMenu(v => !v)}
+                  data-tooltip={sleepSecondsLeft
+                    ? `Parar en ${Math.floor(sleepSecondsLeft / 60)}:${String(sleepSecondsLeft % 60).padStart(2, "0")}`
+                    : "Temporizador de sueño"}
+                  className={cn(
+                    "p-1.5 rounded-xl transition-all active:scale-95 border",
+                    sleepMinutes !== null
+                      ? "text-amber-400 bg-amber-400/12 border-amber-400/25 shadow-[0_0_8px_rgba(251,191,36,0.2)]"
+                      : "text-white/25 border-transparent hover:text-white/60 hover:bg-white/8 hover:border-white/8"
+                  )}
+                >
+                  <Timer className="h-3.5 w-3.5" />
+                  {sleepSecondsLeft !== null && sleepSecondsLeft < 120 && (
+                    <span className="absolute -top-1 -right-1 text-[7px] bg-amber-400 text-black rounded-full w-3.5 h-3.5 flex items-center justify-center font-black tabular-nums leading-none">
+                      {sleepSecondsLeft}
+                    </span>
+                  )}
+                </button>
+                {showSleepMenu && (
+                  <>
+                    <div className="fixed inset-0 z-[55]" onClick={() => setShowSleepMenu(false)} />
+                    <div className="absolute bottom-full right-0 mb-2 z-[56] rounded-xl border border-white/10 overflow-hidden shadow-2xl"
+                      style={{ background: "rgba(10,10,18,0.97)", backdropFilter: "blur(24px)", minWidth: 160 }}>
+                      <div className="px-3 py-2 border-b border-white/8">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-white/40">Temporizador</p>
+                      </div>
+                      {[5, 10, 15, 30, 45, 60].map(min => (
+                        <button
+                          key={min}
+                          onClick={() => { activateSleep(min); setShowSleepMenu(false); }}
+                          className={cn(
+                            "w-full flex items-center justify-between px-3 py-2 text-xs hover:bg-white/8 transition-colors text-left",
+                            sleepMinutes === min ? "text-amber-400 font-black" : "text-white/70"
+                          )}
+                        >
+                          <span>{min} minutos</span>
+                          {sleepMinutes === min && sleepSecondsLeft !== null && (
+                            <span className="text-amber-400 font-mono tabular-nums text-[10px]">
+                              {Math.floor(sleepSecondsLeft / 60)}:{String(sleepSecondsLeft % 60).padStart(2, "0")}
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                      {sleepMinutes !== null && (
+                        <button
+                          onClick={() => { cancelSleep(); setShowSleepMenu(false); }}
+                          className="w-full px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 transition-colors text-left border-t border-white/8"
+                        >
+                          Cancelar temporizador
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
 
               {/* Speed */}
               <button onClick={cycleSpeed} data-tooltip={`Velocidad: ${playbackRate}x`}

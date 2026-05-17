@@ -2711,6 +2711,72 @@ mark.search-highlight {
    WAVE 19 — Samply / [untitled] inspired audio & track micro-interactions
    ════════════════════════════════════════════════════════════════════════════ */
 
+/* ── Marquee text — scrolling for long track titles ─────────────────────── */
+@keyframes marquee-scroll {
+  0%   { transform: translateX(0); }
+  15%  { transform: translateX(0); }   /* pause at start */
+  85%  { transform: translateX(-50%); }
+  100% { transform: translateX(-50%); } /* pause at end */
+}
+.player-marquee-wrap {
+  overflow: hidden;
+  white-space: nowrap;
+  position: relative;
+}
+.player-marquee-inner {
+  display: inline-block;
+  white-space: nowrap;
+  animation: marquee-scroll 8s linear infinite;
+  padding-right: 3rem; /* gap between repeats */
+}
+
+/* ── Heart / like burst animation ────────────────────────────────────────── */
+@keyframes heart-like {
+  0%   { transform: scale(1); }
+  25%  { transform: scale(1.45) rotate(-6deg); }
+  50%  { transform: scale(1.1) rotate(3deg); }
+  75%  { transform: scale(1.25) rotate(-2deg); }
+  100% { transform: scale(1); }
+}
+@keyframes heart-particle {
+  0%   { transform: rotate(var(--angle)) translateY(0) scale(1); opacity: 1; }
+  60%  { opacity: 0.8; }
+  100% { transform: rotate(var(--angle)) translateY(-18px) scale(0); opacity: 0; }
+}
+.heart-liked {
+  animation: heart-like 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.heart-burst-particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #f87171;
+  animation: heart-particle 0.6s ease-out both;
+  --angle: 0deg;
+}
+.heart-burst-particle:nth-child(1) { --angle: 0deg; }
+.heart-burst-particle:nth-child(2) { --angle: 45deg; }
+.heart-burst-particle:nth-child(3) { --angle: 90deg; }
+.heart-burst-particle:nth-child(4) { --angle: 135deg; }
+.heart-burst-particle:nth-child(5) { --angle: 180deg; }
+.heart-burst-particle:nth-child(6) { --angle: 225deg; }
+.heart-burst-particle:nth-child(7) { --angle: 270deg; }
+.heart-burst-particle:nth-child(8) { --angle: 315deg; }
+
+/* ── Sleep timer — amber countdown ring ──────────────────────────────────── */
+@keyframes sleep-ring {
+  from { stroke-dashoffset: 0; }
+  to   { stroke-dashoffset: 38; }
+}
+.sleep-ring-progress {
+  stroke-dasharray: 38;
+  stroke-dashoffset: 0;
+  transform: rotate(-90deg);
+  transform-origin: center;
+  animation: sleep-ring var(--sleep-duration, 30m) linear forwards;
+}
+
 /* ── Waveform / spectrum container hover state ───────────────────────────── */
 .waveform-container {
   position: relative;
