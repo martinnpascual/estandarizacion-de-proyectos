@@ -59,6 +59,18 @@ import { getGenreColors } from "@/lib/genre-colors";
 
 const DEFAULT_YEARS = [2026, 2025, 2024, 2023, 2022, 2021, 2020, 2019];
 
+// Genre → hex color for 3px top stripe on grid cards
+const GENRE_HEX: Record<string, string> = {
+  "Trap":      "#f97316",
+  "Reggaeton": "#22c55e",
+  "Hip Hop":   "#eab308",
+  "R&B":       "#ec4899",
+  "Pop":       "#06b6d4",
+  "Drill":     "#ef4444",
+  "Dancehall": "#a855f7",
+  "Afrobeats": "#f59e0b",
+};
+
 export default function DiscografiaPage() {
   const player = useAudioPlayerContext();
   const { user, profile } = useUser();
@@ -195,6 +207,8 @@ export default function DiscografiaPage() {
       url: audioUrl,
       duration: s.duration_seconds ?? undefined,
       coverArt: s.cover_art_url ?? undefined,
+      bpm: s.bpm ?? undefined,
+      keySignature: s.key_signature ?? undefined,
     };
   }
 
@@ -406,6 +420,22 @@ export default function DiscografiaPage() {
     return result;
   }, [songs, genreFilter, missingPlatformFilter, missingGenreFilter, missingAudioFilter, missingCoverArtFilter, missingBpmFilter, sortBy]);
 
+  // Stats del año actual: cantidad + duración total
+  const yearStats = useMemo(() => {
+    const count = songs.length;
+    const totalSecs = songs.reduce((sum, s) => sum + (s.duration_seconds ?? 0), 0);
+    if (count === 0) return null;
+    const h = Math.floor(totalSecs / 3600);
+    const m = Math.floor((totalSecs % 3600) / 60);
+    const s = Math.floor(totalSecs % 60);
+    const durationStr = totalSecs === 0
+      ? null
+      : h > 0
+        ? `${h}h ${m}m`
+        : `${m}:${s.toString().padStart(2, "0")}`;
+    return { count, durationStr };
+  }, [songs]);
+
   // Stable dispatch — onAction no cambia entre renders → memo en SongRow funciona
   type SongActionType = "play" | "select" | "edit" | "delete" | "detail" | "lyrics";
   const onAction = useCallback((type: SongActionType, song: Song) => {
@@ -432,17 +462,27 @@ export default function DiscografiaPage() {
         detailSong ? "flex-1" : "w-full"
       )}>
       {/* Header */}
-      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card">
+      <div className="card-premium relative overflow-hidden rounded-2xl">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-transparent to-transparent pointer-events-none" />
-        <div className="absolute -top-10 -right-10 w-40 h-40 bg-primary/6 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-primary/8 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-8 -left-8 w-28 h-28 bg-violet-400/5 rounded-full blur-2xl pointer-events-none" />
         <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-5">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/30 to-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
-            <Disc3 className="h-5 w-5 text-primary" />
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/30 to-primary/8 border border-primary/25 flex items-center justify-center flex-shrink-0 shadow-[0_0_20px_hsl(var(--primary)/0.2)]">
+            <Disc3 className="h-6 w-6 text-primary drop-shadow-[0_0_6px_hsl(var(--primary)/0.5)]" />
           </div>
           <div>
-            <h1 className="text-lg font-bold leading-tight">Discografía</h1>
-            <p className="text-muted-foreground text-xs mt-0.5">Toda la música publicada organizada por año</p>
+            <h1 className="text-xl font-black leading-tight tracking-tight gradient-text">Discografía</h1>
+            <p className="text-muted-foreground text-xs mt-0.5">
+              {!loading && yearStats
+                ? <>
+                    <span className="tabular-nums">{yearStats.count}</span>
+                    {" "}canción{yearStats.count !== 1 ? "es" : ""}
+                    {yearStats.durationStr && <> · <span className="tabular-nums">{yearStats.durationStr}</span> total</>}
+                  </>
+                : "Toda la música publicada organizada por año"
+              }
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -529,7 +569,7 @@ export default function DiscografiaPage() {
           </Link>
           <button
             onClick={handleAdd}
-            className="flex items-center gap-2 px-4 py-2 bg-primary/90 hover:bg-primary text-primary-foreground rounded-xl transition-all active:scale-95 text-sm font-semibold shadow-lg shadow-primary/20 hover:shadow-primary/30"
+            className="btn-shine flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 hover:scale-[1.02] transition-all active:scale-95 text-sm font-black shadow-[0_0_20px_hsl(var(--primary)/0.35)]"
           >
             <Plus className="h-4 w-4" />
             Agregar canción
@@ -548,7 +588,7 @@ export default function DiscografiaPage() {
           placeholder="Buscar por título, artista o género… (/)"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-10 pr-10 py-2.5 bg-card/80 border border-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-all placeholder:text-muted-foreground/40"
+          className="w-full pl-10 pr-10 py-3 bg-card/60 backdrop-blur-md border border-border/50 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/35 focus:border-primary/35 focus:bg-card/80 transition-all placeholder:text-muted-foreground/35"
         />
         {/* Indicador de búsqueda pendiente o botón de limpiar */}
         <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -574,10 +614,10 @@ export default function DiscografiaPage() {
                 key={year}
                 onClick={() => setSelectedYear(year)}
                 className={cn(
-                  "px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all active:scale-95",
+                  "px-4 py-1.5 rounded-full text-sm whitespace-nowrap pill-base active:scale-95",
                   selectedYear === year
-                    ? "bg-primary text-primary-foreground font-semibold"
-                    : "bg-secondary text-muted-foreground hover:text-foreground"
+                    ? "font-black bg-primary text-primary-foreground shadow-[0_2px_16px_hsl(var(--primary)/0.55),inset_0_1px_0_hsl(0_0%_100%/0.15)]"
+                    : "font-medium bg-card/70 backdrop-blur-sm border border-border/50 text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-card/90"
                 )}
               >
                 {year}
@@ -585,7 +625,7 @@ export default function DiscografiaPage() {
             ))}
           </div>
           {!loading && songs.length > 0 && (
-            <span className="flex-shrink-0 text-xs text-muted-foreground bg-secondary px-2.5 py-1 rounded-full tabular-nums">
+            <span className="stat-badge flex-shrink-0 text-muted-foreground">
               {songs.length} canción{songs.length !== 1 ? "es" : ""}
             </span>
           )}
@@ -625,16 +665,16 @@ export default function DiscografiaPage() {
                   key={genre}
                   onClick={() => setGenreFilter(active ? null : genre)}
                   className={cn(
-                    "flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full transition-all active:scale-95",
+                    "flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full pill-base active:scale-95",
                     active
-                      ? "bg-primary/20 text-primary border border-primary/30 font-semibold"
-                      : "bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80"
+                      ? "bg-primary/18 text-primary border border-primary/40 font-black shadow-[0_0_0_1px_hsl(var(--primary)/0.25),0_0_12px_hsl(var(--primary)/0.15)]"
+                      : "bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 font-medium"
                   )}
                   title={active ? "Quitar filtro" : `Filtrar por ${genre}`}
                 >
-                  <Filter className={cn("h-3 w-3 flex-shrink-0", active ? "text-primary" : "")} />
+                  <Filter className={cn("h-3 w-3 flex-shrink-0", active ? "text-primary drop-shadow-[0_0_4px_hsl(var(--primary)/0.7)]" : "")} />
                   <span className="truncate max-w-[100px]">{genre}</span>
-                  <span className={cn("font-semibold tabular-nums", active ? "text-primary" : "text-foreground")}>{count}</span>
+                  <span className={cn("tabular-nums font-black", active ? "text-primary" : "text-foreground/70")}>{count}</span>
                 </button>
               );
             })}
@@ -648,8 +688,8 @@ export default function DiscografiaPage() {
               </span>
             )}
             {withAudio > 0 && (
-              <span className="flex items-center gap-1.5 text-[11px] bg-primary/10 text-primary px-2.5 py-1 rounded-full">
-                <Play className="h-3 w-3 flex-shrink-0" />
+              <span className="flex items-center gap-1.5 text-[11px] text-primary px-2.5 py-1 rounded-full border border-primary/25 bg-primary/12 shadow-[0_0_8px_hsl(var(--primary)/0.10)] font-black">
+                <Play className="h-3 w-3 flex-shrink-0 drop-shadow-[0_0_4px_hsl(var(--primary)/0.6)]" />
                 {withAudio} con audio
               </span>
             )}
@@ -662,8 +702,8 @@ export default function DiscografiaPage() {
                   className={cn(
                     "flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full transition-all active:scale-95",
                     missingAudioFilter
-                      ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
-                      : "bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80"
+                      ? "bg-orange-500/18 text-orange-400 border border-orange-500/40 font-black shadow-[0_0_10px_hsl(30_80%_50%/0.15)]"
+                      : "bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 font-medium"
                   )}
                   title={missingAudioFilter ? "Mostrar todas" : "Ver canciones sin archivo de audio"}
                 >
@@ -682,8 +722,8 @@ export default function DiscografiaPage() {
                   className={cn(
                     "flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full transition-all active:scale-95",
                     missingPlatformFilter
-                      ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
-                      : "bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80"
+                      ? "bg-orange-500/18 text-orange-400 border border-orange-500/40 font-black shadow-[0_0_10px_hsl(30_80%_50%/0.15)]"
+                      : "bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 font-medium"
                   )}
                   title={missingPlatformFilter ? "Mostrar todas" : "Ver canciones sin streaming"}
                 >
@@ -701,8 +741,8 @@ export default function DiscografiaPage() {
                   className={cn(
                     "flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full transition-all active:scale-95",
                     missingGenreFilter
-                      ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30"
-                      : "bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80"
+                      ? "bg-yellow-500/18 text-yellow-400 border border-yellow-500/40 font-black shadow-[0_0_10px_hsl(50_80%_50%/0.15)]"
+                      : "bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 font-medium"
                   )}
                   title={missingGenreFilter ? "Mostrar todas" : "Ver canciones sin género"}
                 >
@@ -720,8 +760,8 @@ export default function DiscografiaPage() {
                   className={cn(
                     "flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full transition-all active:scale-95",
                     missingCoverArtFilter
-                      ? "bg-pink-500/20 text-pink-400 border border-pink-500/30"
-                      : "bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80"
+                      ? "bg-pink-500/18 text-pink-400 border border-pink-500/40 font-black shadow-[0_0_10px_hsl(340_80%_55%/0.15)]"
+                      : "bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80 font-medium"
                   )}
                   title={missingCoverArtFilter ? "Mostrar todas" : "Ver canciones sin cover art"}
                 >
@@ -768,28 +808,45 @@ export default function DiscografiaPage() {
 
       {/* Grid view */}
       {viewMode === "grid" && !loading && displayedSongs.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3 stagger-item">
           {displayedSongs.map((song) => {
             const isPlaying = player.currentTrack?.id === song.id && player.isPlaying;
             const hasAudio = !!(song.drive_file_url || song.drive_file_id);
             const platforms = [
-              { label: "Spotify", url: song.spotify_url, color: "#1db954" },
-              { label: "YouTube", url: song.youtube_url, color: "#ef4444" },
-              { label: "Apple", url: song.apple_music_url, color: "#fa243c" },
-              { label: "SC", url: song.soundcloud_url, color: "#f97316" },
+              { label: "Spotify",    abbr: "SP", url: song.spotify_url,     color: "#1db954", bg: "rgba(29,185,84,0.12)",   border: "rgba(29,185,84,0.3)" },
+              { label: "YouTube",    abbr: "YT", url: song.youtube_url,     color: "#ef4444", bg: "rgba(239,68,68,0.12)",   border: "rgba(239,68,68,0.3)" },
+              { label: "Apple",      abbr: "AM", url: song.apple_music_url, color: "#fa243c", bg: "rgba(250,36,60,0.12)",   border: "rgba(250,36,60,0.3)" },
+              { label: "SoundCloud", abbr: "SC", url: song.soundcloud_url,  color: "#f97316", bg: "rgba(249,115,22,0.12)", border: "rgba(249,115,22,0.3)" },
             ].filter(p => p.url);
             return (
               <div
                 key={song.id}
                 className={cn(
-                  "group relative bg-card border rounded-2xl overflow-hidden transition-all duration-200 cursor-pointer",
-                  "hover:shadow-[0_8px_30px_hsl(var(--background)/0.8),0_0_0_1px_hsl(var(--primary)/0.2)] hover:-translate-y-0.5",
-                  isPlaying
-                    ? "border-primary/50 shadow-[0_0_0_1px_hsl(var(--primary)/0.3),0_4px_20px_hsl(var(--primary)/0.15)]"
-                    : "border-border/60"
+                  "card-premium card-gradient-border group relative rounded-2xl overflow-hidden transition-all duration-300 cursor-pointer",
+                  "hover:-translate-y-1",
+                  isPlaying ? "border-primary/50 -translate-y-0.5" : "border-border/60"
                 )}
+                style={isPlaying
+                  ? {
+                      boxShadow: song.genre && GENRE_HEX[song.genre]
+                        ? `0 0 0 1px ${GENRE_HEX[song.genre]}55, 0 8px 32px ${GENRE_HEX[song.genre]}33, 0 0 0 0 transparent`
+                        : "0 0 0 1px hsl(var(--primary)/0.3), 0 6px 24px hsl(var(--primary)/0.2)",
+                    }
+                  : undefined
+                }
                 onClick={() => onAction("select", song)}
               >
+                {/* ── Genre color stripe — 3px top accent ────────────── */}
+                {song.genre && (
+                  <div
+                    className="absolute top-0 left-0 right-0 h-[3px] z-20 pointer-events-none"
+                    style={{
+                      background: GENRE_HEX[song.genre] ?? "hsl(var(--primary))",
+                      boxShadow: `0 0 10px ${(GENRE_HEX[song.genre] ?? "hsl(var(--primary))")}80`,
+                    }}
+                  />
+                )}
+
                 {/* ── Cover art — full bleed ──────────────────────────── */}
                 <div className="relative aspect-square overflow-hidden">
                   {song.cover_art_url ? (
@@ -799,9 +856,8 @@ export default function DiscografiaPage() {
                         alt={song.title}
                         fill
                         sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                        unoptimized
                         className="object-cover transition-transform duration-500 group-hover:scale-105"
-                        placeholder="blur"
-                        blurDataURL="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='4' height='4' fill='%23171820'/%3E%3C/svg%3E"
                       />
                       {/* Gradient overlay — bottom info legibility */}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent opacity-60 group-hover:opacity-80 transition-opacity" />
@@ -878,7 +934,7 @@ export default function DiscografiaPage() {
                 {/* ── Info section ─────────────────────────────────────── */}
                 <div className="p-3">
                   <div className="flex items-start justify-between gap-1">
-                    <p className="text-sm font-semibold truncate leading-tight flex-1">{song.title}</p>
+                    <p className="text-sm font-black truncate leading-tight flex-1">{song.title}</p>
                     {/* Download button in grid card */}
                     {(song.drive_file_id || song.drive_file_url) && (
                       <a
@@ -926,7 +982,7 @@ export default function DiscografiaPage() {
                   )}
                   <div className="flex items-center justify-between mt-2">
                     {platforms.length > 0 ? (
-                      <div className="flex gap-1.5">
+                      <div className="flex gap-1">
                         {platforms.map(p => (
                           <a
                             key={p.label}
@@ -935,10 +991,10 @@ export default function DiscografiaPage() {
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}
                             title={p.label}
-                            className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white transition-opacity opacity-70 hover:opacity-100"
-                            style={{ background: p.color }}
+                            className="px-1.5 py-0.5 rounded-md text-[9px] font-black border transition-all active:scale-95 hover:opacity-100"
+                            style={{ color: p.color, background: p.bg, borderColor: p.border }}
                           >
-                            {p.label[0]}
+                            {p.abbr}
                           </a>
                         ))}
                       </div>
@@ -981,7 +1037,7 @@ export default function DiscografiaPage() {
 
       {/* List view — Contenido */}
       {(viewMode === "list" || loading || displayedSongs.length === 0) && (
-      <div className="bg-card rounded-2xl border border-border/60 overflow-hidden">
+      <div className="card-premium rounded-2xl overflow-hidden">
         {loading ? (
           <div>
             {Array.from({ length: 8 }).map((_, i) => <SongRowSkeleton key={i} />)}
@@ -1088,16 +1144,16 @@ export default function DiscografiaPage() {
               <div>
                 {years.map((year) => (
                   <div key={year}>
-                    <div className="flex items-center gap-3 px-4 py-2 bg-secondary/30 border-b border-border/60 sticky top-0 z-10">
-                      <span className="text-xs font-bold text-muted-foreground tracking-widest">{year}</span>
-                      <div className="flex-1 h-px bg-border/60" />
-                      <span className="text-[10px] text-muted-foreground">{yearGroups[year].length}</span>
+                    <div className="section-group-header">
+                      <span className="section-group-header-label tabular-nums">{year}</span>
+                      <div className="flex-1 h-px bg-gradient-to-r from-border/50 to-transparent" />
+                      <span className="text-[10px] text-muted-foreground/70 bg-secondary/80 border border-border/40 px-2 py-0.5 rounded-full tabular-nums font-bold">{yearGroups[year].length}</span>
                     </div>
-                    <div className="divide-y divide-border/50">
+                    <div className="divide-y divide-border/50 list-enter">
                       {yearGroups[year].map((song) => {
                         const idx = globalIdx++;
                         return (
-                          <div key={song.id} id={`song-row-${song.id}`} onDoubleClick={() => handleEdit(song)}>
+                          <div key={song.id} id={`song-row-${song.id}`} className="row-interactive" onDoubleClick={() => handleEdit(song)}>
                             <SongRow
                               song={song}
                               index={idx + 1}
@@ -1118,7 +1174,7 @@ export default function DiscografiaPage() {
         ) : (
           <div className="divide-y divide-border/50">
             {displayedSongs.map((song, idx) => (
-              <div key={song.id} id={`song-row-${song.id}`} onDoubleClick={() => handleEdit(song)}>
+              <div key={song.id} id={`song-row-${song.id}`} className="row-interactive" onDoubleClick={() => handleEdit(song)}>
                 <SongRow
                   song={song}
                   index={idx + 1}
@@ -1136,7 +1192,7 @@ export default function DiscografiaPage() {
 
       {/* Panel de comentarios */}
       {selectedSong && (
-        <div className="bg-card rounded-2xl border border-border/60 overflow-hidden">
+        <div className="card-premium rounded-2xl overflow-hidden">
           <div className="flex items-center justify-between px-4 py-2 bg-secondary/50 border-b border-border/60">
             <span className="text-xs text-muted-foreground font-medium">
               {selectedSong.title}
@@ -1282,10 +1338,10 @@ const SongRow = memo(function SongRow({
     });
   }
   const platformLinks = [
-    { label: "Spotify",    abbr: "S", color: "text-[#1db954] hover:bg-[#1db954]/10", url: song.spotify_url },
-    { label: "YouTube",   abbr: "Y", color: "text-[#ff0000] hover:bg-[#ff0000]/10", url: song.youtube_url },
-    { label: "Apple",     abbr: "A", color: "text-[#fa243c] hover:bg-[#fa243c]/10", url: song.apple_music_url },
-    { label: "SoundCloud",abbr: "SC",color: "text-[#ff5500] hover:bg-[#ff5500]/10", url: song.soundcloud_url },
+    { label: "Spotify",    abbr: "SP", color: "text-[#1db954]", bg: "bg-[#1db954]/12 border-[#1db954]/25 hover:bg-[#1db954]/20", url: song.spotify_url },
+    { label: "YouTube",   abbr: "YT", color: "text-[#ff0000]", bg: "bg-[#ff0000]/12 border-[#ff0000]/25 hover:bg-[#ff0000]/20", url: song.youtube_url },
+    { label: "Apple",     abbr: "AM", color: "text-[#fa243c]", bg: "bg-[#fa243c]/12 border-[#fa243c]/25 hover:bg-[#fa243c]/20", url: song.apple_music_url },
+    { label: "SoundCloud",abbr: "SC", color: "text-[#ff5500]", bg: "bg-[#ff5500]/12 border-[#ff5500]/25 hover:bg-[#ff5500]/20", url: song.soundcloud_url },
   ].filter((l) => l.url);
 
   const genreColors = getGenreColors(song.genre ?? null);
@@ -1293,58 +1349,68 @@ const SongRow = memo(function SongRow({
   return (
     <div
       className={cn(
-        "stagger-item flex items-center gap-3 px-4 py-3 hover:bg-secondary/40 transition-all duration-150 active:scale-[0.99] group rounded-2xl mx-1",
-        isPlaying && "bg-primary/5",
+        "stagger-item relative flex items-center gap-3 px-4 py-3.5 row-hover transition-all duration-150 active:scale-[0.99] group rounded-xl mx-1.5",
+        isPlaying && "row-is-playing",
         isSelected && "bg-secondary/60",
         isKeyboardSelected && "ring-1 ring-inset ring-primary/50 bg-primary/5"
       )}
     >
-      {/* Número / Play / Pause */}
-      <div className="w-7 flex-shrink-0 text-center relative">
+      {/* Accent bar izquierda — visible cuando suena, con glow */}
+      {isPlaying && (
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-8 rounded-full bg-primary shadow-[0_0_8px_hsl(var(--primary)/0.8)]" />
+      )}
+
+      {/* Número / Play / Pause — crossfade suave */}
+      <div className="w-7 flex-shrink-0 text-center relative h-7">
         {isPlaying ? (
-          /* Playing: show waveform, replace with Pause on hover */
+          /* Playing: EQ animado (fade-out en hover) → Pause (fade-in en hover) */
           <>
             <button
               onClick={() => onAction("play", song)}
               title="Pausar"
-              className="hidden group-hover:flex items-center justify-center w-7 h-7 rounded-full bg-primary text-primary-foreground hover:bg-primary/80 transition-all active:scale-95"
+              className="absolute inset-0 flex items-center justify-center w-7 h-7 rounded-full bg-primary text-primary-foreground hover:bg-primary/80 transition-all active:scale-95 opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100"
             >
               <Pause className="h-3 w-3" />
             </button>
-            <span className="group-hover:hidden flex items-center justify-center w-7 h-7">
-              <span className="flex gap-0.5 items-end h-3">
-                <span className="w-0.5 bg-primary rounded-full animate-bounce h-2" style={{ animationDelay: "0ms" }} />
-                <span className="w-0.5 bg-primary rounded-full animate-bounce h-3" style={{ animationDelay: "150ms" }} />
-                <span className="w-0.5 bg-primary rounded-full animate-bounce h-1.5" style={{ animationDelay: "300ms" }} />
+            <span className="absolute inset-0 flex items-center justify-center w-7 h-7 transition-all group-hover:opacity-0 group-hover:scale-90">
+              <span className="flex gap-0.5 items-end h-3.5">
+                <span className="w-[3px] bg-primary rounded-full eq-bar" style={{ height: "8px" }} />
+                <span className="w-[3px] bg-primary rounded-full eq-bar" style={{ height: "12px" }} />
+                <span className="w-[3px] bg-primary rounded-full eq-bar" style={{ height: "6px" }} />
               </span>
             </span>
           </>
         ) : hasAudio ? (
-          /* Not playing, has audio: always-visible play button */
-          <button
-            onClick={() => onAction("play", song)}
-            title="Reproducir"
-            className="flex items-center justify-center w-7 h-7 rounded-full text-muted-foreground hover:bg-primary hover:text-primary-foreground transition-all active:scale-95"
-          >
-            <Play className="h-3 w-3 ml-0.5" />
-          </button>
+          /* Con audio: número (fade-out en hover) → play button (fade-in en hover) */
+          <>
+            <button
+              onClick={() => onAction("play", song)}
+              title="Reproducir"
+              className="absolute inset-0 flex items-center justify-center w-7 h-7 rounded-full text-primary-foreground bg-primary hover:bg-primary/85 transition-all active:scale-95 opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100"
+            >
+              <Play className="h-3 w-3 ml-0.5" />
+            </button>
+            <span className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground/50 tabular-nums select-none transition-all group-hover:opacity-0 group-hover:scale-90">{index}</span>
+          </>
         ) : (
-          /* No audio: just the number */
-          <span className="text-xs text-muted-foreground">{index}</span>
+          /* Sin audio: número siempre */
+          <span className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground/50 tabular-nums select-none">{index}</span>
         )}
       </div>
 
       {/* Cover art placeholder */}
       <div className={cn(
-        "w-9 h-9 flex-shrink-0 rounded-xl flex items-center justify-center overflow-hidden relative",
-        !song.cover_art_url && genreColors ? genreColors.bg : "bg-secondary"
+        "w-11 h-11 flex-shrink-0 rounded-xl flex items-center justify-center overflow-hidden relative transition-all duration-300",
+        !song.cover_art_url && genreColors ? genreColors.bg : "bg-secondary",
+        isPlaying && "shadow-[0_0_14px_hsl(var(--primary)/0.5)] ring-1 ring-primary/40"
       )}>
         {song.cover_art_url ? (
           <Image
             src={song.cover_art_url}
             alt={song.title}
             fill
-            sizes="36px"
+            sizes="44px"
+            unoptimized
             className="rounded-xl object-cover"
           />
         ) : (
@@ -1357,11 +1423,11 @@ const SongRow = memo(function SongRow({
         onClick={() => onAction("detail", song)}
         className="flex-1 min-w-0 text-left"
       >
-        <p className={cn("text-sm font-medium truncate", isPlaying && "text-primary")}>
+        <p className={cn("text-[13px] font-black truncate leading-tight", isPlaying ? "text-primary" : "text-foreground/90")}>
           {song.title}
         </p>
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-          <span className="text-xs text-muted-foreground truncate">
+          <span className="text-[11px] text-muted-foreground/70 truncate">
             {song.artist_name}
             {song.featuring.length > 0 && ` ft. ${song.featuring.join(", ")}`}
           </span>
@@ -1406,16 +1472,16 @@ const SongRow = memo(function SongRow({
 
       {/* Links externos — colored platform badges */}
       {platformLinks.length > 0 && (
-        <div className="hidden md:flex items-center gap-0.5 flex-shrink-0">
-          {platformLinks.slice(0, 4).map(({ label, abbr, color, url }) => (
+        <div className="hidden md:flex items-center gap-1 flex-shrink-0">
+          {platformLinks.slice(0, 4).map(({ label, abbr, color, bg, url }) => (
             <a
               key={label}
               href={url!}
               target="_blank"
               rel="noopener noreferrer"
               className={cn(
-                "inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded-xl text-[10px] font-bold transition-colors",
-                color
+                "inline-flex items-center justify-center px-1.5 py-0.5 rounded-md text-[9px] font-black border transition-all active:scale-95",
+                color, bg
               )}
               title={label}
               onClick={(e) => e.stopPropagation()}

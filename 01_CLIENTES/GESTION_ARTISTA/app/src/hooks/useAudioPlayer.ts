@@ -9,6 +9,8 @@ export interface Track {
   url: string;
   duration?: number;
   coverArt?: string;
+  bpm?: number;
+  keySignature?: string;
 }
 
 export type LoopMode = "none" | "one" | "all";
@@ -16,6 +18,40 @@ export type LoopMode = "none" | "one" | "all";
 export function useAudioPlayer() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const playPromiseRef = useRef<Promise<void> | null>(null);
+
+  // ── Web Audio API for real-time spectrum ─────────────────────────────
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef     = useRef<AnalyserNode | null>(null);
+  const sourceNodeRef   = useRef<MediaElementAudioSourceNode | null>(null);
+
+  /** Call once on first user-initiated play to wire up the AnalyserNode. */
+  const initWebAudio = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio || audioContextRef.current) return; // already initialized
+    try {
+      const ctx = new AudioContext();
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 2048;            // 1024 frequency bins
+      analyser.smoothingTimeConstant = 0.80; // built-in browser smoothing
+      analyser.minDecibels = -90;
+      analyser.maxDecibels = -10;
+      const source = ctx.createMediaElementSource(audio);
+      source.connect(analyser);
+      analyser.connect(ctx.destination);
+      audioContextRef.current = ctx;
+      analyserRef.current     = analyser;
+      sourceNodeRef.current   = source;
+    } catch (e) {
+      console.warn("Web Audio API unavailable:", e);
+    }
+  }, []);
+
+  /** Resume suspended AudioContext (needed after browser autoplay policy). */
+  const resumeAudioContext = useCallback(() => {
+    if (audioContextRef.current?.state === "suspended") {
+      audioContextRef.current.resume().catch(() => {});
+    }
+  }, []);
 
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -88,6 +124,9 @@ export function useAudioPlayer() {
   const _loadAndPlay = useCallback(async (track: Track) => {
     const audio = audioRef.current;
     if (!audio) return;
+    // Wire up Web Audio API on first play (requires user gesture context)
+    initWebAudio();
+    resumeAudioContext();
     if (playPromiseRef.current) {
       audio.pause();
     }
@@ -101,6 +140,7 @@ export function useAudioPlayer() {
     try {
       playPromiseRef.current = audio.play();
       await playPromiseRef.current;
+      resumeAudioContext();
       setIsPlaying(true);
     } catch (e: unknown) {
       if (e instanceof Error && e.name !== "AbortError") {
@@ -110,7 +150,7 @@ export function useAudioPlayer() {
     } finally {
       playPromiseRef.current = null;
     }
-  }, []);
+  }, [initWebAudio, resumeAudioContext]);
 
   // ── Auto-advance on track end ─────────────────────────────────────────
   // We watch isPlaying going false + currentTime == 0 to detect natural end
@@ -212,9 +252,11 @@ export function useAudioPlayer() {
 
       // Resume current
       if (!audio.src) return;
+      resumeAudioContext();
       try {
         playPromiseRef.current = audio.play();
         await playPromiseRef.current;
+        resumeAudioContext();
         setIsPlaying(true);
       } catch { setIsPlaying(false); } finally { playPromiseRef.current = null; }
     },
@@ -365,5 +407,8 @@ export function useAudioPlayer() {
     cycleLoop,
     playbackRate,
     setPlaybackRate,
+    // Web Audio API
+    analyserRef,
+    resumeAudioContext,
   };
 }

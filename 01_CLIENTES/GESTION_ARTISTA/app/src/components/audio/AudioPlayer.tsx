@@ -29,76 +29,247 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
   );
 }
 
-// ── Progress bar ────────────────────────────────────────────────────────────
-function ProgressBar({
-  currentTime, duration, markers, onSeek,
+// ══════════════════════════════════════════════════════════════════════════════
+// ── Real-time Spectrum Analyzer — SoundCloud aesthetic, canvas 60fps ─────
+// ══════════════════════════════════════════════════════════════════════════════
+const BAR_COUNT   = 128;          // many thin bars like SoundCloud
+const BAR_GAP     = 1.5;         // px between bars
+const MIN_FREQ_HZ = 30;
+const MAX_FREQ_HZ = 16000;
+const NYQUIST     = 22050;
+const ALPHA_UP    = 0.40;        // fast rise — snappy to beats
+const ALPHA_DOWN  = 0.10;        // slow fall — smooth tail
+const MIN_AMP     = 0.05;        // minimum bar height (never fully flat)
+
+function barToFreq(i: number, count: number): number {
+  return MIN_FREQ_HZ * Math.pow(MAX_FREQ_HZ / MIN_FREQ_HZ, i / (count - 1));
+}
+function freqToBin(freq: number, binCount: number): number {
+  return Math.min(binCount - 1, Math.round((freq / NYQUIST) * binCount));
+}
+function buildBinRanges(binCount: number, count: number): Array<[number, number]> {
+  return Array.from({ length: count }, (_, i) => {
+    const b0 = freqToBin(barToFreq(i, count), binCount);
+    const b1 = freqToBin(barToFreq(i + 1, count), binCount);
+    return [b0, Math.max(b0, b1)];
+  });
+}
+
+function SpectrumAnalyzer({
+  analyserRef, isPlaying, currentTime, duration, commentMarkers, onSeek,
 }: {
-  currentTime: number; duration: number; markers: number[]; onSeek: (t: number) => void;
+  analyserRef: React.RefObject<AnalyserNode | null>;
+  isPlaying: boolean;
+  currentTime: number;
+  duration: number;
+  commentMarkers: number[];
+  onSeek: (t: number) => void;
 }) {
-  const barRef = useRef<HTMLDivElement>(null);
-  const dragging = useRef(false);
+  const canvasRef  = useRef<HTMLCanvasElement>(null);
+  const rafRef     = useRef<number>(0);
+  const smoothed   = useRef<Float32Array>(new Float32Array(BAR_COUNT));
+  const binRanges  = useRef<Array<[number, number]> | null>(null);
+  const idlePhase  = useRef(0);
+  const prevDpr    = useRef(0);
+  const prevW      = useRef(0);
+  const prevH      = useRef(0);
 
-  const getTimeFromEvent = useCallback((e: MouseEvent | React.MouseEvent) => {
-    const bar = barRef.current;
-    if (!bar || duration <= 0) return 0;
-    const rect = bar.getBoundingClientRect();
-    return Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * duration;
+  const [hoverPct, setHoverPct] = useState<number | null>(null);
+
+  const seekFromX = useCallback((clientX: number, rect: DOMRect) => {
+    if (duration <= 0) return;
+    onSeek(Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)) * duration);
+  }, [duration, onSeek]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (duration <= 0) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    setHoverPct(Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)));
   }, [duration]);
 
-  function handleMouseDown(e: React.MouseEvent) {
-    e.preventDefault();
-    dragging.current = true;
-    onSeek(getTimeFromEvent(e));
-  }
-
-  const getTimeFromTouch = useCallback((e: TouchEvent | React.TouchEvent) => {
-    const bar = barRef.current;
-    if (!bar || duration <= 0) return 0;
-    const rect = bar.getBoundingClientRect();
-    const touch = e.touches[0] ?? e.changedTouches[0];
-    if (!touch) return 0;
-    return Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width)) * duration;
-  }, [duration]);
-
-  function handleTouchStart(e: React.TouchEvent) {
-    dragging.current = true;
-    onSeek(getTimeFromTouch(e));
-  }
+  const hoverTime = hoverPct !== null && duration > 0 ? hoverPct * duration : null;
 
   useEffect(() => {
-    function onMove(e: MouseEvent) { if (dragging.current) onSeek(getTimeFromEvent(e)); }
-    function onUp() { dragging.current = false; }
-    function onTouchMove(e: TouchEvent) { if (dragging.current) { e.preventDefault(); onSeek(getTimeFromTouch(e)); } }
-    function onTouchEnd() { dragging.current = false; }
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-    window.addEventListener("touchmove", onTouchMove, { passive: false });
-    window.addEventListener("touchend", onTouchEnd);
-    return () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-      window.removeEventListener("touchmove", onTouchMove);
-      window.removeEventListener("touchend", onTouchEnd);
-    };
-  }, [getTimeFromEvent, getTimeFromTouch, onSeek]);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d", { alpha: true });
+    if (!ctx) return;
 
-  const pct = duration > 0 ? (currentTime / duration) * 100 : 0;
+    // Parse CSS primary color once
+    const cssHsl  = getComputedStyle(document.documentElement).getPropertyValue("--primary").trim() || "262 80% 62%";
+    const [pH, pS, pL] = cssHsl.split(" ").map(parseFloat);
+
+    const draw = () => {
+      rafRef.current = requestAnimationFrame(draw);
+
+      const dpr = window.devicePixelRatio || 1;
+      const W   = canvas.clientWidth;
+      const H   = canvas.clientHeight;
+
+      if (W !== prevW.current || H !== prevH.current || dpr !== prevDpr.current) {
+        canvas.width  = Math.round(W * dpr);
+        canvas.height = Math.round(H * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        prevW.current = W; prevH.current = H; prevDpr.current = dpr;
+      }
+
+      ctx.clearRect(0, 0, W, H);
+
+      // ── Read frequency data or breathe ─────────────────────────────
+      const analyser = analyserRef.current;
+      if (analyser && isPlaying) {
+        const binCount = analyser.frequencyBinCount;
+        if (!binRanges.current) binRanges.current = buildBinRanges(binCount, BAR_COUNT);
+        const data = new Uint8Array(binCount);
+        analyser.getByteFrequencyData(data);
+        for (let i = 0; i < BAR_COUNT; i++) {
+          const [b0, b1] = binRanges.current[i];
+          let peak = 0;
+          for (let b = b0; b <= b1; b++) if (data[b] > peak) peak = data[b];
+          const raw   = Math.max(MIN_AMP, peak / 255);
+          const alpha = raw > smoothed.current[i] ? ALPHA_UP : ALPHA_DOWN;
+          smoothed.current[i] += alpha * (raw - smoothed.current[i]);
+        }
+      } else {
+        // Gentle breathing when paused
+        idlePhase.current += 0.014;
+        const t = idlePhase.current;
+        for (let i = 0; i < BAR_COUNT; i++) {
+          const x   = i / BAR_COUNT;
+          // multi-frequency wave for organic feel
+          const wave = 0.5 * Math.sin(t + x * 6.2)
+                     + 0.3 * Math.sin(t * 1.3 + x * 12.4)
+                     + 0.2 * Math.sin(t * 0.7 + x * 3.1);
+          const target = MIN_AMP + 0.065 * (1 + wave) * 0.5;
+          smoothed.current[i] += 0.05 * (target - smoothed.current[i]);
+        }
+      }
+
+      // ── Layout ──────────────────────────────────────────────────────
+      const totalGap = BAR_GAP * (BAR_COUNT - 1);
+      const barW     = Math.max(1, (W - totalGap) / BAR_COUNT);
+      const midY     = H / 2;
+      const halfH    = midY - 1;   // max half-height per bar arm
+
+      const pct        = duration > 0 ? currentTime / duration : 0;
+      const playheadX  = pct * W;
+
+      // Pre-build gradients for played / unplayed (reused every frame)
+      const gradPlayed = ctx.createLinearGradient(0, midY - halfH, 0, midY + halfH);
+      gradPlayed.addColorStop(0,   `hsla(${pH - 8}, ${pS + 5}%, ${Math.min(pL + 22, 90)}%, 0.92)`);
+      gradPlayed.addColorStop(0.45,`hsla(${pH},     ${pS}%,       ${pL}%,                  0.88)`);
+      gradPlayed.addColorStop(0.55,`hsla(${pH},     ${pS}%,       ${pL}%,                  0.88)`);
+      gradPlayed.addColorStop(1,   `hsla(${pH - 8}, ${pS + 5}%, ${Math.min(pL + 22, 90)}%, 0.92)`);
+
+      const gradPaused = ctx.createLinearGradient(0, midY - halfH, 0, midY + halfH);
+      gradPaused.addColorStop(0,   `hsla(${pH}, ${pS}%, ${pL + 12}%, 0.50)`);
+      gradPaused.addColorStop(0.5, `hsla(${pH}, ${pS}%, ${pL}%,      0.38)`);
+      gradPaused.addColorStop(1,   `hsla(${pH}, ${pS}%, ${pL + 12}%, 0.50)`);
+
+      // ── Draw bars (symmetric: grow up + down from midY) ─────────────
+      for (let i = 0; i < BAR_COUNT; i++) {
+        const x      = i * (barW + BAR_GAP);
+        const cx     = x + barW / 2;
+        const val    = smoothed.current[i];
+        const arm    = Math.max(1.5, val * halfH);  // half-height of this bar
+        const radius = Math.min(barW / 2, 1.5);
+
+        const barFrac  = cx / W;
+        const isFilled = barFrac <= pct;
+
+        if (isFilled) {
+          ctx.fillStyle = isPlaying ? gradPlayed : gradPaused;
+        } else {
+          // Unplayed: very subtle, slightly hinted
+          const alpha = isPlaying ? 0.18 : 0.12;
+          ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+        }
+
+        // Top arm (up from center)
+        ctx.beginPath();
+        ctx.roundRect(x, midY - arm, barW, arm, [radius, radius, 0, 0]);
+        ctx.fill();
+
+        // Bottom arm (down from center) — mirror
+        ctx.beginPath();
+        ctx.roundRect(x, midY, barW, arm, [0, 0, radius, radius]);
+        ctx.fill();
+      }
+
+      // ── Playhead ─────────────────────────────────────────────────────
+      if (duration > 0 && pct > 0.001) {
+        // Soft glow column
+        const grd = ctx.createLinearGradient(playheadX - 6, 0, playheadX + 6, 0);
+        grd.addColorStop(0,   `hsla(${pH},${pS}%,${pL+10}%,0)`);
+        grd.addColorStop(0.5, `hsla(${pH},${pS}%,${pL+20}%,0.18)`);
+        grd.addColorStop(1,   `hsla(${pH},${pS}%,${pL+10}%,0)`);
+        ctx.fillStyle = grd;
+        ctx.fillRect(playheadX - 6, 0, 12, H);
+
+        // Crisp 1px line
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(playheadX, 2);
+        ctx.lineTo(playheadX, H - 2);
+        ctx.strokeStyle = `hsla(${pH},${pS}%,${Math.min(pL+28,95)}%,0.95)`;
+        ctx.lineWidth   = 1;
+        ctx.shadowColor = `hsl(${pH} ${pS}% ${pL}%)`;
+        ctx.shadowBlur  = 6;
+        ctx.stroke();
+        ctx.restore();
+
+        // Small knob at center
+        ctx.beginPath();
+        ctx.arc(playheadX, midY, 3.5, 0, Math.PI * 2);
+        ctx.fillStyle   = `hsl(${pH} ${pS}% ${Math.min(pL+30,96)}%)`;
+        ctx.shadowColor = `hsl(${pH} ${pS}% ${pL}%)`;
+        ctx.shadowBlur  = 10;
+        ctx.fill();
+        ctx.shadowBlur  = 0;
+      }
+
+      // ── Comment markers ──────────────────────────────────────────────
+      for (const ts of commentMarkers) {
+        if (duration <= 0) break;
+        const mx = (ts / duration) * W;
+        ctx.beginPath();
+        ctx.arc(mx, midY, 3, 0, Math.PI * 2);
+        ctx.fillStyle   = "rgba(234,179,8,0.92)";
+        ctx.shadowColor = "rgba(234,179,8,0.7)";
+        ctx.shadowBlur  = 6;
+        ctx.fill();
+        ctx.shadowBlur  = 0;
+      }
+    };
+
+    draw();
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [analyserRef, isPlaying, currentTime, duration, commentMarkers]);
 
   return (
-    <div ref={barRef} onMouseDown={handleMouseDown} onTouchStart={handleTouchStart}
-      className="group relative flex-1 h-5 flex items-center cursor-pointer select-none touch-none">
-      <div className="absolute inset-y-0 flex items-center w-full">
-        <div className="w-full h-1 bg-secondary rounded-full relative">
-          <div className="absolute inset-y-0 left-0 bg-primary rounded-full" style={{ width: `${pct}%` }} />
-          {duration > 0 && markers.map((ts) => (
-            <button key={ts} onClick={(e) => { e.stopPropagation(); onSeek(ts); }} title={formatTime(ts)}
-              className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-yellow-400 border-2 border-background z-10 hover:scale-150 transition-transform -translate-x-1/2"
-              style={{ left: `${(ts / duration) * 100}%` }} />
-          ))}
+    <div className="relative w-full" style={{ height: 40 }}>
+      {/* Timestamp hover tooltip */}
+      {hoverTime !== null && hoverPct !== null && (
+        <div
+          className="absolute bottom-full mb-1.5 -translate-x-1/2 pointer-events-none z-10"
+          style={{ left: `${hoverPct * 100}%` }}
+        >
+          <div className="px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold text-white/90 shadow-lg whitespace-nowrap"
+            style={{ background: "rgba(10,10,18,0.92)", border: "1px solid rgba(255,255,255,0.12)", backdropFilter: "blur(8px)" }}>
+            {formatTime(hoverTime)}
+          </div>
+          <div className="w-1.5 h-1.5 mx-auto -mt-[5px] rotate-45"
+            style={{ background: "rgba(10,10,18,0.92)", border: "0 solid transparent", borderRight: "1px solid rgba(255,255,255,0.12)", borderBottom: "1px solid rgba(255,255,255,0.12)" }} />
         </div>
-      </div>
-      <div className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white shadow-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 -translate-x-1/2"
-        style={{ left: `${pct}%` }} />
+      )}
+      <canvas
+        ref={canvasRef}
+        className="w-full h-full cursor-pointer select-none"
+        onClick={(e) => seekFromX(e.clientX, e.currentTarget.getBoundingClientRect())}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={() => setHoverPct(null)}
+        style={{ display: "block" }}
+      />
     </div>
   );
 }
@@ -106,47 +277,48 @@ function ProgressBar({
 // ── Queue drawer ────────────────────────────────────────────────────────────
 function QueueDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const player = useAudioPlayerContext();
-  const { queue, queueIndex, currentTrack, play, removeFromQueue, clearQueue } = player;
+  const { queue, queueIndex, play, removeFromQueue, clearQueue } = player;
 
   if (!open) return null;
   return (
     <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 z-[45] bg-black/40 md:bg-transparent md:pointer-events-none" onClick={onClose} />
-      {/* Panel */}
+      <div className="fixed inset-0 z-[45] bg-black/50 md:bg-transparent md:pointer-events-none" onClick={onClose} />
       <div className={cn(
-        "fixed z-[46] bg-card border border-border/60 shadow-2xl shadow-black/30 flex flex-col",
-        // Mobile: bottom sheet above player
-        "bottom-[72px] left-0 right-0 rounded-t-2xl max-h-[60vh]",
-        // Desktop: right-side panel above player
-        "md:bottom-[72px] md:right-4 md:left-auto md:w-80 md:rounded-2xl md:max-h-[70vh]",
-      )}>
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border/60 flex-shrink-0">
+        "fixed z-[46] flex flex-col overflow-hidden",
+        "bottom-[96px] left-0 right-0 rounded-t-2xl max-h-[60vh]",
+        "md:bottom-[96px] md:right-4 md:left-auto md:w-80 md:rounded-2xl md:max-h-[70vh]",
+        "border border-white/10 shadow-2xl",
+      )}
+        style={{ background: "rgba(10,10,15,0.97)", backdropFilter: "blur(28px)" }}
+      >
+        <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
+
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/8 flex-shrink-0">
           <div className="flex items-center gap-2">
-            <List className="h-4 w-4 text-primary" />
-            <span className="text-sm font-semibold">Cola de reproducción</span>
-            <span className="text-xs text-muted-foreground">({queue.length})</span>
+            <List className="h-4 w-4 text-primary drop-shadow-[0_0_5px_currentColor]" />
+            <span className="text-sm font-black text-white/90">Cola de reproducción</span>
+            <span className="text-xs text-white/30 tabular-nums bg-white/6 px-1.5 py-0.5 rounded-full border border-white/8">
+              {queue.length}
+            </span>
           </div>
           <div className="flex items-center gap-1">
             {queue.length > 0 && (
               <button onClick={clearQueue}
-                className="text-xs text-muted-foreground hover:text-red-400 px-2 py-1 rounded-xl hover:bg-secondary transition-all active:scale-95">
+                className="text-xs text-white/30 hover:text-red-400 px-2 py-1 rounded-xl hover:bg-red-500/10 transition-all active:scale-95">
                 Limpiar
               </button>
             )}
             <button onClick={onClose}
-              className="p-1.5 rounded-xl hover:bg-secondary transition-all active:scale-95 text-muted-foreground hover:text-foreground">
+              className="p-1.5 rounded-xl hover:bg-white/8 transition-all active:scale-95 text-white/40 hover:text-white/80">
               <X className="h-4 w-4" />
             </button>
           </div>
         </div>
 
-        {/* Track list */}
         <div className="overflow-y-auto flex-1">
           {queue.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-2">
-              <Music className="h-8 w-8 opacity-20" />
+            <div className="flex flex-col items-center justify-center py-12 text-white/20 gap-3">
+              <Music className="h-8 w-8 opacity-30" />
               <p className="text-sm">La cola está vacía</p>
             </div>
           ) : (
@@ -157,34 +329,43 @@ function QueueDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
                   <li key={track.id}
                     className={cn(
                       "flex items-center gap-3 px-4 py-2.5 group cursor-pointer transition-all active:scale-[0.99]",
-                      isCurrent ? "bg-primary/10" : "hover:bg-secondary/60"
+                      isCurrent
+                        ? "bg-gradient-to-r from-primary/20 via-primary/10 to-transparent border-l-2 border-primary/60"
+                        : "hover:bg-white/5"
                     )}
                     onClick={() => play(track)}
                   >
-                    <div className="w-7 h-7 rounded flex items-center justify-center flex-shrink-0 bg-secondary">
+                    <div className={cn(
+                      "w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 border",
+                      isCurrent ? "bg-primary/25 border-primary/40 shadow-[0_0_8px_hsl(var(--primary)/0.3)]" : "bg-white/5 border-white/8"
+                    )}>
                       {isCurrent && player.isPlaying ? (
                         <div className="flex gap-[2px] items-end h-4">
                           {[3, 5, 2, 4].map((h, k) => (
-                            <div key={k} className="w-0.5 bg-primary rounded-full animate-pulse"
-                              style={{ height: h * 2, animationDelay: `${k * 0.15}s` }} />
+                            <div key={k} className="w-[2px] rounded-full eq-bar"
+                              style={{
+                                height: h * 2.5,
+                                background: "linear-gradient(to top, hsl(var(--primary)), hsl(262 80% 75%))",
+                                animationDelay: `${k * 0.15}s`,
+                              }} />
                           ))}
                         </div>
                       ) : (
-                        <span className={cn("text-[10px] tabular-nums", isCurrent ? "text-primary font-bold" : "text-muted-foreground")}>{i + 1}</span>
+                        <span className={cn("text-[10px] tabular-nums font-black", isCurrent ? "text-primary" : "text-white/25")}>{i + 1}</span>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className={cn("text-sm truncate font-medium", isCurrent && "text-primary")}>{track.title}</p>
-                      <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
+                      <p className={cn("text-sm truncate font-black leading-tight", isCurrent ? "text-white" : "text-white/80")}>{track.title}</p>
+                      <p className="text-xs text-white/30 truncate mt-0.5">{track.artist}</p>
                     </div>
                     {track.duration && (
-                      <span className="text-[11px] text-muted-foreground tabular-nums flex-shrink-0">
+                      <span className="text-[11px] text-white/25 tabular-nums flex-shrink-0 font-mono">
                         {formatTime(track.duration)}
                       </span>
                     )}
                     <button
                       onClick={(e) => { e.stopPropagation(); removeFromQueue(track.id); }}
-                      className="p-1 rounded-xl opacity-0 group-hover:opacity-100 hover:bg-secondary hover:text-red-400 text-muted-foreground transition-all active:scale-95">
+                      className="p-1 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-500/20 hover:text-red-400 text-white/30 transition-all active:scale-95">
                       <X className="h-3.5 w-3.5" />
                     </button>
                   </li>
@@ -198,10 +379,36 @@ function QueueDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
   );
 }
 
-// ── Loop icon helper ────────────────────────────────────────────────────────
+// ── Helpers ─────────────────────────────────────────────────────────────────
 function LoopIcon({ mode }: { mode: LoopMode }) {
   if (mode === "one") return <Repeat1 className="h-3.5 w-3.5" />;
   return <Repeat className="h-3.5 w-3.5" />;
+}
+
+function CtrlBtn({
+  onClick, disabled, title, active, children, className,
+}: {
+  onClick?: () => void; disabled?: boolean; title?: string;
+  active?: boolean; children: React.ReactNode; className?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      data-tooltip={title}
+      className={cn(
+        "p-1.5 rounded-xl transition-all active:scale-95 flex items-center justify-center",
+        active
+          ? "text-primary bg-primary/18 shadow-[0_0_12px_hsl(var(--primary)/0.30)] border border-primary/25 player-ctrl-active"
+          : disabled
+          ? "text-white/12 cursor-not-allowed"
+          : "text-white/40 hover:text-white/90 hover:bg-white/8 border border-transparent hover:border-white/8",
+        className
+      )}
+    >
+      {children}
+    </button>
+  );
 }
 
 // ── Main player ────────────────────────────────────────────────────────────
@@ -210,6 +417,7 @@ export default function AudioPlayer() {
   const {
     currentTrack, isPlaying, currentTime, duration, volume, commentMarkers,
     queue, queueIndex, shuffle, loop, hasNext, hasPrev, playbackRate, setPlaybackRate,
+    analyserRef, resumeAudioContext,
   } = player;
 
   const [showQueue, setShowQueue] = useState(false);
@@ -218,278 +426,369 @@ export default function AudioPlayer() {
   const SPEED_STEPS = [0.75, 1, 1.25, 1.5, 2];
   function cycleSpeed() {
     const idx = SPEED_STEPS.indexOf(playbackRate);
-    const next = SPEED_STEPS[(idx + 1) % SPEED_STEPS.length];
-    setPlaybackRate(next);
+    setPlaybackRate(SPEED_STEPS[(idx + 1) % SPEED_STEPS.length]);
   }
 
-  // ── Keyboard shortcuts ────────────────────────────────────────────────
+  // ── Keyboard shortcuts ────────────────────────────────────────────
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       const target = e.target as HTMLElement;
       const isInput = ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable;
       if (isInput || !player.currentTrack) return;
-
       switch (e.code) {
-        case "Space":
-          e.preventDefault();
-          player.togglePlay();
-          break;
+        case "Space":       e.preventDefault(); resumeAudioContext(); player.togglePlay(); break;
         case "ArrowRight":
           if (e.altKey) { player.playNext(); break; }
-          e.preventDefault();
-          player.seek(Math.min(currentTime + 10, duration));
-          break;
+          e.preventDefault(); player.seek(Math.min(currentTime + 10, duration)); break;
         case "ArrowLeft":
           if (e.altKey) { player.playPrev(); break; }
-          e.preventDefault();
-          player.seek(Math.max(currentTime - 10, 0));
-          break;
-        case "KeyM":
-          player.setVolume(volume > 0 ? 0 : 0.8);
-          break;
-        case "KeyQ":
-          if (e.altKey) setShowQueue(v => !v);
-          break;
-        case "Escape":
-          if (showQueue) { setShowQueue(false); }
-          break;
+          e.preventDefault(); player.seek(Math.max(currentTime - 10, 0)); break;
+        case "KeyM": player.setVolume(volume > 0 ? 0 : 0.8); break;
+        case "KeyQ": if (e.altKey) setShowQueue(v => !v); break;
+        case "Escape": if (showQueue) setShowQueue(false); break;
       }
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [player, currentTime, duration, volume, showQueue]);
+  }, [player, currentTime, duration, volume, showQueue, resumeAudioContext]);
 
   if (!currentTrack) return null;
 
-  // Cover art del track actual (pasado explícitamente desde las páginas)
   const coverUrl = currentTrack.coverArt ?? null;
+  const pct      = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
     <>
       <QueueDrawer open={showQueue} onClose={() => setShowQueue(false)} />
 
-      <div className="fixed bottom-0 left-0 right-0 z-30 bg-card/85 backdrop-blur-2xl border-t border-border/50 shadow-[0_-8px_40px_hsl(var(--background)/0.9)] animate-in slide-in-from-bottom-4 duration-300">
-        {/* ── Barra de progreso — fina y con gradiente ──────────────────── */}
-        <div className="px-0">
-          <div className="relative h-1 group cursor-pointer" onClick={(e) => {
-            if (duration <= 0) return;
-            const rect = e.currentTarget.getBoundingClientRect();
-            player.seek(Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * duration);
-          }}>
-            {/* Track */}
-            <div className="absolute inset-0 bg-border/60" />
-            {/* Fill */}
-            <div
-              className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary via-primary to-primary/70 transition-none"
-              style={{ width: duration > 0 ? `${(currentTime / duration) * 100}%` : "0%" }}
-            />
-            {/* Glow on filled area */}
-            {isPlaying && (
-              <div
-                className="absolute inset-y-0 left-0 bg-primary/30 blur-sm"
-                style={{ width: duration > 0 ? `${(currentTime / duration) * 100}%` : "0%" }}
-              />
-            )}
-            {/* Thumb — aparece al hover */}
-            <div
-              className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white shadow-lg shadow-primary/30 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none -translate-x-1/2"
-              style={{ left: duration > 0 ? `${(currentTime / duration) * 100}%` : "0%" }}
-            />
-            {/* Markers (comentarios) */}
-            {duration > 0 && commentMarkers.map((ts) => (
-              <button key={ts} onClick={(e) => { e.stopPropagation(); player.seek(ts); }}
-                className="absolute top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-yellow-400 border border-background z-10 -translate-x-1/2 hover:scale-150 transition-transform"
-                style={{ left: `${(ts / duration) * 100}%` }} />
-            ))}
+      <div
+        className="fixed bottom-0 left-0 right-0 z-30 animate-in slide-in-from-bottom-4 duration-300"
+        style={{ filter: "drop-shadow(0 -24px 64px rgba(0,0,0,0.92))" }}
+      >
+        {/* ── Background ──────────────────────────────────────────────── */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute inset-0" style={{
+            background: "rgba(7,7,11,0.97)",
+            backdropFilter: "blur(48px) saturate(2)",
+          }} />
+          <div className="absolute inset-0 pointer-events-none" style={{
+            background: "linear-gradient(135deg, hsl(var(--section-hsl, 262 80% 62%) / 0.22) 0%, transparent 55%, hsl(var(--section-hsl, 262 80% 62%) / 0.12) 100%)",
+          }} />
+          {coverUrl && (
+            <div className="absolute inset-0 pointer-events-none opacity-[0.12] blur-3xl scale-110" style={{
+              backgroundImage: `url(${coverUrl})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }} />
+          )}
+        </div>
+
+        {/* ── Top accent line ──────────────────────────────────────────── */}
+        <div className="absolute top-0 left-0 right-0 h-[1.5px] pointer-events-none" style={{
+          background: "linear-gradient(90deg, transparent 0%, hsl(var(--section-hsl,262 80% 62%)/0.5) 15%, hsl(var(--primary)/1) 50%, hsl(var(--section-hsl,262 80% 62%)/0.5) 85%, transparent 100%)",
+          boxShadow: "0 0 16px hsl(var(--primary)/0.45)",
+        }} />
+
+        {/* ── Spectrum + time labels ────────────────────────────────────── */}
+        <div className="relative z-10 px-3 pt-2">
+          <SpectrumAnalyzer
+            analyserRef={analyserRef}
+            isPlaying={isPlaying}
+            currentTime={currentTime}
+            duration={duration}
+            commentMarkers={commentMarkers}
+            onSeek={player.seek}
+          />
+          <div className="flex justify-between mt-0.5 px-0.5">
+            <span className="text-[9px] tabular-nums font-mono text-white/30 select-none">{formatTime(currentTime)}</span>
+            <span className="text-[9px] tabular-nums font-mono text-white/18 select-none">
+              {duration > 0 ? formatTime(duration) : currentTrack.duration ? formatTime(currentTrack.duration) : "—"}
+            </span>
           </div>
         </div>
 
-        {/* Collapsed mini bar */}
+        {/* ── Collapsed mini bar ─────────────────────────────────────── */}
         {collapsed ? (
-          <div className="flex items-center gap-3 px-4 py-2">
-            <button onClick={player.togglePlay}
-              className={cn(
-                "w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-all active:scale-95",
-                "bg-primary text-primary-foreground hover:bg-primary/80",
-                isPlaying && "shadow-[0_0_12px_hsl(var(--primary)/0.5)]"
-              )}>
-              {isPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5 ml-0.5" />}
+          <div className="relative z-10 flex items-center gap-3 px-4 py-2">
+            {/* Progress line at bottom of collapsed bar */}
+            {duration > 0 && (
+              <div
+                className="player-collapsed-progress"
+                style={{ width: `${(currentTime / duration) * 100}%` }}
+              />
+            )}
+            <button
+              onClick={() => { resumeAudioContext(); player.togglePlay(); }}
+              className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 player-play-btn"
+            >
+              {isPlaying ? <Pause className="h-3.5 w-3.5 text-white" /> : <Play className="h-3.5 w-3.5 text-white ml-0.5" />}
             </button>
-            <div className="flex-1 min-w-0">
-              <p className={cn("text-xs font-semibold truncate leading-none", isPlaying && "text-primary")}>
-                {currentTrack.title}
-              </p>
-              <p className="text-[10px] text-muted-foreground truncate leading-none mt-0.5">{currentTrack.artist}</p>
+            <div className="flex-1 min-w-0 flex items-center gap-2.5">
+              <div className="min-w-0 flex-1">
+                <p className={cn("text-xs font-black truncate leading-none", isPlaying ? "text-white" : "text-white/70")}>
+                  {currentTrack.title}
+                </p>
+                <p className="text-[10px] text-white/30 truncate leading-none mt-0.5">{currentTrack.artist}</p>
+              </div>
+              {/* Mini EQ bars visible in collapsed state while playing */}
+              {isPlaying && (
+                <div className="flex gap-[2px] items-end h-4 flex-shrink-0">
+                  {[3, 5, 2, 4, 3].map((h, k) => (
+                    <div key={k} className="w-[2px] rounded-full eq-bar"
+                      style={{
+                        height: h * 2.8,
+                        background: "linear-gradient(to top, hsl(var(--primary)), hsl(262 80% 78%))",
+                        animationDelay: `${k * 0.12}s`,
+                      }} />
+                  ))}
+                </div>
+              )}
             </div>
-            <span className="text-[10px] text-muted-foreground tabular-nums flex-shrink-0">
-              {formatTime(currentTime)}{duration > 0 ? ` / ${formatTime(duration)}` : ""}
-            </span>
             <button onClick={() => setCollapsed(false)} title="Expandir"
-              className="p-1.5 rounded-xl hover:bg-secondary/80 text-muted-foreground transition-all active:scale-95 flex-shrink-0">
+              className="p-1.5 rounded-xl hover:bg-white/8 text-white/30 hover:text-white/70 transition-all active:scale-95 flex-shrink-0 border border-transparent hover:border-white/8">
               <ChevronUp className="h-3.5 w-3.5" />
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-2 px-3 py-2.5 max-w-screen-xl mx-auto">
+          /* ── Full expanded bar ────────────────────────────────────────── */
+          <div className="relative z-10 flex items-center gap-2 px-4 py-2.5 max-w-screen-xl mx-auto">
 
-            {/* ── Track info — cover art + nombre ─────────────────────── */}
-            <div className="flex items-center gap-3 w-[220px] min-w-0 flex-shrink-0">
-              {/* Cover / Equalizer */}
-              <div className={cn(
-                "relative w-10 h-10 rounded-xl flex-shrink-0 overflow-hidden flex items-center justify-center",
-                "bg-gradient-to-br from-primary/30 to-primary/5 border border-border/60",
-                isPlaying && "shadow-[0_0_12px_hsl(var(--primary)/0.3)]"
-              )}>
-                {coverUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={coverUrl} alt="" className="w-full h-full object-cover" />
-                ) : isPlaying ? (
-                  /* Ecualizador animado real con CSS classes */
-                  <div className="flex gap-[2.5px] items-end h-5 px-1">
-                    {[1,2,3,4,5].map((i) => (
-                      <div
-                        key={i}
-                        className="eq-bar w-[3px] bg-primary rounded-full"
-                        style={{ height: `${[60,100,45,80,55][i-1]}%` }}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <Music className="h-4 w-4 text-primary/50" />
+            {/* ── LEFT: Cover + info ────────────────────────────────── */}
+            <div className="flex items-center gap-3 w-[270px] min-w-0 flex-shrink-0">
+              {/* Cover art */}
+              <div className="relative flex-shrink-0">
+                {isPlaying && (
+                  <div className="absolute -inset-[4px] rounded-[18px] pointer-events-none animate-pulse" style={{
+                    boxShadow: "0 0 0 1.5px hsl(var(--primary)/0.55), 0 0 22px hsl(var(--primary)/0.40), 0 0 44px hsl(var(--primary)/0.16)",
+                    animationDuration: "2.2s",
+                  }} />
                 )}
-              </div>
-
-              <div className="min-w-0 flex-1">
-                <p className={cn(
-                  "text-sm font-semibold truncate leading-tight transition-colors",
-                  isPlaying ? "text-primary" : "text-foreground"
-                )}>
-                  {currentTrack.title}
-                </p>
-                <p className="text-[11px] text-muted-foreground truncate leading-tight mt-0.5">
-                  {currentTrack.artist}
-                </p>
-              </div>
-            </div>
-
-            {/* ── Center controls ───────────────────────────────────────── */}
-            <div className="flex-1 flex flex-col items-center gap-1 min-w-0">
-              <div className="flex items-center gap-1">
-                {/* Shuffle */}
-                <button onClick={player.toggleShuffle} title="Shuffle"
-                  className={cn("p-1.5 rounded-xl transition-all active:scale-95 hidden md:flex",
-                    shuffle ? "text-primary bg-primary/10 shadow-[0_0_8px_hsl(var(--primary)/0.2)]" : "text-muted-foreground hover:text-foreground hover:bg-secondary/80")}>
-                  <Shuffle className="h-3.5 w-3.5" />
-                </button>
-
-                {/* Prev */}
-                <button onClick={player.playPrev} disabled={!hasPrev} title="Anterior (Alt+←)"
-                  className={cn("p-1.5 rounded-xl transition-all",
-                    hasPrev ? "text-muted-foreground hover:text-foreground hover:bg-secondary/80 active:scale-95" : "text-muted-foreground/25 cursor-not-allowed")}>
-                  <SkipBack className="h-4 w-4" />
-                </button>
-
-                {/* -10s */}
-                <button onClick={() => player.seek(Math.max(0, currentTime - 10))} title="Retroceder 10s (←)"
-                  className="p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-all active:scale-95 hidden sm:flex items-center justify-center w-7 h-7">
-                  <span className="text-[9px] font-bold tabular-nums">-10</span>
-                </button>
-
-                {/* Play / Pause — botón principal */}
-                <button onClick={player.togglePlay} title={isPlaying ? "Pausar (Espacio)" : "Reproducir (Espacio)"}
-                  className={cn(
-                    "w-10 h-10 rounded-full flex items-center justify-center transition-all",
-                    "bg-primary text-primary-foreground hover:bg-primary/85 hover:scale-105 active:scale-95",
-                    isPlaying
-                      ? "shadow-[0_0_20px_hsl(var(--primary)/0.5),0_4px_12px_hsl(var(--primary)/0.3)]"
-                      : "shadow-[0_2px_8px_hsl(0_0%_0%/0.3)]"
-                  )}>
-                  {isPlaying
-                    ? <Pause className="h-4 w-4" />
-                    : <Play className="h-4 w-4 ml-0.5" />}
-                </button>
-
-                {/* +10s */}
-                <button onClick={() => player.seek(Math.min(duration, currentTime + 10))} title="Adelantar 10s (→)"
-                  className="p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-all active:scale-95 hidden sm:flex items-center justify-center w-7 h-7">
-                  <span className="text-[9px] font-bold tabular-nums">+10</span>
-                </button>
-
-                {/* Next */}
-                <button onClick={player.playNext} disabled={!hasNext} title="Siguiente (Alt+→)"
-                  className={cn("p-1.5 rounded-xl transition-all",
-                    hasNext ? "text-muted-foreground hover:text-foreground hover:bg-secondary/80 active:scale-95" : "text-muted-foreground/25 cursor-not-allowed")}>
-                  <SkipForward className="h-4 w-4" />
-                </button>
-
-                {/* Loop */}
-                <button onClick={player.cycleLoop} title="Modo repetición"
-                  className={cn("p-1.5 rounded-xl transition-all active:scale-95 hidden md:flex",
-                    loop !== "none" ? "text-primary bg-primary/10 shadow-[0_0_8px_hsl(var(--primary)/0.2)]" : "text-muted-foreground hover:text-foreground hover:bg-secondary/80")}>
-                  <LoopIcon mode={loop} />
-                </button>
-              </div>
-
-              {/* Tiempo */}
-              <div className="flex items-center gap-2 text-[10px] text-muted-foreground/60 tabular-nums">
-                <span className="text-muted-foreground">{formatTime(currentTime)}</span>
-                <span>/</span>
-                <span>{duration > 0 ? formatTime(duration) : (currentTrack.duration ? formatTime(currentTrack.duration) : "—")}</span>
-                {queue.length > 1 && (
-                  <span className="text-muted-foreground/40 ml-1">{queueIndex + 1}/{queue.length}</span>
+                {isPlaying && (
+                  <div className="absolute -inset-[7px] rounded-full pointer-events-none player-ring-spin" style={{
+                    background: "conic-gradient(from 0deg, hsl(var(--primary)/0.65) 0%, transparent 40%, hsl(var(--primary)/0.35) 70%, transparent 100%)",
+                    WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 2px), black calc(100% - 2px))",
+                    mask: "radial-gradient(farthest-side, transparent calc(100% - 2px), black calc(100% - 2px))",
+                  }} />
                 )}
-              </div>
-            </div>
-
-            {/* ── Right controls ────────────────────────────────────────── */}
-            <div className="hidden sm:flex items-center gap-1.5 w-[220px] justify-end flex-shrink-0">
-              {/* Speed */}
-              <button onClick={cycleSpeed} title={`Velocidad: ${playbackRate}x`}
-                className={cn(
-                  "px-2 py-1 rounded-xl text-[10px] font-bold tabular-nums transition-all active:scale-95 border",
-                  playbackRate !== 1
-                    ? "text-primary bg-primary/10 border-primary/20"
-                    : "text-muted-foreground border-transparent hover:text-foreground hover:bg-secondary/80 hover:border-border/60"
+                <div className={cn(
+                  "relative w-16 h-16 rounded-xl overflow-hidden flex items-center justify-center transition-all duration-500",
+                  "border player-cover-vinyl player-cover-shine",
+                  isPlaying
+                    ? "border-primary/50 shadow-[0_6px_28px_hsl(var(--primary)/0.40)]"
+                    : "border-white/12 shadow-[0_4px_18px_rgba(0,0,0,0.5)]"
                 )}>
-                {playbackRate}x
-              </button>
-
-              {/* Volume icon */}
-              <button onClick={() => player.setVolume(volume > 0 ? 0 : 0.8)} title="Silenciar (M)"
-                className="p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-all active:scale-95">
-                {volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-              </button>
-
-              {/* Volume bar */}
-              <div className="relative flex items-center w-16 h-5 group/vol cursor-pointer"
-                onClick={(e) => {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  player.setVolume(Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)));
-                }}>
-                <div className="w-full h-1 rounded-full bg-border/60 relative overflow-hidden">
-                  <div
-                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary/70 to-primary rounded-full transition-none"
-                    style={{ width: `${volume * 100}%` }}
-                  />
+                  {coverUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={coverUrl} alt="" className={cn(
+                      "w-full h-full object-cover transition-all duration-1000",
+                      isPlaying && "scale-[1.06] player-vinyl-spin"
+                    )} />
+                  ) : (
+                    <>
+                      <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-primary/12 to-violet-900/40" />
+                      <div className={cn(
+                        "relative z-[2] w-7 h-7 rounded-full flex items-center justify-center border border-primary/40",
+                        "bg-gradient-to-br from-primary/60 to-primary/30",
+                        isPlaying && "player-vinyl-spin shadow-[0_0_12px_hsl(var(--primary)/0.5)]"
+                      )}>
+                        {isPlaying ? (
+                          <div className="flex gap-[2px] items-end h-3.5">
+                            {[1,2,3,4,5].map((i) => (
+                              <div key={i} className="eq-bar rounded-full" style={{
+                                width: "2px",
+                                height: `${[55,100,40,75,50][i-1]}%`,
+                                background: "linear-gradient(to top, hsl(var(--primary)), hsl(262 80% 80%))",
+                              }} />
+                            ))}
+                          </div>
+                        ) : (
+                          <Music className="h-3.5 w-3.5 text-primary/70" />
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
+              {/* Title + artist */}
+              <div className="min-w-0 flex-1">
+                {isPlaying ? (
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <div className="player-now-dot" />
+                    <span className="text-[9px] font-black uppercase tracking-widest text-primary/80 drop-shadow-[0_0_4px_hsl(var(--primary)/0.6)]">
+                      Reproduciendo
+                    </span>
+                  </div>
+                ) : (
+                  <div className="mb-1">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-white/20">En pausa</span>
+                  </div>
+                )}
+                <div className="player-marquee-wrap">
+                  <p className={cn(
+                    "text-sm font-black leading-tight transition-colors player-marquee-inner",
+                    isPlaying ? "text-white" : "text-white/65"
+                  )}>
+                    {currentTrack.title}
+                  </p>
+                </div>
+                <p className="text-[11px] text-white/35 truncate leading-tight mt-0.5 font-medium">
+                  {currentTrack.artist}
+                </p>
+                {/* BPM + Key badges */}
+                {(currentTrack.bpm || currentTrack.keySignature) && (
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    {currentTrack.bpm && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-black font-mono tabular-nums"
+                        style={{ background: "rgba(96,165,250,0.15)", color: "rgba(147,197,253,0.9)", border: "1px solid rgba(96,165,250,0.2)" }}>
+                        {currentTrack.bpm} BPM
+                      </span>
+                    )}
+                    {currentTrack.keySignature && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black"
+                        style={{ background: "rgba(192,132,252,0.15)", color: "rgba(216,180,254,0.9)", border: "1px solid rgba(192,132,252,0.2)" }}>
+                        {currentTrack.keySignature}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ── Separator ─────────────────────────────────────────── */}
+            <div className="hidden lg:block w-px h-10 bg-white/8 flex-shrink-0 mx-1" />
+
+            {/* ── CENTER: Controls ──────────────────────────────────── */}
+            <div className="flex-1 flex flex-col items-center gap-1 min-w-0">
+              <div className="flex items-center gap-1">
+                <CtrlBtn onClick={player.toggleShuffle} title="Aleatorio" active={shuffle} className="hidden md:flex">
+                  <Shuffle className="h-3.5 w-3.5" />
+                </CtrlBtn>
+
+                <CtrlBtn onClick={player.playPrev} disabled={!hasPrev} title="Anterior (Alt+←)">
+                  <SkipBack className="h-4 w-4" />
+                </CtrlBtn>
+
+                <CtrlBtn onClick={() => player.seek(Math.max(0, currentTime - 10))} title="Retroceder 10s (←)" className="hidden sm:flex w-8 h-8">
+                  <span className="text-[9px] font-black tabular-nums leading-none">-10s</span>
+                </CtrlBtn>
+
+                {/* ── Play / Pause ─────────────────────────────────── */}
+                <div className="relative mx-2">
+                  <button
+                    onClick={() => { resumeAudioContext(); player.togglePlay(); }}
+                    title={isPlaying ? "Pausar (Espacio)" : "Reproducir (Espacio)"}
+                    className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 player-play-btn relative z-10"
+                  >
+                    {isPlaying
+                      ? <Pause className="h-5 w-5 text-white" />
+                      : <Play className="h-5 w-5 text-white ml-0.5" />}
+                  </button>
+                </div>
+
+                <CtrlBtn onClick={() => player.seek(Math.min(duration, currentTime + 10))} title="Adelantar 10s (→)" className="hidden sm:flex w-8 h-8">
+                  <span className="text-[9px] font-black tabular-nums leading-none">+10s</span>
+                </CtrlBtn>
+
+                <CtrlBtn onClick={player.playNext} disabled={!hasNext} title="Siguiente (Alt+→)">
+                  <SkipForward className="h-4 w-4" />
+                </CtrlBtn>
+
+                <CtrlBtn onClick={player.cycleLoop} title="Modo repetición" active={loop !== "none"} className="hidden md:flex">
+                  <LoopIcon mode={loop} />
+                </CtrlBtn>
+              </div>
+
+              {queue.length > 1 && (
+                <div className="flex items-center gap-1 text-[9px] text-white/25 tabular-nums select-none">
+                  <span className="text-white/40 font-black">{queueIndex + 1}</span>
+                  <span className="text-white/15">/ {queue.length}</span>
+                </div>
+              )}
+            </div>
+
+            {/* ── Separator ─────────────────────────────────────────── */}
+            <div className="hidden lg:block w-px h-10 bg-white/8 flex-shrink-0 mx-1" />
+
+            {/* ── RIGHT: Speed, volume, queue, collapse ─────────────── */}
+            <div className="hidden sm:flex items-center gap-1.5 w-[250px] justify-end flex-shrink-0">
+
+              {/* Speed */}
+              <button onClick={cycleSpeed} data-tooltip={`Velocidad: ${playbackRate}x`}
+                className={cn(
+                  "px-2.5 py-1 rounded-full text-[10px] font-black tabular-nums transition-all active:scale-95 border",
+                  playbackRate !== 1
+                    ? "text-primary bg-primary/18 border-primary/30 shadow-[0_0_10px_hsl(var(--primary)/0.25)]"
+                    : "text-white/35 border-white/10 hover:text-white/65 hover:bg-white/8 hover:border-white/18"
+                )}
+              >
+                {playbackRate}×
+              </button>
+
+              <div className="w-px h-5 bg-white/8 mx-0.5" />
+
+              {/* Volume icon */}
+              <button
+                onClick={() => player.setVolume(volume > 0 ? 0 : 0.8)}
+                data-tooltip="Silenciar (M)"
+                className="p-1.5 rounded-xl transition-all active:scale-95 border border-transparent text-white/50 hover:text-white/90 hover:bg-white/8 hover:border-white/8"
+              >
+                {volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+              </button>
+
+              {/* Volume slider */}
+              <div
+                className="player-vol-wrap relative flex items-center w-20 h-6 cursor-pointer group/vol"
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  player.setVolume(Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)));
+                }}
+              >
+                <div className="w-full" style={{ padding: "8px 0" }}>
+                  <div className="player-vol-track w-full relative overflow-visible" style={{ background: "rgba(255,255,255,0.10)" }}>
+                    <div
+                      className="absolute inset-y-0 left-0 rounded-full transition-none"
+                      style={{
+                        width: `${volume * 100}%`,
+                        background: "linear-gradient(90deg, hsl(var(--primary)/0.65), hsl(var(--primary)))",
+                        boxShadow: volume > 0 ? "0 0 6px hsl(var(--primary)/0.4)" : "none",
+                      }}
+                    />
+                    <div
+                      className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white opacity-0 group-hover/vol:opacity-100 transition-opacity -translate-x-1/2 pointer-events-none border border-white/40"
+                      style={{ left: `${volume * 100}%`, boxShadow: "0 0 6px rgba(255,255,255,0.8), 0 0 12px hsl(var(--primary)/0.4)" }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="w-px h-5 bg-white/8 mx-0.5" />
+
               {/* Queue */}
-              <button onClick={() => setShowQueue(v => !v)}
-                title={`Cola (Alt+Q)${queue.length > 0 ? ` · ${queue.length} pistas` : ""}`}
-                className={cn("p-1.5 rounded-xl transition-all active:scale-95 relative",
-                  showQueue ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-secondary/80")}>
+              <button
+                onClick={() => setShowQueue(v => !v)}
+                data-tooltip={`Cola (Alt+Q)${queue.length > 0 ? ` · ${queue.length} pistas` : ""}`}
+                className={cn(
+                  "p-1.5 rounded-xl transition-all active:scale-95 relative border",
+                  showQueue
+                    ? "text-primary bg-primary/18 border-primary/30 shadow-[0_0_10px_hsl(var(--primary)/0.25)]"
+                    : "text-white/40 border-transparent hover:text-white/80 hover:bg-white/8 hover:border-white/8"
+                )}
+              >
                 <List className="h-4 w-4" />
                 {queue.length > 1 && (
-                  <span className="absolute -top-1 -right-1 text-[8px] bg-primary text-primary-foreground rounded-full w-3.5 h-3.5 flex items-center justify-center font-bold tabular-nums leading-none">
+                  <span className="absolute -top-1 -right-1 text-[8px] bg-primary text-primary-foreground rounded-full w-4 h-4 flex items-center justify-center font-black tabular-nums leading-none shadow-[0_0_8px_hsl(var(--primary)/0.6)] border border-primary/50">
                     {queue.length > 9 ? "9+" : queue.length}
                   </span>
                 )}
               </button>
 
               {/* Collapse */}
-              <button onClick={() => setCollapsed(true)} title="Minimizar"
-                className="p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-all active:scale-95">
+              <button
+                onClick={() => setCollapsed(true)}
+                data-tooltip="Minimizar"
+                className="p-1.5 rounded-xl text-white/20 hover:text-white/60 hover:bg-white/8 transition-all active:scale-95 border border-transparent hover:border-white/8"
+              >
                 <ChevronDown className="h-4 w-4" />
               </button>
             </div>

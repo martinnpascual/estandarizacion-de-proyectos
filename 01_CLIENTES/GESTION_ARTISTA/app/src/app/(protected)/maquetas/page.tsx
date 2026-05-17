@@ -76,11 +76,22 @@ const STATUS_LEFT_BORDER: Record<DraftStatus, string> = {
 };
 
 const STATUS_GRADIENT_THUMB: Record<DraftStatus, string> = {
-  borrador: "from-zinc-600/40 to-zinc-800/20",
-  en_mezcla: "from-blue-600/40 to-blue-900/20",
-  masterizada: "from-purple-600/40 to-purple-900/20",
-  lista_para_publicar: "from-green-600/40 to-green-900/20",
+  borrador:            "from-slate-600/80 via-slate-800/70 to-slate-900/80",
+  en_mezcla:           "from-blue-500/80 via-blue-700/70 to-blue-900/80",
+  masterizada:         "from-purple-500/80 via-purple-700/70 to-purple-900/80",
+  lista_para_publicar: "from-emerald-500/80 via-emerald-700/70 to-emerald-900/80",
 };
+
+// Colores de las barras del waveform por estado
+const STATUS_WAVEFORM_COLOR: Record<DraftStatus, string> = {
+  borrador:            "bg-slate-300",
+  en_mezcla:           "bg-blue-300",
+  masterizada:         "bg-purple-300",
+  lista_para_publicar: "bg-emerald-300",
+};
+
+// Alturas (px) de las 5 barras del waveform — perfil asimétrico estilo audio
+const WAVEFORM_BARS = [5, 9, 13, 7, 11];
 
 // Solid hex colors for the pipeline bar segments
 const STATUS_BAR_COLOR: Record<DraftStatus, string> = {
@@ -271,6 +282,8 @@ export default function MaquetasPage() {
       artist: d.producer ?? "Sin productor",
       url: audioUrl,
       coverArt: d.cover_art_url ?? undefined,
+      bpm: d.bpm ?? undefined,
+      keySignature: d.key_signature ?? undefined,
     };
   }
 
@@ -499,18 +512,29 @@ export default function MaquetasPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/8 via-transparent to-transparent" />
-        <div className="absolute -top-16 -right-16 w-48 h-48 bg-blue-500/6 rounded-full blur-3xl" />
+      <div className="card-premium relative overflow-hidden rounded-2xl">
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-transparent to-transparent" />
+        <div className="absolute -top-16 -right-16 w-56 h-56 bg-blue-500/8 rounded-full blur-3xl" />
         <div className="relative px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/30 to-blue-600/10 border border-blue-500/20 flex items-center justify-center flex-shrink-0">
-              <FileAudio className="h-5 w-5 text-blue-400" />
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500/30 to-blue-600/8 border border-blue-500/25 flex items-center justify-center flex-shrink-0 shadow-[0_0_20px_hsl(220_80%_60%/0.18)]">
+              <FileAudio className="h-6 w-6 text-blue-400 drop-shadow-[0_0_6px_hsl(220_80%_60%/0.5)]" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">Maquetas</h1>
+              <h1 className="text-xl font-black tracking-tight gradient-text">Maquetas</h1>
               <p className="text-muted-foreground text-xs mt-0.5">
-                Canciones en progreso · {!loading && <span className="text-foreground/60 font-medium">{drafts.length} total</span>}
+                {!loading && drafts.length > 0 ? (
+                  <>
+                    <span className="tabular-nums text-foreground/60 font-medium">{drafts.length}</span>
+                    {" "}maqueta{drafts.length !== 1 ? "s" : ""}
+                    {(() => {
+                      const withAudio = drafts.filter(d => !!d.drive_file_id || !!d.drive_file_url).length;
+                      return withAudio > 0
+                        ? <> · <span className="tabular-nums">{withAudio}</span> con audio</>
+                        : null;
+                    })()}
+                  </>
+                ) : "Canciones en progreso"}
               </p>
             </div>
           </div>
@@ -570,7 +594,7 @@ export default function MaquetasPage() {
                 setEditingDraft(undefined);
                 setShowForm(true);
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-all active:scale-95 text-sm font-semibold shadow-[0_0_16px_hsl(var(--primary)/0.25)]"
+              className="btn-shine flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 hover:scale-[1.02] transition-all active:scale-95 text-sm font-black shadow-[0_0_20px_hsl(var(--primary)/0.35)]"
             >
               <Plus className="h-4 w-4" />
               Nueva
@@ -622,8 +646,8 @@ export default function MaquetasPage() {
                   className={cn(
                     "px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all active:scale-95",
                     selectedYear === year
-                      ? "bg-blue-500/20 text-blue-400 font-semibold"
-                      : "bg-secondary text-muted-foreground hover:text-foreground"
+                      ? "bg-blue-500/25 text-blue-400 font-black shadow-[0_2px_10px_hsl(220_80%_60%/0.2),inset_0_1px_0_hsl(0_0%_100%/0.08)] border border-blue-500/25"
+                      : "bg-secondary text-muted-foreground hover:text-foreground border border-transparent"
                   )}
                 >
                   {year}
@@ -637,7 +661,7 @@ export default function MaquetasPage() {
             })}
           </div>
           {!loading && (
-            <span className="flex-shrink-0 text-xs text-muted-foreground bg-secondary px-2.5 py-1 rounded-full tabular-nums">
+            <span className="stat-badge flex-shrink-0 text-muted-foreground">
               {displayedDrafts.length} maqueta{displayedDrafts.length !== 1 ? "s" : ""}
             </span>
           )}
@@ -653,7 +677,7 @@ export default function MaquetasPage() {
           placeholder="Buscar maqueta o productor… (/)"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-10 pr-10 py-2.5 bg-card/80 border border-border/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-all placeholder:text-muted-foreground/40"
+          className="w-full pl-10 pr-10 py-3 bg-card/60 backdrop-blur-md border border-border/50 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/35 focus:border-primary/35 focus:bg-card/80 transition-all placeholder:text-muted-foreground/35"
         />
         {searchQuery && (
           <button
@@ -678,8 +702,8 @@ export default function MaquetasPage() {
                 className={cn(
                   "flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full transition-all active:scale-95",
                   missingAudioFilter
-                    ? "bg-orange-500/20 text-orange-400 border border-orange-500/30"
-                    : "bg-secondary text-muted-foreground hover:text-foreground"
+                    ? "bg-orange-500/18 text-orange-400 border border-orange-500/40 font-black shadow-[0_0_10px_hsl(30_80%_50%/0.15)]"
+                    : "bg-secondary text-muted-foreground hover:text-foreground font-medium"
                 )}
               >
                 <FileAudio className="h-3 w-3 flex-shrink-0" />
@@ -693,8 +717,8 @@ export default function MaquetasPage() {
                 className={cn(
                   "flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full transition-all active:scale-95",
                   missingBpmFilter
-                    ? "bg-violet-500/20 text-violet-400 border border-violet-500/30"
-                    : "bg-secondary text-muted-foreground hover:text-foreground"
+                    ? "bg-violet-500/18 text-violet-400 border border-violet-500/40 font-black shadow-[0_0_10px_hsl(260_80%_60%/0.15)]"
+                    : "bg-secondary text-muted-foreground hover:text-foreground font-medium"
                 )}
               >
                 <Zap className="h-3 w-3 flex-shrink-0" />
@@ -722,7 +746,7 @@ export default function MaquetasPage() {
       )}
 
       {/* Vista Lista */}
-      <div className={cn("bg-card/80 backdrop-blur-sm rounded-2xl border border-border/60 overflow-hidden", viewMode === "board" ? "hidden" : "")}>
+      <div className={cn("card-premium rounded-2xl overflow-hidden", viewMode === "board" ? "hidden" : "")}>
         {loading ? (
           <div>
             {Array.from({ length: 6 }).map((_, i) => <SongRowSkeleton key={i} />)}
@@ -739,7 +763,7 @@ export default function MaquetasPage() {
           </div>
         ) : drafts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center px-4">
-            <div className="relative mb-5">
+            <div className="relative mb-5 empty-state-icon">
               <div className="absolute inset-0 bg-blue-500/20 rounded-2xl blur-xl scale-125" />
               <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500/20 to-blue-700/10 border border-blue-500/20 flex items-center justify-center">
                 <FileAudio className="h-8 w-8 text-blue-400/60" />
@@ -781,15 +805,16 @@ export default function MaquetasPage() {
               // Grouped by month view
               draftsByMonth.map(({ month, label, drafts: groupDrafts }) => (
                 <div key={month}>
-                  <div className="px-4 py-2 bg-secondary/30 border-b border-border/50 flex items-center gap-2">
-                    <span className="text-[11px] font-bold text-muted-foreground/70 tracking-wide uppercase">{label}</span>
-                    <span className="text-[10px] text-muted-foreground/40 tabular-nums bg-secondary px-1.5 py-0.5 rounded-full">
+                  <div className="section-group-header">
+                    <span className="section-group-header-label">{label}</span>
+                    <div className="flex-1 h-px bg-gradient-to-r from-border/50 to-transparent" />
+                    <span className="text-[10px] text-muted-foreground/70 bg-secondary/80 border border-border/40 px-2 py-0.5 rounded-full tabular-nums font-bold">
                       {groupDrafts.length}
                     </span>
                   </div>
                   <div className="divide-y divide-border/50">
                     {groupDrafts.map((draft) => (
-                      <div key={draft.id} id={`draft-row-${draft.id}`} className="bg-card">
+                      <div key={draft.id} id={`draft-row-${draft.id}`} className="row-interactive">
                         <DraftRow
                           draft={draft}
                           isPlaying={player.currentTrack?.id === draft.id && player.isPlaying}
@@ -826,7 +851,7 @@ export default function MaquetasPage() {
               // Flat list (when filtering / sorting differently)
               <div className="divide-y divide-border/50">
                 {displayedDrafts.map((draft) => (
-                  <div key={draft.id} id={`draft-row-${draft.id}`} className="bg-card">
+                  <div key={draft.id} id={`draft-row-${draft.id}`}>
                     <DraftRow
                       draft={draft}
                       isPlaying={player.currentTrack?.id === draft.id && player.isPlaying}
@@ -865,7 +890,7 @@ export default function MaquetasPage() {
       {/* Bulk action floating bar */}
       {selectedIds.size > 0 && (
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 animate-slide-up">
-          <div className="flex items-center gap-2 px-4 py-3 bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl shadow-2xl shadow-black/40">
+          <div className="flex items-center gap-2 px-4 py-3 glass-panel rounded-2xl">
             <button
               onClick={() => setSelectedIds(new Set())}
               className="p-1.5 rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground transition-all active:scale-95"
@@ -873,7 +898,7 @@ export default function MaquetasPage() {
             >
               <X className="h-4 w-4" />
             </button>
-            <span className="text-sm font-semibold tabular-nums text-primary mr-1">
+            <span className="text-sm font-black tabular-nums text-primary mr-1">
               {selectedIds.size} seleccionada{selectedIds.size !== 1 ? "s" : ""}
             </span>
             <div className="w-px h-5 bg-border/60" />
@@ -1011,11 +1036,15 @@ function DraftRow({
     <div
       className={cn(
         "border-l-2 transition-all group",
-        STATUS_LEFT_BORDER[draft.status],
-        selected ? "bg-primary/5 border-l-primary/60" : isPlaying ? "bg-primary/5" : "hover:bg-secondary/30",
+        selected
+          ? "bg-primary/5 border-l-primary/60"
+          : isPlaying
+            ? "row-is-playing border-l-primary"
+            : STATUS_LEFT_BORDER[draft.status],
+        !selected && !isPlaying && "row-hover",
       )}
     >
-    <div className="flex items-center gap-3 px-4 py-3">
+    <div className="flex items-center gap-3 px-4 py-3.5">
       {/* Checkbox de selección */}
       <button
         onClick={onSelect}
@@ -1032,14 +1061,30 @@ function DraftRow({
       </button>
       {/* Cover art thumbnail / Play button */}
       <div className={cn(
-        "w-9 h-9 flex-shrink-0 relative rounded-xl overflow-hidden border border-border/60 flex items-center justify-center",
-        draft.cover_art_url ? "" : `bg-gradient-to-br ${STATUS_GRADIENT_THUMB[draft.status]}`
+        "w-11 h-11 flex-shrink-0 relative rounded-xl overflow-hidden flex items-center justify-center",
+        draft.cover_art_url
+          ? "border border-border/60"
+          : `bg-gradient-to-br ${STATUS_GRADIENT_THUMB[draft.status]} border border-white/5`
       )}>
         {draft.cover_art_url ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img src={draft.cover_art_url} alt="" className="w-full h-full object-cover" />
         ) : (
-          <FileAudio className="h-4 w-4 text-white/30" />
+          /* Waveform decorativo — barras asimétricas, animadas si está reproduciendo */
+          <div className="flex gap-[2.5px] items-end h-4 px-0.5">
+            {WAVEFORM_BARS.map((h, i) => (
+              <div
+                key={i}
+                className={cn(
+                  "w-[3px] rounded-full",
+                  isPlaying
+                    ? cn("opacity-90 waveform-bar-animated", STATUS_WAVEFORM_COLOR[draft.status])
+                    : cn("opacity-60", STATUS_WAVEFORM_COLOR[draft.status])
+                )}
+                style={{ height: `${h}px` }}
+              />
+            ))}
+          </div>
         )}
         {/* Play overlay */}
         {hasAudio && (
@@ -1064,15 +1109,15 @@ function DraftRow({
       <div className="flex-1 min-w-0">
         <p
           className={cn(
-            "text-sm font-medium truncate",
-            isPlaying && "text-primary"
+            "text-[13px] font-black truncate leading-tight",
+            isPlaying ? "text-primary" : "text-foreground/90"
           )}
         >
           {draft.title}
         </p>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
           {draft.producer && (
-            <span className="text-xs text-muted-foreground truncate">
+            <span className="text-[11px] text-muted-foreground/70 truncate">
               {draft.producer}
             </span>
           )}
@@ -1105,6 +1150,32 @@ function DraftRow({
             );
           })()}
         </div>
+      </div>
+
+      {/* Pipeline micro-steps */}
+      <div className="hidden sm:flex items-center gap-[5px] flex-shrink-0 mr-1">
+        {(["borrador","en_mezcla","masterizada","lista_para_publicar"] as DraftStatus[]).map((s, i) => {
+          const stepIdx = ["borrador","en_mezcla","masterizada","lista_para_publicar"].indexOf(draft.status);
+          const isDone    = i <= stepIdx;
+          const isCurrent = i === stepIdx;
+          return (
+            <div
+              key={s}
+              title={s === "borrador" ? "Borrador" : s === "en_mezcla" ? "En mezcla" : s === "masterizada" ? "Masterizada" : "Lista para publicar"}
+              className={cn(
+                "rounded-full transition-all duration-300",
+                isCurrent ? "w-2 h-2" : "w-1.5 h-1.5"
+              )}
+              style={isDone
+                ? {
+                    background: STATUS_BAR_COLOR[s],
+                    boxShadow: isCurrent ? `0 0 5px ${STATUS_BAR_COLOR[s]}cc` : undefined,
+                  }
+                : { background: "rgba(255,255,255,0.12)" }
+              }
+            />
+          );
+        })}
       </div>
 
       {/* Estado */}
@@ -1141,7 +1212,7 @@ function DraftRow({
       {isReady && (
         <button
           onClick={onPublish}
-          className="hidden group-hover:flex items-center gap-1 px-2.5 py-1 rounded-xl bg-green-600 text-white text-xs font-semibold hover:bg-green-700 transition-all active:scale-95 flex-shrink-0"
+          className="hidden group-hover:flex items-center gap-1 px-2.5 py-1 rounded-xl bg-green-600 text-white text-xs font-black hover:bg-green-700 transition-all active:scale-95 flex-shrink-0"
         >
           <Upload className="h-3 w-3" />
           Publicar
