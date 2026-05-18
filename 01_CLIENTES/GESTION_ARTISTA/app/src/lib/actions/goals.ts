@@ -5,6 +5,7 @@ import { GoalSchema } from "@/lib/schemas";
 import type { GoalFormData } from "@/lib/schemas";
 import type { Goal } from "@/types/database";
 import { revalidatePath } from "next/cache";
+import { fetchYouTubeGoalStat } from "@/lib/social-sync";
 
 // ─── Get all goals ────────────────────────────────────────────────────────────
 export async function getGoals(filters?: {
@@ -73,6 +74,47 @@ export async function updateGoal(
   if (error) return { data: null, error: error.message };
   revalidatePath("/metas");
   return { data: data as Goal, error: null };
+}
+
+// ─── Manual sync: fetch YouTube stat now and update current_value ─────────────
+export async function syncGoalNow(
+  id: string
+): Promise<{ newValue: number | null; metric: string; error: string | null }> {
+  const supabase = await createServerSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { newValue: null, metric: "", error: "No autenticado" };
+
+  // Fetch the goal's platform_url
+  const { data: goal, error: fetchErr } = await supabase
+    .from("goals")
+    .select("id, platform_url, current_value")
+    .eq("id", id)
+    .eq("created_by", user.id)
+    .single();
+
+  if (fetchErr || !goal) return { newValue: null, metric: "", error: "Meta no encontrada" };
+  if (!goal.platform_url) return { newValue: null, metric: "", error: "Esta meta no tiene URL configurada" };
+
+  const url: string = goal.platform_url;
+  const isYouTube = url.includes("youtube.com") || url.includes("youtu.be");
+  if (!isYouTube) return { newValue: null, metric: "", error: "Solo se soportan URLs de YouTube" };
+
+  const stat = await fetchYouTubeGoalStat(url);
+  if (stat.error || stat.value === null) {
+    return { newValue: null, metric: stat.metric, error: stat.error ?? "No se pudo obtener el dato" };
+  }
+
+  // Update the goal
+  const { error: updateErr } = await supabase
+    .from("goals")
+    .update({ current_value: stat.value, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("created_by", user.id);
+
+  if (updateErr) return { newValue: null, metric: stat.metric, error: updateErr.message };
+
+  revalidatePath("/metas");
+  return { newValue: stat.value, metric: stat.metric, error: null };
 }
 
 // ─── Delete goal ──────────────────────────────────────────────────────────────

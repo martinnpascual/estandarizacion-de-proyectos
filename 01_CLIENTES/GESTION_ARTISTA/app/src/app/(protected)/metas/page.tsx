@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getGoals, createGoal, updateGoal, deleteGoal } from "@/lib/actions/goals";
+import { getGoals, createGoal, updateGoal, deleteGoal, syncGoalNow } from "@/lib/actions/goals";
 import type { Goal } from "@/types/database";
 import type { GoalFormData } from "@/lib/schemas";
 import { GoalSchema } from "@/lib/schemas";
@@ -294,12 +294,20 @@ interface GoalCardProps {
   onDelete: (id: string) => void;
   onUpdateProgress: (id: string, current_value: number) => void;
   onEdit: (goal: Goal) => void;
+  onSyncNow: (id: string) => Promise<void>;
 }
 
-function GoalCard({ goal, onToggle, onDelete, onUpdateProgress, onEdit }: GoalCardProps) {
+function GoalCard({ goal, onToggle, onDelete, onUpdateProgress, onEdit, onSyncNow }: GoalCardProps) {
   const percent = Math.min(100, Math.round((goal.current_value / goal.target_value) * 100));
   const [editing, setEditing] = useState(false);
   const [tempValue, setTempValue] = useState(String(goal.current_value));
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    await onSyncNow(goal.id);
+    setSyncing(false);
+  };
 
   const saveProgress = () => {
     const val = parseFloat(tempValue);
@@ -329,13 +337,15 @@ function GoalCard({ goal, onToggle, onDelete, onUpdateProgress, onEdit }: GoalCa
               <div className="flex items-center gap-1.5">
                 <p className="text-[11px] text-muted-foreground">{CATEGORY_LABELS[goal.category]}</p>
                 {goal.auto_update && (
-                  <span
-                    className="flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/20 font-medium"
-                    title="Se actualiza automáticamente desde YouTube"
+                  <button
+                    onClick={handleSync}
+                    disabled={syncing}
+                    title={syncing ? "Actualizando…" : "Sincronizar ahora desde YouTube"}
+                    className="flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/20 font-medium hover:bg-red-500/25 transition-all active:scale-95 disabled:opacity-60"
                   >
-                    <RefreshCw className="h-2.5 w-2.5" />
-                    Auto
-                  </span>
+                    <RefreshCw className={`h-2.5 w-2.5 ${syncing ? "animate-spin" : ""}`} />
+                    {syncing ? "…" : "Auto"}
+                  </button>
                 )}
               </div>
             </div>
@@ -558,6 +568,16 @@ export default function MetasPage() {
     if (error) toastError(error);
   };
 
+  const handleSyncNow = async (id: string) => {
+    const { newValue, metric, error } = await syncGoalNow(id);
+    if (error) { toastError(error); return; }
+    if (newValue !== null) {
+      setGoals((prev) => prev.map((g) => g.id === id ? { ...g, current_value: newValue } : g));
+      const label = metric === "views" ? "vistas" : "suscriptores";
+      toastSuccess(`Actualizado: ${newValue.toLocaleString("es-AR")} ${label}`);
+    }
+  };
+
   const handleExportCSV = () => {
     if (!goals.length) return;
     const rows = [
@@ -773,6 +793,7 @@ export default function MetasPage() {
                   onDelete={handleDelete}
                   onUpdateProgress={handleUpdateProgress}
                   onEdit={setEditingGoal}
+                  onSyncNow={handleSyncNow}
                 />
               </StaggerItem>
             ))}
