@@ -84,14 +84,18 @@ function ToastItem({
   return (
     <div
       className={cn(
-        "flex items-start gap-3 px-4 py-3 rounded-2xl shadow-2xl shadow-black/30 border text-sm min-w-[260px] max-w-xs transition-all duration-300 backdrop-blur-xl",
-        META.classes,
+        "relative glass-panel flex items-start gap-3 px-4 py-3 rounded-2xl text-sm min-w-[260px] max-w-xs transition-all duration-300 overflow-hidden",
+        toast.type === "success" && "border-l-2 border-l-green-500/70",
+        toast.type === "error" && "border-l-2 border-l-red-500/70",
+        toast.type === "info" && "border-l-2 border-l-primary/70",
         visible
           ? "opacity-100 translate-x-0"
           : "opacity-0 translate-x-4"
       )}
     >
-      <Icon className={cn("h-4 w-4 flex-shrink-0 mt-0.5", META.iconClass)} />
+      <span className={cn("toast-icon-wrap flex-shrink-0", toast.type)}>
+        <Icon className={cn("h-3.5 w-3.5", META.iconClass)} />
+      </span>
       <p className="flex-1 leading-snug">{toast.message}</p>
       <button
         onClick={() => {
@@ -102,6 +106,19 @@ function ToastItem({
       >
         <X className="h-3.5 w-3.5" />
       </button>
+      {/* Progress bar */}
+      <div className="absolute bottom-0 left-0 right-0 h-[2px] overflow-hidden rounded-b-2xl">
+        <div
+          className={cn(
+            "h-full",
+            toast.type === "success" ? "bg-green-500/60" : toast.type === "error" ? "bg-red-500/60" : "bg-primary/60"
+          )}
+          style={{
+            animation: `toast-progress ${toast.duration}ms linear forwards`,
+            transformOrigin: "left",
+          }}
+        />
+      </div>
     </div>
   );
 }

@@ -139,6 +139,83 @@ async function fetchSpotifyStats(url: string): Promise<PlatformSyncResult> {
   }
 }
 
+// ─── YouTube goal helpers ─────────────────────────────────────────────────────
+
+/** Extract a YouTube video ID from various URL formats */
+export function extractYouTubeVideoId(url: string): string | null {
+  // youtu.be/{id}
+  const shortMatch = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+  if (shortMatch) return shortMatch[1];
+
+  // youtube.com/watch?v={id}
+  const watchMatch = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+  if (watchMatch) return watchMatch[1];
+
+  // youtube.com/shorts/{id}  or  youtube.com/embed/{id}
+  const pathMatch = url.match(/youtube\.com\/(?:shorts|embed|v)\/([a-zA-Z0-9_-]{11})/);
+  if (pathMatch) return pathMatch[1];
+
+  return null;
+}
+
+export type YouTubeGoalMetric = "subscribers" | "views";
+
+/**
+ * Detect which metric to pull for a YouTube goal URL.
+ * - Channel URL → subscriber count
+ * - Video URL   → view count
+ */
+export function detectYouTubeGoalMetric(url: string): YouTubeGoalMetric {
+  return extractYouTubeVideoId(url) ? "views" : "subscribers";
+}
+
+export interface YouTubeGoalResult {
+  value: number | null;
+  metric: YouTubeGoalMetric;
+  error?: string;
+}
+
+/**
+ * Fetch the relevant stat for a YouTube goal URL.
+ * Channel URL → subscriberCount, Video URL → viewCount.
+ */
+export async function fetchYouTubeGoalStat(url: string): Promise<YouTubeGoalResult> {
+  const apiKey = process.env.YOUTUBE_API_KEY;
+  if (!apiKey) return { value: null, metric: "subscribers", error: "YOUTUBE_API_KEY no configurada" };
+
+  const videoId = extractYouTubeVideoId(url);
+
+  if (videoId) {
+    // ── Video view count ───────────────────────────────────────────────────
+    const params = new URLSearchParams({ part: "statistics", id: videoId, key: apiKey });
+    try {
+      const res = await fetch(
+        `https://www.googleapis.com/youtube/v3/videos?${params}`,
+        { next: { revalidate: 0 } }
+      );
+      if (!res.ok) {
+        const body = await res.text();
+        return { value: null, metric: "views", error: `YouTube API ${res.status}: ${body.slice(0, 100)}` };
+      }
+      const data = await res.json();
+      const item = data.items?.[0];
+      if (!item) return { value: null, metric: "views", error: "Video no encontrado" };
+      const raw = item.statistics?.viewCount;
+      return { value: raw != null ? parseInt(raw, 10) : null, metric: "views" };
+    } catch (err) {
+      return { value: null, metric: "views", error: err instanceof Error ? err.message : "Error de red" };
+    }
+  }
+
+  // ── Channel subscriber count ───────────────────────────────────────────
+  const channelStats = await fetchYouTubeStats(url);
+  return {
+    value: channelStats.followers,
+    metric: "subscribers",
+    error: channelStats.error,
+  };
+}
+
 // ─── Public dispatcher ───────────────────────────────────────────────────────
 
 export async function fetchPlatformStats(

@@ -132,7 +132,7 @@ function RoyaltyForm({ onClose, onSave, initial, isEditing }: RoyaltyFormProps &
 
         <form
           onSubmit={handleSubmit}
-          className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl shadow-2xl w-full p-6 space-y-4"
+          className="relative glass-panel rounded-2xl w-full p-6 space-y-4"
         >
           {/* Header */}
           <div className="flex items-center justify-between">
@@ -140,7 +140,7 @@ function RoyaltyForm({ onClose, onSave, initial, isEditing }: RoyaltyFormProps &
               <div className="w-8 h-8 rounded-xl bg-green-500/15 border border-green-500/20 flex items-center justify-center">
                 <DollarSign className="h-4 w-4 text-green-400" />
               </div>
-              <h2 className="font-semibold text-base">{isEditing ? "Editar ingreso" : "Registrar ingreso"}</h2>
+              <h2 className="font-black text-base">{isEditing ? "Editar ingreso" : "Registrar ingreso"}</h2>
             </div>
             <button
               type="button"
@@ -246,7 +246,7 @@ function RoyaltyForm({ onClose, onSave, initial, isEditing }: RoyaltyFormProps &
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 bg-primary text-primary-foreground rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex-1 bg-primary text-primary-foreground rounded-xl px-4 py-2.5 text-sm font-black hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {saving ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -385,16 +385,17 @@ export default function IngresosPage() {
     <PageTransition className="min-h-screen">
       <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
         {/* Header */}
-        <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card">
+        <div className="card-premium relative overflow-hidden rounded-2xl">
           <div className="absolute inset-0 bg-gradient-to-br from-green-500/8 via-transparent to-transparent pointer-events-none" />
-          <div className="absolute -top-10 -right-10 w-40 h-40 bg-green-500/6 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -top-10 -right-10 w-40 h-40 bg-green-500/8 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-emerald-400/6 rounded-full blur-2xl pointer-events-none" />
           <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-5">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500/30 to-emerald-500/10 border border-green-500/20 flex items-center justify-center flex-shrink-0">
                 <DollarSign className="h-5 w-5 text-green-400" />
               </div>
               <div>
-                <h1 className="text-xl font-bold tracking-tight">Ingresos & Royalties</h1>
+                <h1 className="text-xl font-black tracking-tight gradient-text">Ingresos & Royalties</h1>
                 <p className="text-muted-foreground text-xs mt-0.5">
                   Registrá y analizá tus ganancias por plataforma
                 </p>
@@ -414,7 +415,7 @@ export default function IngresosPage() {
               <button
                 onClick={() => setShowForm(true)}
                 title="Nuevo ingreso (N)"
-                className="flex items-center gap-2 bg-green-500/90 hover:bg-green-500 text-white rounded-xl px-4 py-2 text-sm font-semibold transition-all active:scale-95 shadow-lg shadow-green-500/20 hover:shadow-green-500/30"
+                className="flex items-center gap-2 bg-green-500/90 hover:bg-green-500 text-white rounded-xl px-4 py-2 text-sm font-black transition-all active:scale-95 shadow-lg shadow-green-500/20 hover:shadow-green-500/30 btn-shine"
               >
                 <Plus className="h-4 w-4" /> Nuevo ingreso
                 <kbd className="hidden md:inline-flex ml-1 text-[9px] bg-white/20 px-1 py-0.5 rounded font-mono">N</kbd>
@@ -427,7 +428,7 @@ export default function IngresosPage() {
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="rounded-2xl border border-border/60 bg-card/90 p-5 animate-pulse space-y-3">
+              <div key={i} className="card-premium rounded-2xl p-5 skeleton-shimmer space-y-3">
                 <div className="h-4 w-28 bg-muted rounded" />
                 <div className="h-8 w-24 bg-muted rounded" />
               </div>
@@ -435,35 +436,38 @@ export default function IngresosPage() {
           </div>
         ) : summary ? (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl p-5 relative overflow-hidden group hover:border-green-500/30 hover:-translate-y-0.5 hover:shadow-md transition-all">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/5 rounded-full -translate-y-8 translate-x-8 group-hover:bg-green-500/10 transition-colors" />
-              <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium uppercase tracking-wide mb-2">
-                <DollarSign className="h-3.5 w-3.5 text-green-400 group-hover:scale-110 transition-transform" /> Total acumulado
+            <div className="card-premium rounded-2xl p-5 relative overflow-hidden group hover:border-green-500/40 hover:-translate-y-1 hover:shadow-[0_12px_32px_hsl(0_0%_0%/0.3),0_0_20px_rgba(74,222,128,0.08)] transition-all">
+              <div className="absolute top-0 right-0 w-28 h-28 bg-green-500/8 rounded-full -translate-y-10 translate-x-10 group-hover:bg-green-500/14 transition-colors blur-sm" />
+              <div className="absolute bottom-0 left-0 w-16 h-16 bg-green-500/5 rounded-full translate-y-6 -translate-x-6 blur-md" />
+              <div className="flex items-center gap-2 text-muted-foreground/70 text-xs font-black uppercase tracking-wider mb-2 relative">
+                <DollarSign className="h-3.5 w-3.5 text-green-400 drop-shadow-[0_0_5px_rgba(74,222,128,0.9)] group-hover:scale-110 transition-transform" /> Total acumulado
               </div>
-              <div className="text-2xl font-bold tabular-nums">
+              <div className="text-3xl font-black text-green-400 tabular-nums tracking-tight drop-shadow-[0_0_18px_rgba(74,222,128,0.45)] relative">
                 <AnimatedCounter value={summary.total_all_time} prefix="$" decimals={2} />
               </div>
-              <p className="text-xs text-muted-foreground/50 mt-1">Todos los tiempos</p>
+              <p className="text-xs text-muted-foreground/60 mt-1.5">Todos los tiempos</p>
             </div>
-            <div className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl p-5 relative overflow-hidden group hover:border-green-500/30 hover:-translate-y-0.5 hover:shadow-md transition-all">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/5 rounded-full -translate-y-8 translate-x-8 group-hover:bg-green-500/10 transition-colors" />
-              <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium uppercase tracking-wide mb-2">
-                <TrendingUp className="h-3.5 w-3.5 text-green-400 group-hover:scale-110 transition-transform" /> Este año
+            <div className="card-premium rounded-2xl p-5 relative overflow-hidden group hover:border-green-500/40 hover:-translate-y-1 hover:shadow-[0_12px_32px_hsl(0_0%_0%/0.3),0_0_20px_rgba(74,222,128,0.08)] transition-all">
+              <div className="absolute top-0 right-0 w-28 h-28 bg-green-500/8 rounded-full -translate-y-10 translate-x-10 group-hover:bg-green-500/14 transition-colors blur-sm" />
+              <div className="absolute bottom-0 left-0 w-16 h-16 bg-green-500/5 rounded-full translate-y-6 -translate-x-6 blur-md" />
+              <div className="flex items-center gap-2 text-muted-foreground/70 text-xs font-black uppercase tracking-wider mb-2 relative">
+                <TrendingUp className="h-3.5 w-3.5 text-green-400 drop-shadow-[0_0_5px_rgba(74,222,128,0.9)] group-hover:scale-110 transition-transform" /> Este año
               </div>
-              <div className="text-2xl font-bold text-green-400 tabular-nums">
+              <div className="text-2xl font-black text-green-400 tabular-nums drop-shadow-[0_0_14px_rgba(74,222,128,0.45)] relative">
                 <AnimatedCounter value={summary.total_this_year} prefix="$" decimals={2} />
               </div>
-              <p className="text-xs text-muted-foreground/50 mt-1">{new Date().getFullYear()}</p>
+              <p className="text-xs text-muted-foreground/60 mt-1.5">{new Date().getFullYear()}</p>
             </div>
-            <div className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl p-5 relative overflow-hidden group hover:border-green-500/30 hover:-translate-y-0.5 hover:shadow-md transition-all">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/5 rounded-full -translate-y-8 translate-x-8 group-hover:bg-green-500/10 transition-colors" />
-              <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium uppercase tracking-wide mb-2">
-                <BarChart3 className="h-3.5 w-3.5 group-hover:scale-110 transition-transform" /> Mes anterior
+            <div className="card-premium rounded-2xl p-5 relative overflow-hidden group hover:border-green-500/40 hover:-translate-y-1 hover:shadow-[0_12px_32px_hsl(0_0%_0%/0.3),0_0_20px_rgba(74,222,128,0.08)] transition-all">
+              <div className="absolute top-0 right-0 w-28 h-28 bg-green-500/8 rounded-full -translate-y-10 translate-x-10 group-hover:bg-green-500/14 transition-colors blur-sm" />
+              <div className="absolute bottom-0 left-0 w-16 h-16 bg-green-500/5 rounded-full translate-y-6 -translate-x-6 blur-md" />
+              <div className="flex items-center gap-2 text-muted-foreground/70 text-xs font-black uppercase tracking-wider mb-2 relative">
+                <BarChart3 className="h-3.5 w-3.5 text-green-400 drop-shadow-[0_0_5px_rgba(74,222,128,0.9)] group-hover:scale-110 transition-transform" /> Mes anterior
               </div>
-              <div className="text-2xl font-bold tabular-nums">
+              <div className="text-2xl font-black text-green-400 tabular-nums drop-shadow-[0_0_14px_rgba(74,222,128,0.40)] relative">
                 <AnimatedCounter value={summary.total_last_month} prefix="$" decimals={2} />
               </div>
-              <p className="text-xs text-muted-foreground/50 mt-1">Último mes completo</p>
+              <p className="text-xs text-muted-foreground/60 mt-1.5">Último mes completo</p>
             </div>
           </div>
         ) : null}
@@ -472,18 +476,22 @@ export default function IngresosPage() {
         {!loading && summary && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Area Chart - Monthly */}
-            <div className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl p-5">
-              <h3 className="font-semibold mb-4">Ingresos por mes</h3>
+            <div className="card-premium rounded-2xl p-5">
+              <h3 className="font-black tracking-tight mb-4 flex items-center gap-2 text-sm">
+                <TrendingUp className="h-4 w-4 text-green-400 drop-shadow-[0_0_5px_rgba(74,222,128,0.8)]" />
+                Ingresos por mes
+              </h3>
               {summary.by_month.length > 0 ? (
                 <ResponsiveContainer width="100%" height={220}>
                   <AreaChart data={summary.by_month}>
                     <defs>
                       <linearGradient id="royaltyGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#6366F1" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#6366F1" stopOpacity={0} />
+                        <stop offset="0%" stopColor="#6366F1" stopOpacity={0.55} />
+                        <stop offset="50%" stopColor="#6366F1" stopOpacity={0.18} />
+                        <stop offset="100%" stopColor="#6366F1" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.35} />
                     <XAxis
                       dataKey="period_month"
                       tickFormatter={monthLabel}
@@ -511,8 +519,10 @@ export default function IngresosPage() {
                       type="monotone"
                       dataKey="total"
                       stroke="#6366F1"
-                      strokeWidth={2}
+                      strokeWidth={2.5}
                       fill="url(#royaltyGrad)"
+                      dot={false}
+                      activeDot={{ r: 5, fill: "#6366F1", stroke: "#6366F1", strokeWidth: 2, filter: "drop-shadow(0 0 6px #6366F1)" }}
                     />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -524,8 +534,11 @@ export default function IngresosPage() {
             </div>
 
             {/* Pie Chart - By Source */}
-            <div className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl p-5">
-              <h3 className="font-semibold mb-4">Distribución por plataforma</h3>
+            <div className="card-premium rounded-2xl p-5">
+              <h3 className="font-black tracking-tight mb-4 flex items-center gap-2 text-sm">
+                <BarChart3 className="h-4 w-4 text-primary drop-shadow-[0_0_5px_hsl(var(--primary)/0.8)]" />
+                Distribución por plataforma
+              </h3>
               {summary.by_source.length > 0 ? (
                 <ResponsiveContainer width="100%" height={220}>
                   <PieChart>
@@ -577,8 +590,8 @@ export default function IngresosPage() {
                 onClick={() => setSelectedYear(y)}
                 className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-all active:scale-95 ${
                   selectedYear === y
-                    ? "bg-card shadow-sm border border-border/60 text-foreground font-semibold"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "bg-card shadow-[0_2px_8px_hsl(0_0%_0%/0.2),0_0_12px_hsl(var(--primary)/0.15)] border border-primary/20 text-foreground font-black"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                 }`}
               >
                 {y}
@@ -598,9 +611,9 @@ export default function IngresosPage() {
         </div>
 
         {/* Payments List */}
-        <div className="rounded-2xl border border-border/60 bg-card/90 backdrop-blur-xl overflow-hidden">
+        <div className="card-premium rounded-2xl overflow-hidden">
           <div className="px-4 py-3 border-b bg-muted/30 flex items-center justify-between">
-            <span className="font-medium text-sm">{payments.length} registro{payments.length !== 1 ? "s" : ""}</span>
+            <span className="font-black text-sm">{payments.length} registro{payments.length !== 1 ? "s" : ""}</span>
           </div>
 
           {loading ? (
@@ -627,7 +640,7 @@ export default function IngresosPage() {
                   <path d="M72 38l-4-5-4 5M68 33v8" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.5" />
                 </svg>
               </div>
-              <h3 className="text-base font-semibold mb-1">Sin ingresos registrados</h3>
+              <h3 className="text-base font-black mb-1">Sin ingresos registrados</h3>
               <p className="text-muted-foreground text-sm max-w-xs leading-relaxed">
                 Llevá el control de tus regalías, pagos por shows, licencias y cualquier ingreso de tu carrera musical.
               </p>
@@ -644,22 +657,27 @@ export default function IngresosPage() {
               {payments.map((p) => (
                 <StaggerItem key={p.id}>
                   <div
-                    className="flex items-center gap-4 px-4 py-3 border-b last:border-0 hover:bg-muted/30 transition-all group cursor-pointer"
+                    className="row-interactive flex items-center gap-4 px-4 py-3 border-b last:border-0 hover:bg-muted/30 transition-all group cursor-pointer"
                     onDoubleClick={() => setEditingPayment(p)}
                   >
                     <div
-                      className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-white text-xs font-bold"
-                      style={{ backgroundColor: SOURCE_COLORS[p.source] ?? "#6366F1" }}
+                      className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-xs font-black group-hover:scale-110 transition-transform"
+                      style={{
+                        backgroundColor: `${SOURCE_COLORS[p.source] ?? "#6366F1"}20`,
+                        border: `1.5px solid ${SOURCE_COLORS[p.source] ?? "#6366F1"}50`,
+                        color: SOURCE_COLORS[p.source] ?? "#6366F1",
+                        boxShadow: `0 0 14px ${SOURCE_COLORS[p.source] ?? "#6366F1"}40, inset 0 1px 0 ${SOURCE_COLORS[p.source] ?? "#6366F1"}25`,
+                      }}
                     >
                       {(SOURCE_LABELS[p.source] ?? p.source).slice(0, 2).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm truncate">{SOURCE_LABELS[p.source] ?? p.source}</div>
+                      <div className="font-black text-sm truncate">{SOURCE_LABELS[p.source] ?? p.source}</div>
                       <div className="text-xs text-muted-foreground truncate">
                         {p.period_month} {p.notes ? `· ${p.notes}` : ""}
                       </div>
                     </div>
-                    <div className="font-semibold text-green-400 font-mono tabular-nums text-sm shrink-0">
+                    <div className="font-black text-green-400 font-mono tabular-nums text-sm shrink-0">
                       {formatCurrency(Number(p.amount), p.currency)}
                     </div>
                     <button

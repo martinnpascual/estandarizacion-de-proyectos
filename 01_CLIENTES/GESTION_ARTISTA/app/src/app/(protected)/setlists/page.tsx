@@ -15,6 +15,11 @@ import {
   Search,
   Pencil,
   Download,
+  Play,
+  Pause,
+  Upload,
+  Zap,
+  Headphones,
 } from "lucide-react";
 import {
   getSetlists,
@@ -28,11 +33,19 @@ import {
   type SetlistFormData,
   type SetlistSongWithDetails,
 } from "@/lib/actions/setlists";
+import {
+  getSetlistBeats,
+  addSetlistBeat,
+  removeSetlistBeat,
+  type SetlistBeat,
+} from "@/lib/actions/setlist-beats";
+import { useAudioPlayerContext } from "@/components/audio/AudioPlayer";
 import { getSongsByYear } from "@/lib/actions/songs";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { cn } from "@/lib/utils";
 import { formatTime } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
 import type { Setlist, Song } from "@/types/database";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -57,11 +70,29 @@ function getTrackTitle(s: SetlistSongWithDetails): string {
   return s.song?.title ?? s.draft?.title ?? "Sin título";
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function getAudioDuration(file: File): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const audio = new Audio(url);
+    audio.addEventListener("loadedmetadata", () => {
+      URL.revokeObjectURL(url);
+      resolve(audio.duration);
+    });
+    audio.addEventListener("error", () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Could not read duration"));
+    });
+  });
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function SetlistsPage() {
   const toast = useToast();
   const { confirm, ConfirmDialog } = useConfirm();
+  const player = useAudioPlayerContext();
 
   // Setlists state
   const [setlists, setSetlists] = useState<Setlist[]>([]);
@@ -71,6 +102,16 @@ export default function SetlistsPage() {
   // Setlist songs state
   const [setlistSongs, setSetlistSongs] = useState<SetlistSongWithDetails[]>([]);
   const [songsLoading, setSongsLoading] = useState(false);
+
+  // Beats state
+  const [beats, setBeats] = useState<SetlistBeat[]>([]);
+  const [beatsLoading, setBeatsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<"songs" | "beats">("songs");
+  const [uploadingBeat, setUploadingBeat] = useState(false);
+  const [removingBeatId, setRemovingBeatId] = useState<string | null>(null);
+  const beatInputRef = useRef<HTMLInputElement>(null);
+  const [beatTitleDraft, setBeatTitleDraft] = useState("");
+  const [showBeatUpload, setShowBeatUpload] = useState(false);
 
   // All songs (for song picker)
   const [allSongs, setAllSongs] = useState<Song[]>([]);
@@ -158,10 +199,119 @@ export default function SetlistsPage() {
   useEffect(() => {
     if (selectedSetlist) {
       loadSetlistSongs(selectedSetlist.id);
+      loadBeats(selectedSetlist.id);
     } else {
       setSetlistSongs([]);
+      setBeats([]);
     }
-  }, [selectedSetlist, loadSetlistSongs]);
+  }, [selectedSetlist, loadSetlistSongs]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ─── Load beats ─────────────────────────────────────────────────────────────
+
+  const loadBeats = useCallback(async (setlistId: string) => {
+    setBeatsLoading(true);
+    const result = await getSetlistBeats(setlistId);
+    if (!result.error) setBeats(result.data ?? []);
+    setBeatsLoading(false);
+  }, []);
+
+  // ─── Beat upload ─────────────────────────────────────────────────────────────
+
+  async function handleBeatFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !selectedSetlist) return;
+    if (!file.type.startsWith("audio/")) {
+      toast.error("Solo se permiten archivos de audio");
+      return;
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error("El archivo no puede superar 50MB");
+      return;
+    }
+    setUploadingBeat(true);
+    try {
+      const supabase = createClient();
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "mp3";
+      const fileName = `${selectedSetlist.id}/${Date.now()}.${ext}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("setlist-beats")
+        .upload(fileName, file, { upsert: false, contentType: file.type });
+      if (uploadError) throw new Error(uploadError.message);
+      const { data: urlData } = supabase.storage
+        .from("setlist-beats")
+        .getPublicUrl(uploadData.path);
+
+      // Try to get audio duration
+      let duration: number | null = null;
+      try {
+        duration = await getAudioDuration(file);
+      } catch { /* ignore */ }
+
+      const title = beatTitleDraft.trim() || file.name.replace(/\.[^/.]+$/, "");
+      const result = await addSetlistBeat(selectedSetlist.id, {
+        title,
+        audio_url: urlData.publicUrl,
+        file_path: uploadData.path,
+        duration_seconds: duration ? Math.round(duration) : null,
+        beat_order: beats.length + 1,
+      });
+      if (result.error) throw new Error(result.error);
+      setBeats(prev => [...prev, result.data!]);
+      setBeatTitleDraft("");
+      setShowBeatUpload(false);
+      toast.success(`Beat "${title}" agregado`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al subir el beat");
+    } finally {
+      setUploadingBeat(false);
+      if (beatInputRef.current) beatInputRef.current.value = "";
+    }
+  }
+
+  async function handleRemoveBeat(beat: SetlistBeat) {
+    setRemovingBeatId(beat.id);
+    // Try to delete from storage too
+    if (beat.file_path) {
+      try {
+        const supabase = createClient();
+        await supabase.storage.from("setlist-beats").remove([beat.file_path]);
+      } catch { /* ignore storage errors */ }
+    }
+    const { error } = await removeSetlistBeat(beat.id);
+    if (error) toast.error(error);
+    else {
+      setBeats(prev => prev.filter(b => b.id !== beat.id));
+      toast.success(`"${beat.title}" eliminado`);
+    }
+    setRemovingBeatId(null);
+  }
+
+  function handlePlayBeat(beat: SetlistBeat) {
+    if (player.currentTrack?.id === beat.id && player.isPlaying) {
+      player.pause();
+      return;
+    }
+    const beatTrack = {
+      id: beat.id,
+      title: beat.title,
+      artist: "Beat",
+      url: beat.audio_url,
+      duration: beat.duration_seconds ?? undefined,
+    };
+    // If multiple beats, load all as queue; else play single
+    if (beats.length > 1) {
+      const allTracks = beats.map(b => ({
+        id: b.id,
+        title: b.title,
+        artist: "Beat",
+        url: b.audio_url,
+        duration: b.duration_seconds ?? undefined,
+      }));
+      player.play(beatTrack, allTracks);
+    } else {
+      player.play(beatTrack);
+    }
+  }
 
   // ─── Load all songs for picker ──────────────────────────────────────────────
 
@@ -181,10 +331,9 @@ export default function SetlistsPage() {
   // ─── Stats ──────────────────────────────────────────────────────────────────
 
   const totalSetlists = setlists.length;
-  // We can't sum songs across all setlists without fetching each, so we show
-  // song count of selected setlist or a dash for the total
   const selectedSongCount = setlistSongs.length;
   const selectedTotalDuration = calcTotalDuration(setlistSongs);
+  const beatCount = beats.length;
 
   // ─── Actions ────────────────────────────────────────────────────────────────
 
@@ -380,6 +529,16 @@ export default function SetlistsPage() {
             <span className="tabular-nums font-medium text-foreground/70">{selectedSongCount}</span>
             <span>canción{selectedSongCount !== 1 ? "es" : ""}</span>
           </div>
+          {beatCount > 0 && (
+            <>
+              <div className="w-px h-3 bg-border/60" />
+              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <Headphones className="h-3.5 w-3.5 text-violet-400/70" />
+                <span className="tabular-nums font-medium text-foreground/70">{beatCount}</span>
+                <span>beat{beatCount !== 1 ? "s" : ""}</span>
+              </div>
+            </>
+          )}
           {selectedTotalDuration > 0 && (
             <>
               <div className="w-px h-3 bg-border/60" />
@@ -486,110 +645,285 @@ export default function SetlistsPage() {
                     )}
                   </div>
                 </div>
+                {activeTab === "songs" ? (
+                  <button
+                    onClick={() => setShowSongPicker(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-500/15 border border-violet-500/20 text-violet-400 text-xs font-black hover:bg-violet-500/25 transition-all active:scale-95"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Agregar canción
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setShowBeatUpload(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-500/15 border border-violet-500/20 text-violet-400 text-xs font-black hover:bg-violet-500/25 transition-all active:scale-95"
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    Subir beat
+                  </button>
+                )}
+              </div>
+
+              {/* Songs / Beats tabs */}
+              <div className="flex border-b border-border/50">
                 <button
-                  onClick={() => setShowSongPicker(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-500/15 border border-violet-500/20 text-violet-400 text-xs font-black hover:bg-violet-500/25 transition-all active:scale-95"
+                  onClick={() => setActiveTab("songs")}
+                  className={cn(
+                    "flex items-center gap-1.5 px-5 py-2.5 text-xs font-black transition-all border-b-2 -mb-px",
+                    activeTab === "songs"
+                      ? "border-violet-500 text-violet-400"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  )}
                 >
-                  <Plus className="h-3.5 w-3.5" />
-                  Agregar canción
+                  <Music className="h-3.5 w-3.5" />
+                  Canciones
+                  {selectedSongCount > 0 && (
+                    <span className="ml-1 bg-violet-500/15 text-violet-400 px-1.5 py-0.5 rounded-full text-[10px]">
+                      {selectedSongCount}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => setActiveTab("beats")}
+                  className={cn(
+                    "flex items-center gap-1.5 px-5 py-2.5 text-xs font-black transition-all border-b-2 -mb-px",
+                    activeTab === "beats"
+                      ? "border-violet-500 text-violet-400"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Headphones className="h-3.5 w-3.5" />
+                  Beats
+                  {beatCount > 0 && (
+                    <span className="ml-1 bg-violet-500/15 text-violet-400 px-1.5 py-0.5 rounded-full text-[10px]">
+                      {beatCount}
+                    </span>
+                  )}
                 </button>
               </div>
 
-              {/* Track list */}
-              <div className="flex-1 overflow-y-auto">
-                {songsLoading ? (
-                  <div className="flex items-center justify-center py-16">
-                    <Loader2 className="h-6 w-6 text-violet-400 animate-spin" />
-                  </div>
-                ) : setlistSongs.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-center px-6">
-                    <Music className="h-10 w-10 text-muted-foreground/20 mb-3" />
-                    <p className="text-sm text-muted-foreground/50">
-                      Esta setlist no tiene canciones todavía
-                    </p>
+              {/* Beat upload form */}
+              {showBeatUpload && (
+                <div className="px-5 py-3 bg-violet-500/5 border-b border-border/50 space-y-3">
+                  <input
+                    ref={beatInputRef}
+                    type="file"
+                    accept="audio/*"
+                    className="hidden"
+                    onChange={handleBeatFileUpload}
+                  />
+                  <p className="text-xs font-black text-violet-400">Subir beat de audio</p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={beatTitleDraft}
+                      onChange={e => setBeatTitleDraft(e.target.value)}
+                      placeholder="Nombre del beat (opcional)"
+                      className="flex-1 bg-background border border-border/60 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500/40 placeholder:text-muted-foreground/40"
+                    />
                     <button
-                      onClick={() => setShowSongPicker(true)}
-                      className="mt-4 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-500/15 border border-violet-500/20 text-violet-400 text-xs font-black hover:bg-violet-500/25 transition-all active:scale-95"
+                      onClick={() => beatInputRef.current?.click()}
+                      disabled={uploadingBeat}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-500/20 border border-violet-500/30 text-violet-400 text-xs font-black hover:bg-violet-500/30 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
                     >
-                      <Plus className="h-3.5 w-3.5" />
-                      Agregar canción
+                      {uploadingBeat
+                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        : <Upload className="h-3.5 w-3.5" />}
+                      {uploadingBeat ? "Subiendo…" : "Elegir archivo"}
+                    </button>
+                    <button
+                      onClick={() => { setShowBeatUpload(false); setBeatTitleDraft(""); }}
+                      className="p-1.5 rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground transition-all active:scale-95"
+                    >
+                      <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
-                ) : (
-                  <div className="divide-y divide-border/40">
-                    {setlistSongs.map((item, index) => (
-                      <div
-                        key={item.id}
-                        draggable
-                        onDragStart={() => handleDragStart(index)}
-                        onDragEnter={() => handleDragEnter(index)}
-                        onDragEnd={handleDragEnd}
-                        onDragOver={(e) => e.preventDefault()}
-                        className="row-interactive flex items-center gap-3 px-4 py-3 hover:bg-secondary/30 transition-all group cursor-grab active:cursor-grabbing select-none"
+                  <p className="text-[10px] text-muted-foreground/50">MP3, WAV, FLAC, AAC · máx. 50MB</p>
+                </div>
+              )}
+
+              {/* Track list / Beats list */}
+              <div className="flex-1 overflow-y-auto">
+                {/* ── Songs tab ── */}
+                {activeTab === "songs" && (
+                  songsLoading ? (
+                    <div className="flex items-center justify-center py-16">
+                      <Loader2 className="h-6 w-6 text-violet-400 animate-spin" />
+                    </div>
+                  ) : setlistSongs.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 text-center px-6">
+                      <Music className="h-10 w-10 text-muted-foreground/20 mb-3" />
+                      <p className="text-sm text-muted-foreground/50">
+                        Esta setlist no tiene canciones todavía
+                      </p>
+                      <button
+                        onClick={() => setShowSongPicker(true)}
+                        className="mt-4 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-500/15 border border-violet-500/20 text-violet-400 text-xs font-black hover:bg-violet-500/25 transition-all active:scale-95"
                       >
-                        {/* Track number + drag handle */}
-                        <div className="flex items-center gap-1.5 w-7 flex-shrink-0">
-                          <GripVertical className="h-4 w-4 text-muted-foreground/20 group-hover:text-muted-foreground/50 transition-colors" />
-                          <span className="text-xs text-muted-foreground/40 tabular-nums group-hover:hidden">
-                            {index + 1}
-                          </span>
-                        </div>
+                        <Plus className="h-3.5 w-3.5" />
+                        Agregar canción
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-border/40">
+                      {setlistSongs.map((item, index) => (
+                        <div
+                          key={item.id}
+                          draggable
+                          onDragStart={() => handleDragStart(index)}
+                          onDragEnter={() => handleDragEnter(index)}
+                          onDragEnd={handleDragEnd}
+                          onDragOver={(e) => e.preventDefault()}
+                          className="row-interactive flex items-center gap-3 px-4 py-3 hover:bg-secondary/30 transition-all group cursor-grab active:cursor-grabbing select-none"
+                        >
+                          {/* Track number + drag handle */}
+                          <div className="flex items-center gap-1.5 w-7 flex-shrink-0">
+                            <GripVertical className="h-4 w-4 text-muted-foreground/20 group-hover:text-muted-foreground/50 transition-colors" />
+                            <span className="text-xs text-muted-foreground/40 tabular-nums group-hover:hidden">
+                              {index + 1}
+                            </span>
+                          </div>
 
-                        {/* Cover art thumbnail */}
-                        <div className="w-9 h-9 flex-shrink-0 rounded-xl overflow-hidden border border-border/50 bg-gradient-to-br from-violet-500/20 to-violet-800/10 flex items-center justify-center">
-                          {item.song?.cover_art_url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={item.song.cover_art_url}
-                              alt=""
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <Music className="h-4 w-4 text-violet-400/30" />
-                          )}
-                        </div>
-
-                        {/* Song info */}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold truncate">
-                            {getTrackTitle(item)}
-                          </p>
-                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                            {(item.song?.bpm ?? item.draft?.bpm) && (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-blue-500/15 text-blue-400 border border-blue-500/20 tabular-nums">
-                                {item.song?.bpm ?? item.draft?.bpm} BPM
-                              </span>
-                            )}
-                            {(item.song?.key_signature ?? item.draft?.key_signature) && (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-purple-500/15 text-purple-400 border border-purple-500/20">
-                                {item.song?.key_signature ?? item.draft?.key_signature}
-                              </span>
-                            )}
-                            {item.song?.duration_seconds && (
-                              <span className="text-[10px] text-muted-foreground/50 tabular-nums flex items-center gap-0.5">
-                                <Clock className="h-2.5 w-2.5" />
-                                {formatTime(item.song.duration_seconds)}
-                              </span>
+                          {/* Cover art thumbnail */}
+                          <div className="w-9 h-9 flex-shrink-0 rounded-xl overflow-hidden border border-border/50 bg-gradient-to-br from-violet-500/20 to-violet-800/10 flex items-center justify-center">
+                            {item.song?.cover_art_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={item.song.cover_art_url} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <Music className="h-4 w-4 text-violet-400/30" />
                             )}
                           </div>
-                        </div>
 
-                        {/* Remove button */}
-                        <button
-                          onClick={() => handleRemoveSong(item)}
-                          disabled={removingId === item.id}
-                          className="p-1.5 rounded-xl opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-                          title="Quitar de la setlist"
-                        >
-                          {removingId === item.id ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-3.5 w-3.5" />
-                          )}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+                          {/* Song info */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold truncate">{getTrackTitle(item)}</p>
+                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                              {(item.song?.bpm ?? item.draft?.bpm) && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-blue-500/15 text-blue-400 border border-blue-500/20 tabular-nums">
+                                  {item.song?.bpm ?? item.draft?.bpm} BPM
+                                </span>
+                              )}
+                              {(item.song?.key_signature ?? item.draft?.key_signature) && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-purple-500/15 text-purple-400 border border-purple-500/20">
+                                  {item.song?.key_signature ?? item.draft?.key_signature}
+                                </span>
+                              )}
+                              {item.song?.duration_seconds && (
+                                <span className="text-[10px] text-muted-foreground/50 tabular-nums flex items-center gap-0.5">
+                                  <Clock className="h-2.5 w-2.5" />
+                                  {formatTime(item.song.duration_seconds)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Remove button */}
+                          <button
+                            onClick={() => handleRemoveSong(item)}
+                            disabled={removingId === item.id}
+                            className="p-1.5 rounded-xl opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                            title="Quitar de la setlist"
+                          >
+                            {removingId === item.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                )}
+
+                {/* ── Beats tab ── */}
+                {activeTab === "beats" && (
+                  beatsLoading ? (
+                    <div className="flex items-center justify-center py-16">
+                      <Loader2 className="h-6 w-6 text-violet-400 animate-spin" />
+                    </div>
+                  ) : beats.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 text-center px-6">
+                      <Headphones className="h-10 w-10 text-muted-foreground/20 mb-3" />
+                      <p className="text-sm text-muted-foreground/50">
+                        No hay beats para este setlist
+                      </p>
+                      <p className="text-xs text-muted-foreground/40 mt-1 mb-4">
+                        Subí pistas de backing, loops o beats de ensayo
+                      </p>
+                      <button
+                        onClick={() => setShowBeatUpload(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-500/15 border border-violet-500/20 text-violet-400 text-xs font-black hover:bg-violet-500/25 transition-all active:scale-95"
+                      >
+                        <Upload className="h-3.5 w-3.5" />
+                        Subir primer beat
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-border/40">
+                      {beats.map((beat, index) => {
+                        const isPlaying = player.currentTrack?.id === beat.id && player.isPlaying;
+                        return (
+                          <div
+                            key={beat.id}
+                            className={cn(
+                              "flex items-center gap-3 px-4 py-3 hover:bg-secondary/30 transition-all group",
+                              isPlaying && "bg-primary/5"
+                            )}
+                          >
+                            {/* Index */}
+                            <span className="text-xs text-muted-foreground/40 tabular-nums w-5 flex-shrink-0 text-center">
+                              {index + 1}
+                            </span>
+
+                            {/* Play button */}
+                            <button
+                              onClick={() => handlePlayBeat(beat)}
+                              className={cn(
+                                "w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-all active:scale-95 border",
+                                isPlaying
+                                  ? "bg-primary text-primary-foreground border-primary/50 shadow-[0_0_12px_hsl(var(--primary)/0.4)]"
+                                  : "bg-violet-500/10 border-violet-500/20 text-violet-400 hover:bg-violet-500/20"
+                              )}
+                            >
+                              {isPlaying
+                                ? <Pause className="h-3.5 w-3.5" />
+                                : <Play className="h-3.5 w-3.5 ml-0.5" />}
+                            </button>
+
+                            {/* Beat info */}
+                            <div className="flex-1 min-w-0">
+                              <p className={cn("text-sm font-semibold truncate", isPlaying && "text-primary")}>
+                                {beat.title}
+                              </p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                {beat.bpm && (
+                                  <span className="text-[10px] bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded-full border border-blue-500/20 tabular-nums font-medium">
+                                    <Zap className="h-2.5 w-2.5 inline mr-0.5" />
+                                    {beat.bpm} BPM
+                                  </span>
+                                )}
+                                {beat.duration_seconds && (
+                                  <span className="text-[10px] text-muted-foreground/50 tabular-nums flex items-center gap-0.5">
+                                    <Clock className="h-2.5 w-2.5" />
+                                    {formatTime(beat.duration_seconds)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Remove */}
+                            <button
+                              onClick={() => handleRemoveBeat(beat)}
+                              disabled={removingBeatId === beat.id}
+                              className="p-1.5 rounded-xl opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                              title="Eliminar beat"
+                            >
+                              {removingBeatId === beat.id
+                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                : <Trash2 className="h-3.5 w-3.5" />}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )
                 )}
               </div>
 

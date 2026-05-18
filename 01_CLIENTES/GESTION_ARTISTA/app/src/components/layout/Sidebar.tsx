@@ -48,6 +48,7 @@ const mobileTabBar = [
 const navigationGroups = [
   {
     label: "Música",
+    dot: "bg-violet-400",
     items: [
       { name: "Dashboard",   href: "/dashboard",   icon: LayoutDashboard },
       { name: "Discografía", href: "/discografia",  icon: Disc3 },
@@ -57,6 +58,7 @@ const navigationGroups = [
   },
   {
     label: "Gestión",
+    dot: "bg-blue-400",
     items: [
       { name: "Featuring",   href: "/collabs",      icon: Users },
       { name: "Proyectos",   href: "/proyectos",    icon: FolderOpen },
@@ -69,6 +71,7 @@ const navigationGroups = [
   },
   {
     label: "Análisis",
+    dot: "bg-indigo-400",
     items: [
       { name: "Estadísticas",    href: "/estadisticas",   icon: BarChart2 },
       { name: "Analizar BPM",    href: "/analizar",       icon: Zap },
@@ -154,8 +157,8 @@ export default function Sidebar() {
       <aside
         className={cn(
           "fixed top-0 left-0 z-50 h-full w-64 flex flex-col transition-transform duration-200",
-          "border-r border-border/60",
-          "bg-card/95 backdrop-blur-xl",
+          "border-r border-border/50 sidebar-edge-glow",
+          "bg-card/98 backdrop-blur-2xl",
           "md:translate-x-0 md:static md:z-auto",
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
@@ -166,9 +169,12 @@ export default function Sidebar() {
           <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-primary/4 to-transparent pointer-events-none" />
 
           <div className="relative flex items-center gap-3">
-            {/* Avatar con glow ring */}
+            {/* Avatar con glow ring animado */}
             <div className="relative flex-shrink-0">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center overflow-hidden shadow-lg shadow-primary/20">
+              {/* Anillo de gradiente rotatorio sutil */}
+              <div className="absolute -inset-[2px] rounded-xl bg-gradient-to-br from-primary/60 via-blue-400/20 to-violet-500/40 opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{ animation: "none" }} />
+              <div className="absolute -inset-[2px] rounded-xl bg-gradient-to-br from-primary/40 to-violet-500/30 animate-pulse opacity-50 pointer-events-none" style={{ animationDuration: "3s" }} />
+              <div className="relative w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center overflow-hidden shadow-lg shadow-primary/20">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="/artist.jpg"
@@ -186,12 +192,12 @@ export default function Sidebar() {
                 />
                 <Disc3 className="h-4 w-4 text-primary-foreground absolute" style={{ zIndex: -1 }} />
               </div>
-              {/* Status dot */}
-              <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-card" />
+              {/* Status dot — pulsing ring */}
+              <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-card shadow-[0_0_6px_hsl(142_70%_45%/0.7)] status-ring text-green-500" />
             </div>
 
             <div>
-              <h1 className="text-sm font-bold tracking-wide leading-none">{displayName}</h1>
+              <h1 className="text-sm font-black tracking-wide leading-none">{displayName}</h1>
               <p className="text-[10px] text-primary/60 uppercase tracking-widest mt-0.5 font-medium">
                 Studio
               </p>
@@ -214,10 +220,16 @@ export default function Sidebar() {
           {navigationGroups.map((group) => (
             <div key={group.label}>
               {/* Group label */}
-              <p className="px-3 mb-1 text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground/40 select-none">
-                {group.label}
-              </p>
-              <div className="space-y-0.5">
+              <div className="px-3 mb-1.5 flex items-center gap-2 select-none">
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <span className={cn("nav-group-dot", group.dot)} />
+                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground/50">
+                    {group.label}
+                  </p>
+                </div>
+                <div className="flex-1 h-px bg-gradient-to-r from-border/60 via-border/30 to-transparent" />
+              </div>
+              <div className="space-y-0.5 list-enter">
                 {group.items.map((item) => {
                   const isActive =
                     pathname === item.href ||
@@ -228,16 +240,28 @@ export default function Sidebar() {
                       href={item.href}
                       onClick={() => setMobileOpen(false)}
                       className={cn(
-                        "relative flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-150",
+                        "group relative flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all duration-150",
                         isActive
-                          ? "bg-gradient-to-r from-primary/15 to-primary/5 text-primary"
-                          : "text-muted-foreground hover:text-foreground hover:bg-secondary/70"
+                          ? "nav-section-active"
+                          : "font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/70 hover:shadow-[inset_0_1px_0_hsl(0_0%_100%/0.04)]"
                       )}
                     >
                       {isActive && (
-                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r-full bg-primary shadow-[0_0_6px_hsl(var(--primary)/0.6)]" />
+                        <span
+                          className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full"
+                          style={{
+                            background: "hsl(var(--section-hsl, 262 80% 62%))",
+                            boxShadow: "0 0 16px hsl(var(--section-hsl, 262 80% 62%) / 1), 0 0 32px hsl(var(--section-hsl, 262 80% 62%) / 0.5)",
+                          }}
+                        />
                       )}
-                      <item.icon className={cn("h-4 w-4 flex-shrink-0 transition-colors", isActive && "text-primary")} />
+                      <item.icon
+                        className={cn("h-4 w-4 flex-shrink-0 nav-icon", !isActive && "text-muted-foreground group-hover:text-foreground")}
+                        style={isActive ? {
+                          color: "hsl(var(--section-hsl, 262 80% 62%))",
+                          filter: "drop-shadow(0 0 6px hsl(var(--section-hsl, 262 80% 62%) / 0.7))",
+                        } : undefined}
+                      />
                       <span className="flex-1">{item.name}</span>
                       {item.href === "/notificaciones" && notifCount > 0 && (
                         <span className={cn(
@@ -262,11 +286,11 @@ export default function Sidebar() {
           {/* Búsqueda Cmd+K */}
           <button
             onClick={() => { setMobileOpen(false); openSearch(); }}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/70 transition-all"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground transition-all group border border-transparent hover:border-border/50 hover:bg-secondary/50"
           >
-            <Search className="h-4 w-4 flex-shrink-0" />
-            <span className="flex-1 text-left">Buscar</span>
-            <kbd className="hidden md:inline-flex items-center gap-0.5 text-[9px] bg-secondary px-1.5 py-0.5 rounded border border-border/60 text-muted-foreground">
+            <Search className="h-3.5 w-3.5 flex-shrink-0 group-hover:text-primary transition-colors" />
+            <span className="flex-1 text-left text-xs font-medium text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">Buscar...</span>
+            <kbd className="hidden md:inline-flex items-center gap-0.5 text-[9px] font-mono bg-secondary/80 px-1.5 py-0.5 rounded-md border border-border/50 text-muted-foreground/50">
               ⌘K
             </kbd>
           </button>
@@ -280,16 +304,19 @@ export default function Sidebar() {
                 href={item.href}
                 onClick={() => setMobileOpen(false)}
                 className={cn(
-                  "relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
+                  "group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all",
                   isActive
-                    ? "bg-gradient-to-r from-primary/15 to-primary/5 text-primary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/70"
+                    ? "font-black bg-gradient-to-r from-primary/18 to-primary/5 text-primary shadow-[inset_0_1px_0_hsl(0_0%_100%/0.08),0_0_16px_hsl(var(--primary)/0.15)]"
+                    : "font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/70"
                 )}
               >
                 {isActive && (
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r-full bg-primary" />
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-primary shadow-[0_0_8px_hsl(var(--primary)/0.8),0_0_20px_hsl(var(--primary)/0.4)]" />
                 )}
-                <item.icon className="h-4 w-4 flex-shrink-0" />
+                <item.icon className={cn(
+                  "h-4 w-4 flex-shrink-0 nav-icon",
+                  isActive ? "text-primary drop-shadow-[0_0_6px_hsl(var(--primary)/0.7)]" : "group-hover:text-foreground"
+                )} />
                 {item.name}
               </Link>
             );
@@ -299,15 +326,19 @@ export default function Sidebar() {
           <div className="h-px bg-border/60 my-1" />
 
           <div className="flex items-center justify-between px-1 py-1">
-            <p className="text-[10px] text-muted-foreground/50 font-medium">
-              Studio v1.0
-            </p>
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_5px_hsl(142_70%_45%/0.8)]" />
+              <p className="text-[9px] text-muted-foreground/40 font-mono uppercase tracking-[0.18em]">
+                v2.0
+              </p>
+            </div>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setShowShortcuts(true)}
                 className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary transition-all active:scale-95"
                 aria-label="Atajos de teclado"
-                title="Atajos de teclado (?)"
+                data-tooltip="Atajos de teclado (?)"
+                data-tooltip-dir="below"
               >
                 <Keyboard className="h-4 w-4" />
               </button>
@@ -315,7 +346,8 @@ export default function Sidebar() {
                 onClick={toggleTheme}
                 className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary transition-all active:scale-95"
                 aria-label="Cambiar tema"
-                title={theme === "dark" ? "Modo claro" : "Modo oscuro"}
+                data-tooltip={theme === "dark" ? "Modo claro" : "Modo oscuro"}
+                data-tooltip-dir="below"
               >
                 {theme === "dark" ? (
                   <Sun className="h-4 w-4" />
@@ -330,7 +362,38 @@ export default function Sidebar() {
       </aside>
 
       {/* Mobile bottom tab bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-card/90 backdrop-blur-xl border-t border-border/60 safe-area-bottom">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-card/95 backdrop-blur-2xl border-t border-border/30 safe-area-bottom shadow-[0_-8px_32px_hsl(0_0%_0%/0.5)]">
+        {/* Sliding pill indicator */}
+        {(() => {
+          const activeIdx = mobileTabBar.findIndex(item =>
+            item.href &&
+            (pathname === item.href || (item.href !== "/dashboard" && pathname?.startsWith(item.href)))
+          );
+          return activeIdx >= 0 ? (
+            <div
+              className="absolute top-0 pointer-events-none"
+              style={{
+                width: `${100 / mobileTabBar.length}%`,
+                left: `${(activeIdx / mobileTabBar.length) * 100}%`,
+                transition: "left 0.32s cubic-bezier(0.22, 1, 0.36, 1)",
+              }}
+            >
+              <div
+                className="mx-3 h-[2px] rounded-full"
+                style={{
+                  background: "linear-gradient(90deg, transparent, hsl(var(--section-hsl, 262 80% 62%)), transparent)",
+                  boxShadow: "0 0 8px hsl(var(--section-hsl, 262 80% 62%) / 0.8)",
+                }}
+              />
+              <div
+                className="absolute inset-x-0 top-0 h-10 opacity-40 pointer-events-none"
+                style={{
+                  background: "radial-gradient(ellipse 60% 100% at 50% 0%, hsl(var(--section-hsl, 262 80% 62%) / 0.15), transparent)",
+                }}
+              />
+            </div>
+          ) : null;
+        })()}
         <div className="flex items-center">
           {mobileTabBar.map((item) => {
             const isActive =
@@ -369,12 +432,21 @@ export default function Sidebar() {
                   "flex-1 flex flex-col items-center justify-center gap-1 py-3 transition-all active:scale-95 relative",
                   isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
                 )}
+                style={isActive ? { color: "hsl(var(--section-hsl, 262 80% 62%))" } : undefined}
               >
-                {isActive && (
-                  <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full bg-primary shadow-[0_0_6px_hsl(var(--primary)/0.7)]" />
+                {/* Icon container — pill background when active */}
+                <div className={cn(
+                  "flex items-center justify-center w-9 h-7 rounded-xl transition-all duration-250",
+                  isActive ? "bg-primary/10" : ""
                 )}
-                <item.icon className={cn("h-5 w-5", isActive && "drop-shadow-[0_0_6px_hsl(var(--primary)/0.5)]")} />
-                <span className="text-[9px] font-semibold uppercase tracking-wide">{item.name}</span>
+                  style={isActive ? { background: "hsl(var(--section-hsl, 262 80% 62%) / 0.12)" } : undefined}
+                >
+                  <item.icon
+                    className="h-5 w-5"
+                    style={isActive ? { filter: "drop-shadow(0 0 6px hsl(var(--section-hsl, 262 80% 62%) / 0.8))" } : undefined}
+                  />
+                </div>
+                <span className="text-[9px] font-bold uppercase tracking-wide">{item.name}</span>
               </Link>
             );
           })}
@@ -387,17 +459,17 @@ export default function Sidebar() {
       {/* Keyboard shortcuts modal */}
       {showShortcuts && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 modal-backdrop"
           onClick={() => setShowShortcuts(false)}
         >
           <div className="relative w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
             {/* Glow ring */}
             <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-primary/20 via-transparent to-violet-500/10 pointer-events-none" />
             <div
-              className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl max-h-[80vh] overflow-y-auto shadow-2xl shadow-black/40"
+              className="relative glass-panel rounded-2xl max-h-[80vh] overflow-y-auto"
             >
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border/60 sticky top-0 bg-card/95 backdrop-blur-xl rounded-t-2xl z-10">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border/60 sticky top-0 sticky-frosted rounded-t-2xl z-10">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center flex-shrink-0">
                   <Keyboard className="h-4 w-4 text-primary" />
@@ -549,8 +621,8 @@ export default function Sidebar() {
 
 function ShortcutGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div>
-      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">{title}</p>
+    <div className="border-l-2 border-primary/20 pl-3">
+      <p className="text-[10px] font-black uppercase tracking-widest text-primary/50 mb-2">{title}</p>
       <div className="space-y-1.5">{children}</div>
     </div>
   );

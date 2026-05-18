@@ -10,9 +10,9 @@ import {
 import {
   BarChart2, Disc3, Clock, Tag, Users2, Music2,
   FileAudio, Users, FolderOpen, CheckCircle2, AlertTriangle, CalendarClock, ChevronRight,
-  LayoutDashboard, Award, TrendingUp, TrendingDown, Share2, Play, Zap,
+  LayoutDashboard, Award, TrendingUp, TrendingDown, Share2, Play, Zap, Target,
 } from "lucide-react";
-import { getAllStats, type AllStats } from "@/lib/actions/stats";
+import { getAllStats, type AllStats, type GoalsStats } from "@/lib/actions/stats";
 import { getSocialLinks, type SocialLinkWithLatestStat } from "@/lib/actions/social";
 import { cn } from "@/lib/utils";
 import { AnimatedCounter } from "@/components/ui/MotionWrapper";
@@ -48,7 +48,7 @@ const TOOLTIP_STYLE = {
   padding: "8px 12px",
 };
 
-type Tab = "resumen" | "discografia" | "maquetas" | "collabs" | "proyectos" | "redes";
+type Tab = "resumen" | "discografia" | "maquetas" | "collabs" | "proyectos" | "redes" | "metas";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType; color: string }[] = [
   { id: "resumen",     label: "Resumen",       icon: LayoutDashboard, color: "text-primary" },
@@ -57,6 +57,7 @@ const TABS: { id: Tab; label: string; icon: React.ElementType; color: string }[]
   { id: "collabs",     label: "Featúrings",     icon: Users,           color: "text-yellow-400" },
   { id: "proyectos",   label: "Proyectos",      icon: FolderOpen,      color: "text-purple-400" },
   { id: "redes",       label: "Redes",          icon: Share2,          color: "text-pink-400" },
+  { id: "metas",       label: "Metas",          icon: Target,          color: "text-emerald-400" },
 ];
 
 const PLATFORM_META: Record<string, { label: string; color: string; chartColor: string }> = {
@@ -355,6 +356,9 @@ function EstadisticasContent() {
 
           {/* ── REDES TAB ────────────────────────────────────────── */}
           {tab === "redes" && <RedesTab links={socialLinks} loading={loadingLinks} />}
+
+          {/* ── METAS TAB ────────────────────────────────────────── */}
+          {tab === "metas" && <MetasTab stats={stats?.goals ?? null} />}
         </>
       )}
     </div>
@@ -465,6 +469,63 @@ function DiscografiaTab({ stats }: { stats: AllStats["discografia"] }) {
           </SectionCard>
         )}
       </div>
+
+      {/* BPM & Key Distribution */}
+      {(stats.bpmDistribution.length > 0 || stats.keyDistribution.length > 0) && (
+        <div className="grid md:grid-cols-2 gap-6">
+          {stats.bpmDistribution.length > 0 && (
+            <SectionCard title={`BPM · ${stats.songsWithBpm} canción${stats.songsWithBpm !== 1 ? "es" : ""} analizadas`}>
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={stats.bpmDistribution} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="bpmBarGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#60a5fa" stopOpacity={1} />
+                      <stop offset="100%" stopColor="#818cf8" stopOpacity={0.6} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis dataKey="range" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} allowDecimals={false} />
+                  <Tooltip contentStyle={TOOLTIP_STYLE}
+                    formatter={(v: unknown) => [v as number, "canciones"]}
+                    labelFormatter={(l) => `${l} BPM`} />
+                  <Bar dataKey="count" fill="url(#bpmBarGrad)" radius={[6, 6, 0, 0]} maxBarSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                {stats.totalSongs - stats.songsWithBpm} canción{stats.totalSongs - stats.songsWithBpm !== 1 ? "es" : ""} sin BPM registrado
+              </p>
+            </SectionCard>
+          )}
+
+          {stats.keyDistribution.length > 0 && (
+            <SectionCard title={`Tonalidades · ${stats.songsWithKey} canción${stats.songsWithKey !== 1 ? "es" : ""} analizadas`}>
+              <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1 scrollbar-none">
+                {stats.keyDistribution.map(({ key, count }, i) => {
+                  const max = stats.keyDistribution[0].count;
+                  const pct = Math.round((count / max) * 100);
+                  const hue = Math.round((i / stats.keyDistribution.length) * 280);
+                  return (
+                    <div key={key} className="flex items-center gap-2.5">
+                      <span className="text-xs font-mono font-black w-16 flex-shrink-0 truncate" style={{ color: `hsl(${hue} 70% 65%)` }}>{key}</span>
+                      <div className="flex-1 h-2 bg-secondary/60 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-700"
+                          style={{ width: `${pct}%`, background: `hsl(${hue} 70% 55%)`, boxShadow: `0 0 6px hsl(${hue} 70% 55% / 0.4)` }}
+                        />
+                      </div>
+                      <span className="text-xs text-muted-foreground tabular-nums w-4 text-right flex-shrink-0">{count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-2">
+                {stats.totalSongs - stats.songsWithKey} canción{stats.totalSongs - stats.songsWithKey !== 1 ? "es" : ""} sin tonalidad registrada
+              </p>
+            </SectionCard>
+          )}
+        </div>
+      )}
 
       {stats.topTags.length > 0 && (
         <SectionCard title="Tags más usados">
@@ -768,10 +829,11 @@ function TargetDateBadge({ daysLeft }: { daysLeft: number }) {
 // ── Resumen (overview) tab ────────────────────────────────────────────
 
 function ResumenTab({ stats }: { stats: AllStats }) {
-  const disco = stats.discografia;
-  const maq   = stats.maquetas;
-  const col   = stats.collabs;
-  const proy  = stats.projects;
+  const disco  = stats.discografia;
+  const maq    = stats.maquetas;
+  const col    = stats.collabs;
+  const proy   = stats.projects;
+  const goals  = stats.goals;
 
   const maquetasReady = maq?.byStatus.find(s => s.status === "lista_para_publicar")?.count ?? 0;
   const maquetasPct   = maq && maq.total > 0 ? Math.round((maquetasReady / maq.total) * 100) : 0;
@@ -799,7 +861,7 @@ function ResumenTab({ stats }: { stats: AllStats }) {
   return (
     <div className="space-y-6">
       {/* Mega KPI row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <StatCard icon={Disc3}      label="Canciones"       value={String(disco?.totalSongs ?? 0)}
           sub={disco ? formatDuration(disco.totalDurationSeconds) + " de música" : undefined}
           color="text-primary" href="/discografia" />
@@ -812,6 +874,9 @@ function ResumenTab({ stats }: { stats: AllStats }) {
         <StatCard icon={FolderOpen} label="Proyectos"       value={String(proy?.total ?? 0)}
           sub={proy ? `${proyPct}% publicados` : undefined}
           color="text-purple-400" href="/proyectos" />
+        <StatCard icon={Target}     label="Metas"           value={String(goals?.total ?? 0)}
+          sub={goals && goals.total > 0 ? `${goals.completed} completada${goals.completed !== 1 ? "s" : ""} · ${goals.avgProgress}% prom.` : undefined}
+          color="text-emerald-400" href="/metas" />
       </div>
 
       {/* Year-over-year output comparison */}
@@ -968,6 +1033,34 @@ function ResumenTab({ stats }: { stats: AllStats }) {
                 <p className="text-[11px] text-red-400 mt-1.5 flex items-center gap-1">
                   <AlertTriangle className="h-3 w-3" />
                   {proy.overdue} proyecto{proy.overdue !== 1 ? "s" : ""} con fecha vencida
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Goals progress */}
+          {goals && goals.total > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Target className="h-3.5 w-3.5 text-emerald-400" />
+                  <span className="text-sm font-medium">Progreso de metas</span>
+                </div>
+                <span className="text-xs text-muted-foreground">{goals.completed}/{goals.total} completadas</span>
+              </div>
+              <div className="flex h-2.5 rounded-full overflow-hidden gap-px bg-secondary">
+                {goals.byCategory.map(c => {
+                  const pct = Math.round((c.count / goals.total) * 100);
+                  return pct > 0 ? (
+                    <div key={c.category} className="h-full transition-all duration-700 first:rounded-l-full last:rounded-r-full"
+                      style={{ width: `${pct}%`, background: c.color }}
+                      title={`${c.label}: ${c.count}`} />
+                  ) : null;
+                })}
+              </div>
+              {goals.avgProgress > 0 && (
+                <p className="text-[11px] text-muted-foreground mt-1.5">
+                  Progreso promedio activas: <span className="text-emerald-400 font-black">{goals.avgProgress}%</span>
                 </p>
               )}
             </div>
@@ -1497,6 +1590,186 @@ function RedesTab({ links, loading }: { links: SocialLinkWithLatestStat[]; loadi
           })}
         </div>
       </SectionCard>
+    </div>
+  );
+}
+
+// ── Metas Tab ─────────────────────────────────────────────────────────────────
+
+function GoalMiniRing({ pct, color }: { pct: number; color: string }) {
+  const size = 40;
+  const r = (size - 6) / 2;
+  const circ = 2 * Math.PI * r;
+  const dash = (pct / 100) * circ;
+  return (
+    <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="hsl(var(--secondary))" strokeWidth={5} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={5}
+          strokeLinecap="round" strokeDasharray={`${dash} ${circ}`}
+          style={{ transition: "stroke-dasharray 1s ease" }} />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="text-[9px] font-black tabular-nums" style={{ color }}>{pct}%</span>
+      </div>
+    </div>
+  );
+}
+
+function MetasTab({ stats }: { stats: GoalsStats | null }) {
+  if (!stats || stats.total === 0) {
+    return (
+      <div className="text-center py-20 text-muted-foreground">
+        <Target className="h-12 w-12 mx-auto mb-3 opacity-20" />
+        <p className="text-sm">Todavía no hay metas registradas</p>
+        <a href="/metas" className="inline-flex items-center gap-1 mt-3 text-xs text-primary hover:underline transition-all active:scale-95">
+          Crear primera meta <ChevronRight className="h-3 w-3" />
+        </a>
+      </div>
+    );
+  }
+
+  const completionPct = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
+
+  return (
+    <div className="space-y-6">
+      {/* KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard icon={Target}       label="Total metas"     value={String(stats.total)}     color="text-emerald-400" />
+        <StatCard icon={CheckCircle2} label="Completadas"     value={String(stats.completed)}
+          sub={`${completionPct}% del total`} color="text-green-400" />
+        <StatCard icon={TrendingUp}   label="En progreso"     value={String(stats.active)}    color="text-blue-400" />
+        <StatCard icon={Zap}          label="Progreso prom."  value={`${stats.avgProgress}%`} color="text-yellow-400" />
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        {/* Completion radial */}
+        <SectionCard title="Tasa de finalización">
+          <div className="flex items-center gap-6">
+            <div className="relative flex-shrink-0">
+              <ResponsiveContainer width={120} height={120}>
+                <RadialBarChart
+                  cx="50%" cy="50%"
+                  innerRadius={36} outerRadius={56}
+                  startAngle={90} endAngle={-270}
+                  data={[
+                    { name: "Completadas", value: completionPct,       fill: "#4ade80" },
+                    { name: "Pendientes",  value: 100 - completionPct, fill: "hsl(var(--secondary))" },
+                  ]}
+                  barSize={14}
+                >
+                  <RadialBar dataKey="value" cornerRadius={6} background={false} />
+                </RadialBarChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-xl font-black tabular-nums leading-none">{completionPct}%</span>
+                <span className="text-[9px] text-muted-foreground">listas</span>
+              </div>
+            </div>
+            <div className="space-y-2.5 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
+                <span className="text-sm flex-1">Completadas</span>
+                <span className="text-sm font-bold tabular-nums">{stats.completed}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0" />
+                <span className="text-sm flex-1">En progreso</span>
+                <span className="text-sm font-bold tabular-nums">{stats.active}</span>
+              </div>
+              {stats.avgProgress > 0 && (
+                <div className="border-t border-border/60 pt-2">
+                  <p className="text-[11px] text-muted-foreground">Progreso promedio activas</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all duration-700 bg-emerald-400"
+                        style={{ width: `${stats.avgProgress}%` }} />
+                    </div>
+                    <span className="text-xs font-black text-emerald-400 tabular-nums">{stats.avgProgress}%</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </SectionCard>
+
+        {/* By category */}
+        {stats.byCategory.length > 0 && (
+          <SectionCard title="Metas por categoría">
+            <div className="space-y-3">
+              {stats.byCategory.map(({ label, count, completed, color }) => {
+                const catPct = count > 0 ? Math.round((completed / count) * 100) : 0;
+                return (
+                  <div key={label} className="flex items-center gap-3">
+                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
+                    <span className="text-sm flex-1 truncate">{label}</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">{completed}/{count}</span>
+                    <div className="w-20 h-1.5 bg-secondary rounded-full overflow-hidden flex-shrink-0">
+                      <div className="h-full rounded-full transition-all duration-700"
+                        style={{ width: `${catPct}%`, background: color }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </SectionCard>
+        )}
+
+        {/* Category bar chart */}
+        {stats.byCategory.length > 1 && (
+          <SectionCard title="Distribución por categoría">
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart
+                data={stats.byCategory.map(c => ({ ...c, activas: c.count - c.completed }))}
+                margin={{ top: 4, right: 8, left: -20, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} allowDecimals={false} />
+                <Tooltip contentStyle={TOOLTIP_STYLE}
+                  formatter={(v: unknown, name: unknown) => [v as number, name === "completed" ? "completadas" : "activas"]} />
+                <Bar dataKey="activas"   stackId="a" radius={[0,0,0,0]}>
+                  {stats.byCategory.map((c, i) => <Cell key={i} fill={`${c.color}88`} />)}
+                </Bar>
+                <Bar dataKey="completed" stackId="a" radius={[4,4,0,0]}>
+                  {stats.byCategory.map((c, i) => <Cell key={i} fill={c.color} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+            <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-4">
+              <span className="flex items-center gap-1"><span className="inline-block w-3 h-2 rounded-sm bg-emerald-400" /> completadas</span>
+              <span className="flex items-center gap-1"><span className="inline-block w-3 h-2 rounded-sm bg-emerald-400/40" /> activas</span>
+            </p>
+          </SectionCard>
+        )}
+
+        {/* Near deadline */}
+        {stats.nearDeadline.length > 0 && (
+          <SectionCard title="Próximas fechas límite (60 días)">
+            <div className="space-y-3">
+              {stats.nearDeadline.map((g) => (
+                <a key={g.id} href="/metas"
+                  className="flex items-center gap-3 -mx-1 px-1 py-1.5 rounded-xl hover:bg-secondary/60 transition-all group">
+                  <GoalMiniRing pct={g.pct} color={g.categoryColor} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{g.title}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                        style={{ background: `${g.categoryColor}22`, color: g.categoryColor }}>
+                        {g.categoryLabel}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(g.target_date).toLocaleDateString("es-AR", { day: "numeric", month: "short" })}
+                      </span>
+                    </div>
+                  </div>
+                  <TargetDateBadge daysLeft={g.daysLeft} />
+                </a>
+              ))}
+            </div>
+          </SectionCard>
+        )}
+      </div>
     </div>
   );
 }

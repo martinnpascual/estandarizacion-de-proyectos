@@ -437,16 +437,17 @@ export default function CollabsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card">
+      <div className="card-premium relative overflow-hidden rounded-2xl">
         <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/8 via-transparent to-transparent pointer-events-none" />
-        <div className="absolute -top-10 -right-10 w-40 h-40 bg-yellow-500/6 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-yellow-500/8 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-8 -left-8 w-28 h-28 bg-amber-400/5 rounded-full blur-2xl pointer-events-none" />
         <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-5">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-500/30 to-yellow-600/10 border border-yellow-500/20 flex items-center justify-center flex-shrink-0">
               <Users className="h-5 w-5 text-yellow-400" />
             </div>
             <div>
-              <h1 className="text-lg font-bold leading-tight">Featuring</h1>
+              <h1 className="text-xl font-black tracking-tight leading-tight gradient-text">Featuring</h1>
               <p className="text-muted-foreground text-xs mt-0.5">Colaboraciones con otros artistas</p>
             </div>
           </div>
@@ -480,7 +481,7 @@ export default function CollabsPage() {
             )}
             <button
               onClick={openCreate}
-              className="flex items-center gap-2 px-4 py-2 bg-yellow-500/90 hover:bg-yellow-500 text-black rounded-xl transition-all active:scale-95 text-sm font-semibold shadow-lg shadow-yellow-500/20 hover:shadow-yellow-500/30"
+              className="flex items-center gap-2 px-4 py-2 bg-yellow-500/90 hover:bg-yellow-500 text-black rounded-xl transition-all active:scale-95 text-sm font-black shadow-lg shadow-yellow-500/20 hover:shadow-yellow-500/30 btn-shine"
             >
               <Plus className="h-4 w-4" />
               Nueva collab
@@ -524,8 +525,8 @@ export default function CollabsPage() {
                 className={cn(
                   "flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all active:scale-95",
                   statusFilter === s.value
-                    ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 font-semibold"
-                    : "bg-secondary text-muted-foreground hover:text-foreground"
+                    ? "bg-yellow-500/18 text-yellow-400 border border-yellow-500/40 font-black shadow-[0_0_10px_hsl(50_80%_50%/0.15)]"
+                    : "font-medium bg-secondary text-muted-foreground hover:text-foreground hover:border hover:border-yellow-500/20"
                 )}
               >
                 {s.label}
@@ -533,7 +534,7 @@ export default function CollabsPage() {
                   <span className={cn(
                     "text-[10px] px-1.5 py-0.5 rounded-full tabular-nums",
                     statusFilter === s.value
-                      ? "bg-yellow-500/20 text-yellow-400"
+                      ? "bg-yellow-500/25 text-yellow-400 font-black"
                       : "bg-secondary/80 text-muted-foreground"
                   )}>
                     {count}
@@ -552,8 +553,8 @@ export default function CollabsPage() {
                 className={cn(
                   "flex items-center gap-1.5 text-xs px-2.5 py-2 rounded-xl border transition-all active:scale-95 flex-shrink-0 whitespace-nowrap",
                   noDeadlineFilter
-                    ? "bg-orange-500/15 border-orange-500/30 text-orange-400"
-                    : "bg-secondary border-0 text-muted-foreground hover:text-foreground"
+                    ? "bg-orange-500/18 border border-orange-500/45 text-orange-400 font-black shadow-[0_0_10px_hsl(30_80%_50%/0.15)]"
+                    : "bg-secondary border border-border/50 text-muted-foreground hover:text-foreground hover:border-orange-500/25"
                 )}
               >
                 <CalendarDays className={cn("h-3.5 w-3.5", noDeadlineFilter ? "text-orange-400" : "")} />
@@ -570,8 +571,8 @@ export default function CollabsPage() {
               className={cn(
                 "flex items-center gap-1.5 text-xs px-2.5 py-2 rounded-xl border transition-all active:scale-95 flex-shrink-0 whitespace-nowrap",
                 artistFilter === artist
-                  ? "bg-yellow-500/15 border-yellow-500/30 text-yellow-400"
-                  : "bg-secondary border-0 text-muted-foreground hover:text-foreground"
+                  ? "bg-yellow-500/18 border border-yellow-500/45 text-yellow-400 font-black shadow-[0_0_10px_hsl(50_80%_50%/0.15)]"
+                  : "bg-secondary border border-border/50 text-muted-foreground hover:text-foreground hover:border-yellow-500/25"
               )}
               title={`Filtrar por artista: ${artist}`}
             >
@@ -601,8 +602,8 @@ export default function CollabsPage() {
 
       {/* Pipeline bar */}
       {!loading && !error && collabs.length > 0 && (
-        <div className="bg-card border border-border/60 rounded-2xl p-4 space-y-3">
-          <div className="flex h-2.5 rounded-full overflow-hidden gap-px">
+        <div className="card-premium rounded-2xl p-4 space-y-3">
+          <div className="flex h-3.5 rounded-full overflow-hidden gap-[2px] shadow-[inset_0_1px_3px_hsl(0_0%_0%/0.3),0_1px_0_hsl(0_0%_100%/0.05)]">
             {(["propuesta_enviada","en_grabacion","recibido","mezclando","listo"] as CollabStatus[]).map((s) => {
               const pct = Math.round(((statusCounts[s] ?? 0) / collabs.length) * 100);
               if (pct === 0) return null;
@@ -611,8 +612,12 @@ export default function CollabsPage() {
                   key={s}
                   onClick={() => setStatusFilter(s)}
                   title={`${translateCollabStatus(s)}: ${statusCounts[s] ?? 0}`}
-                  className="h-full transition-opacity hover:opacity-80"
-                  style={{ width: `${pct}%`, background: STATUS_BAR_COLORS[s] }}
+                  className="pipeline-segment h-full relative overflow-hidden"
+                  style={{
+                    width: `${pct}%`,
+                    background: `linear-gradient(180deg, color-mix(in srgb, ${STATUS_BAR_COLORS[s]} 80%, white 20%) 0%, ${STATUS_BAR_COLORS[s]} 100%)`,
+                    boxShadow: `inset 0 1px 0 hsl(0 0% 100% / 0.25)`,
+                  }}
                 />
               );
             })}
@@ -628,11 +633,11 @@ export default function CollabsPage() {
                   onClick={() => setStatusFilter(statusFilter === s ? "todos" : s)}
                   className="flex items-center gap-1.5 text-xs transition-opacity hover:opacity-70"
                 >
-                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: STATUS_BAR_COLORS[s] }} />
-                  <span className={statusFilter === s ? "font-semibold text-foreground" : "text-muted-foreground"}>
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: STATUS_BAR_COLORS[s], boxShadow: `0 0 6px ${STATUS_BAR_COLORS[s]}` }} />
+                  <span className={statusFilter === s ? "font-black text-foreground" : "text-muted-foreground"}>
                     {translateCollabStatus(s)}
                   </span>
-                  <span className="font-medium tabular-nums">{n}</span>
+                  <span className="font-black tabular-nums">{n}</span>
                   <span className="text-muted-foreground">({pct}%)</span>
                 </button>
               );
@@ -652,19 +657,19 @@ export default function CollabsPage() {
             return (
               <div className="flex flex-wrap gap-2 pt-1 border-t border-border/60/50">
                 {uniqueArtists > 0 && (
-                  <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground px-2 py-0.5 rounded-full bg-secondary/50">
+                  <span className="stat-badge text-muted-foreground">
                     <Users className="h-3 w-3 flex-shrink-0" />
                     {uniqueArtists} artista{uniqueArtists !== 1 ? "s" : ""}
                   </span>
                 )}
                 {completedCount > 0 && (
-                  <span className="flex items-center gap-1.5 text-[11px] text-green-400 px-2 py-0.5 rounded-full bg-green-500/10">
-                    <CheckCircle2 className="h-3 w-3 flex-shrink-0" />
+                  <span className="flex items-center gap-1.5 text-[11px] text-green-400 px-2 py-0.5 rounded-full bg-green-500/12 border border-green-500/25 font-black shadow-[0_0_8px_hsl(142_70%_45%/0.10)]">
+                    <CheckCircle2 className="h-3 w-3 flex-shrink-0 drop-shadow-[0_0_3px_currentColor]" />
                     {completedCount} lista{completedCount !== 1 ? "s" : ""}
                   </span>
                 )}
                 {withDeadline > 0 && (
-                  <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground px-2 py-0.5 rounded-full bg-secondary/50">
+                  <span className="stat-badge text-muted-foreground">
                     <CalendarDays className="h-3 w-3 flex-shrink-0" />
                     {withDeadline} con deadline
                   </span>
@@ -751,7 +756,7 @@ export default function CollabsPage() {
       )}
 
       {/* Lista */}
-      <div className={cn("bg-card rounded-2xl border border-border/60 overflow-hidden", viewMode === "board" ? "hidden" : "")}>
+      <div className={cn("card-premium rounded-2xl overflow-hidden", viewMode === "board" ? "hidden" : "")}>
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -785,7 +790,7 @@ export default function CollabsPage() {
                 <circle cx="52" cy="31.5" r="2" fill="#facc15" opacity="0.5" />
               </svg>
             </div>
-            <h3 className="text-base font-semibold mb-1">Sin colaboraciones todavía</h3>
+            <h3 className="text-base font-black mb-1">Sin colaboraciones todavía</h3>
             <p className="text-muted-foreground text-sm max-w-xs leading-relaxed">
               Registrá tus featurings, colabos y proyectos con otros artistas para tener todo en un solo lugar.
             </p>
@@ -833,10 +838,14 @@ export default function CollabsPage() {
               const deadlineInfo = getDeadlineInfo(collab.deadline);
               const isExpanded = expandedId === collab.id;
               return (
-              <div key={collab.id} className={cn("bg-card", deadlineInfo?.rowBorder)}>
+              <div key={collab.id} className={cn(
+                "bg-card",
+                deadlineInfo?.rowBorder,
+                (deadlineInfo?.urgency === "overdue" || deadlineInfo?.urgency === "today") && "row-urgency-overdue"
+              )}>
                 <div
                   className={cn(
-                    "flex items-center gap-3 px-4 py-3.5 hover:bg-secondary/40 transition-all group",
+                    "row-interactive flex items-center gap-3 px-4 py-3.5 hover:bg-secondary/40 transition-all group",
                     (deadlineInfo?.urgency === "overdue" || deadlineInfo?.urgency === "today") && "bg-red-500/5 hover:bg-red-500/10",
                     deadlineInfo?.urgency === "tomorrow" && "bg-orange-500/5 hover:bg-orange-500/10",
                   )}
@@ -853,7 +862,7 @@ export default function CollabsPage() {
                 </button>
 
                 {/* Avatar artista */}
-                <div className="w-9 h-9 rounded-full bg-yellow-500/15 flex items-center justify-center flex-shrink-0">
+                <div className="w-9 h-9 rounded-full bg-yellow-500/15 border border-yellow-500/25 flex items-center justify-center flex-shrink-0 shadow-[0_0_8px_hsl(45_90%_55%/0.15)] group-hover:shadow-[0_0_12px_hsl(45_90%_55%/0.25)] transition-shadow">
                   <span className="text-sm font-bold text-yellow-400">
                     {collab.artist_name[0]?.toUpperCase()}
                   </span>
@@ -861,7 +870,7 @@ export default function CollabsPage() {
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium truncate">{collab.song_title}</p>
+                    <p className="text-sm font-black truncate">{collab.song_title}</p>
                     {collab.notes && (
                       <StickyNote className="h-3 w-3 text-muted-foreground flex-shrink-0 opacity-60" />
                     )}
@@ -908,12 +917,13 @@ export default function CollabsPage() {
                     return (
                       <span
                         key={step}
+                        style={isCurrent ? { color: STATUS_BAR_COLORS[collab.status] } : undefined}
                         className={cn(
                           "rounded-full transition-all",
                           isCurrent
-                            ? cn("w-2.5 h-2.5", PIPELINE_DOT_COLORS[collab.status])
+                            ? cn("w-2.5 h-2.5 pipeline-dot-current", PIPELINE_DOT_COLORS[collab.status])
                             : isDone
-                            ? cn("w-1.5 h-1.5 opacity-40", PIPELINE_DOT_COLORS[collab.status])
+                            ? cn("w-1.5 h-1.5 opacity-50", PIPELINE_DOT_COLORS[collab.status])
                             : "w-1.5 h-1.5 bg-border/60"
                         )}
                       />
@@ -936,7 +946,10 @@ export default function CollabsPage() {
                     {advancingId !== collab.id && <span className="hidden md:inline">{STATUS_NEXT_LABEL[collab.status]}</span>}
                   </button>
                 )}
-                <span className={cn("px-2 py-0.5 rounded-full text-[11px] font-medium border flex-shrink-0", STATUS_COLORS[collab.status])}>
+                <span
+                  className={cn("px-2 py-0.5 rounded-full text-[11px] font-medium border flex-shrink-0 transition-all", STATUS_COLORS[collab.status])}
+                  style={{ boxShadow: `0 0 8px ${STATUS_BAR_COLORS[collab.status]}50` }}
+                >
                   {translateCollabStatus(collab.status)}
                 </span>
 
@@ -1060,13 +1073,13 @@ export default function CollabsPage() {
           >
             {/* Glow ring */}
             <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-yellow-500/20 via-transparent to-yellow-600/10 pointer-events-none" />
-            <div className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl shadow-2xl shadow-black/40">
+            <div className="relative glass-panel rounded-2xl">
             <div className="flex items-center justify-between p-5 border-b border-border/60">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-xl bg-yellow-500/15 border border-yellow-500/20 flex items-center justify-center flex-shrink-0">
                   <Users className="h-4 w-4 text-yellow-400" />
                 </div>
-                <h2 className="text-base font-semibold">
+                <h2 className="text-base font-black">
                   {editingCollab ? "Editar collab" : "Nueva collab"}
                 </h2>
               </div>
@@ -1100,8 +1113,8 @@ export default function CollabsPage() {
                 <textarea value={form.notes ?? ""} onChange={(e) => setField("notes", e.target.value || null)} rows={2} className={iClass(false) + " resize-none"} />
               </FormField>
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => { setShowForm(false); setEditingCollab(undefined); }} className="flex-1 py-2.5 rounded-xl border border-border/60 text-sm font-semibold hover:bg-secondary/60 transition-all active:scale-95">Cancelar</button>
-                <button type="submit" disabled={submitting} className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                <button type="button" onClick={() => { setShowForm(false); setEditingCollab(undefined); }} className="flex-1 py-2.5 rounded-xl border border-border/60 text-sm font-black hover:bg-secondary/60 transition-all active:scale-95">Cancelar</button>
+                <button type="submit" disabled={submitting} className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-black hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                   {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
                   {editingCollab ? "Guardar" : "Crear"}
                 </button>
@@ -1231,15 +1244,15 @@ function CollabKanbanBoard({ collabs, onEdit, onDelete, onStatusChange }: Kanban
           >
             {/* Column header */}
             <div className={cn(
-              "flex items-center justify-between px-3 py-2 rounded-t-2xl border transition-colors",
+              "flex items-center justify-between px-3 py-2.5 rounded-t-2xl border transition-colors",
               col.bg,
               isDropTarget && col.border
             )}>
               <div className="flex items-center gap-2">
-                <span className={cn("w-2 h-2 rounded-full transition-transform", col.dot, isDropTarget && "scale-125")} />
-                <span className={cn("text-xs font-semibold", col.color)}>{col.label}</span>
+                <span className={cn("w-2.5 h-2.5 rounded-full transition-transform shadow-[0_0_6px_currentColor]", col.dot, isDropTarget && "scale-125")} />
+                <span className={cn("text-xs font-black tracking-tight", col.color)}>{col.label}</span>
               </div>
-              <span className={cn("text-xs font-bold tabular-nums", col.color)}>{colCollabs.length}</span>
+              <span className={cn("text-xs font-black tabular-nums px-1.5 py-0.5 rounded-full bg-black/20", col.color)}>{colCollabs.length}</span>
             </div>
 
             {/* Column body */}
@@ -1268,17 +1281,18 @@ function CollabKanbanBoard({ collabs, onEdit, onDelete, onStatusChange }: Kanban
                         onDragStart={(e) => handleDragStart(e, c)}
                         onDragEnd={handleDragEnd}
                         className={cn(
-                          "bg-card border border-border/60 rounded-2xl p-3 group transition-all duration-150 select-none",
+                          "card-premium card-accent-top card-gradient-border rounded-2xl p-3 group transition-all duration-150 select-none",
                           isDragging && "opacity-40 scale-95 shadow-lg",
-                          !isDragging && "cursor-grab active:cursor-grabbing hover:border-muted-foreground/30 hover:shadow-sm hover:-translate-y-0.5",
+                          !isDragging && "cursor-grab active:cursor-grabbing hover:border-muted-foreground/30 hover:shadow-md hover:-translate-y-0.5",
                           dInfo && (dInfo.urgency === "overdue" || dInfo.urgency === "today") && "border-l-2 border-red-500/60"
                         )}
+                        style={{ "--card-accent": STATUS_BAR_COLORS[c.status] } as React.CSSProperties}
                       >
                         {/* Drag handle + title */}
                         <div className="flex items-start gap-1.5 mb-1.5">
                           <GripVertical className="h-3 w-3 text-muted-foreground/30 flex-shrink-0 mt-0.5" />
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold truncate leading-snug">{c.song_title}</p>
+                            <p className="text-xs font-black truncate leading-snug">{c.song_title}</p>
                             <p className="text-[11px] text-muted-foreground truncate">ft. {c.artist_name}</p>
                           </div>
                           {c.notes && <StickyNote className="h-3 w-3 text-muted-foreground/40 flex-shrink-0" />}

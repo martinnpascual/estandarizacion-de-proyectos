@@ -194,8 +194,8 @@ export default function CommentsPanel({
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
-        <h3 className="text-sm font-semibold flex items-center gap-2">
-          <MessageSquare className="h-4 w-4 text-primary" />
+        <h3 className="text-sm font-black flex items-center gap-2">
+          <MessageSquare className="h-4 w-4 text-primary drop-shadow-[0_0_3px_currentColor]" />
           Comentarios
           {comments.length > 0 && (
             <span className="text-xs text-muted-foreground">
@@ -375,7 +375,7 @@ function CommentItem({
         {/* Contenido */}
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="text-xs font-medium">
+            <span className="text-xs font-semibold">
               {comment.author?.full_name ?? "Usuario"}
             </span>
             <span className="text-[10px] text-muted-foreground" title={new Date(comment.created_at).toLocaleString("es-AR")}>
@@ -403,7 +403,7 @@ function CommentItem({
                 <button
                   onClick={onSaveEdit}
                   disabled={savingEdit || !editBody.trim()}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/80 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-primary text-primary-foreground text-xs font-black hover:bg-primary/80 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
                 >
                   {savingEdit ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
                   Guardar

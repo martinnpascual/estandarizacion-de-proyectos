@@ -26,6 +26,7 @@ export function useTheme() {
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>("dark");
+  const [flashing, setFlashing] = useState(false);
 
   // Read from localStorage on mount (avoids SSR mismatch)
   useEffect(() => {
@@ -49,6 +50,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }
 
   const toggle = useCallback(() => {
+    // Flash overlay — smooth visual wipe on theme change
+    setFlashing(true);
+    setTimeout(() => setFlashing(false), 380);
+
     setTheme((prev) => {
       const next: Theme = prev === "dark" ? "light" : "dark";
       localStorage.setItem("theme", next);
@@ -59,6 +64,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <ThemeContext.Provider value={{ theme, toggle }}>
+      {/* Theme-change flash overlay */}
+      {flashing && <div className="theme-flash-overlay" key={Date.now()} />}
       {children}
     </ThemeContext.Provider>
   );

@@ -52,7 +52,7 @@ export function useConfirm() {
   const ConfirmDialog = dialog ? (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
       <div
-        className="bg-card/90 backdrop-blur-xl border border-border/60 rounded-2xl w-full max-w-sm shadow-[0_32px_80px_hsl(0_0%_0%/0.5)]"
+        className="glass-panel rounded-2xl w-full max-w-sm"
         style={{ animation: "fadeInScale 0.14s cubic-bezier(0.16,1,0.3,1)" }}
       >
         <div className="p-5">
@@ -70,7 +70,7 @@ export function useConfirm() {
               </div>
             )}
             <div className="flex-1 pt-0.5">
-              <h3 className="font-semibold text-sm leading-snug">{dialog.title}</h3>
+              <h3 className="font-black text-sm leading-snug">{dialog.title}</h3>
               {dialog.message && (
                 <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
                   {dialog.message}
@@ -90,7 +90,7 @@ export function useConfirm() {
             <button
               onClick={handleConfirm}
               className={cn(
-                "flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2",
+                "flex-1 py-2.5 rounded-xl text-sm font-black transition-all active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2",
                 isDanger
                   ? "bg-red-500/90 text-white hover:bg-red-500 shadow-[0_0_16px_hsl(0_84%_60%/0.25)] focus:ring-red-500"
                   : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_0_16px_hsl(var(--primary)/0.25)] focus:ring-primary"

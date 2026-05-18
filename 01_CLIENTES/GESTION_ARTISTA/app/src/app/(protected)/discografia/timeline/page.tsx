@@ -152,7 +152,7 @@ export default function TimelinePage() {
       </div>
 
       {/* Header */}
-      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card">
+      <div className="card-premium relative overflow-hidden rounded-2xl">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-transparent to-transparent pointer-events-none" />
         <div className="absolute -top-10 -right-10 w-40 h-40 bg-primary/6 rounded-full blur-3xl pointer-events-none" />
         <div className="relative flex items-center justify-between px-6 py-5">
@@ -161,7 +161,7 @@ export default function TimelinePage() {
               <Disc3 className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-lg font-bold leading-tight">Timeline de lanzamientos</h1>
+              <h1 className="text-xl font-black tracking-tight leading-tight gradient-text">Timeline de lanzamientos</h1>
               <p className="text-muted-foreground text-xs mt-0.5">Toda la discografía ordenada cronológicamente</p>
             </div>
           </div>
@@ -175,9 +175,9 @@ export default function TimelinePage() {
           { label: "Años activo", value: yearsActive, icon: <Disc3 className="h-4 w-4" /> },
           { label: "Duración total", value: totalHours > 0 ? `${totalHours}h ${totalMins}m` : `${totalMins}m`, icon: <Clock className="h-4 w-4" /> },
         ].map(({ label, value, icon }) => (
-          <div key={label} className="bg-card/90 border border-border/60 rounded-2xl p-4 text-center backdrop-blur-xl">
+          <div key={label} className="card-premium rounded-2xl p-4 text-center">
             <div className="flex items-center justify-center gap-1.5 text-muted-foreground mb-1">{icon}<span className="text-xs">{label}</span></div>
-            <p className="text-xl font-bold tabular-nums">{value}</p>
+            <p className="text-xl font-black tabular-nums">{value}</p>
           </div>
         ))}
       </div>
@@ -190,8 +190,9 @@ export default function TimelinePage() {
         </div>
       ) : (
         <div className="relative">
-          {/* Vertical line */}
-          <div className="absolute left-[76px] top-0 bottom-0 w-px bg-border/60" />
+          {/* Vertical line — gradient fade */}
+          <div className="absolute left-[76px] top-0 bottom-0 w-px"
+            style={{ background: "linear-gradient(to bottom, transparent 0%, hsl(var(--border)/0.6) 5%, hsl(var(--border)/0.6) 95%, transparent 100%)" }} />
 
           <div className="space-y-10">
             {yearGroups.map((group, groupIdx) => (
@@ -202,13 +203,14 @@ export default function TimelinePage() {
                     "w-[76px] flex-shrink-0 flex items-center justify-end pr-4",
                     groupIdx === 0 ? "text-primary" : "text-muted-foreground"
                   )}>
-                    <span className="text-sm font-bold tabular-nums">{group.year}</span>
+                    <span className="text-sm font-black tabular-nums">{group.year}</span>
                   </div>
                   {/* Year dot on the line */}
                   <div className={cn(
                     "absolute left-[72px] w-3 h-3 rounded-full border-2 border-background",
-                    groupIdx === 0 ? "bg-primary" : "bg-muted-foreground"
-                  )} />
+                    groupIdx === 0 ? "bg-primary" : "bg-muted-foreground/60"
+                  )}
+                  style={groupIdx === 0 ? { boxShadow: "0 0 0 3px hsl(var(--primary)/0.2), 0 0 12px hsl(var(--primary)/0.4)" } : undefined} />
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">
                       {group.songs.length} canción{group.songs.length !== 1 ? "es" : ""}
@@ -239,7 +241,7 @@ export default function TimelinePage() {
                         )}
                       >
                         {/* Cover art */}
-                        <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-secondary flex-shrink-0 flex items-center justify-center">
+                        <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-secondary flex-shrink-0 flex items-center justify-center group-hover:scale-105 transition-transform">
                           {song.cover_art_url ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={song.cover_art_url} alt={song.title} className="w-full h-full object-cover" />
@@ -251,7 +253,7 @@ export default function TimelinePage() {
                         {/* Info */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <p className={cn("text-sm font-medium truncate", isPlaying && "text-primary")}>
+                            <p className={cn("text-sm font-black truncate", isPlaying && "text-primary")}>
                               {song.title}
                             </p>
                             {song.is_public ? (

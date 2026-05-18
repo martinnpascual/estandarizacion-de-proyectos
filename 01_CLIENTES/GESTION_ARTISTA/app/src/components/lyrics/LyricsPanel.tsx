@@ -172,16 +172,16 @@ export default function LyricsPanel({
       />
 
       {/* Panel */}
-      <div className="fixed right-0 top-0 z-50 h-full w-full max-w-md bg-card border-l border-border/60 shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
+      <div className="fixed right-0 top-0 z-50 h-full w-full max-w-md glass-panel border-l border-border/20 flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border/60 flex-shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-7 h-7 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center flex-shrink-0">
-              <FileText className="h-3.5 w-3.5 text-primary" />
+              <FileText className="h-3.5 w-3.5 text-primary drop-shadow-[0_0_3px_currentColor]" />
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-semibold truncate">{title}</p>
+              <p className="text-sm font-black truncate">{title}</p>
               {artist && (
                 <p className="text-[11px] text-muted-foreground truncate">{artist}</p>
               )}
@@ -279,7 +279,7 @@ export default function LyricsPanel({
                   return (
                     <div key={i} className="space-y-1.5">
                       {label && (
-                        <p className="text-[10px] font-semibold uppercase tracking-widest text-primary/70">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-primary/70">
                           {label}
                         </p>
                       )}
@@ -338,7 +338,7 @@ export default function LyricsPanel({
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-black hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {saving
                     ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Guardando…</>

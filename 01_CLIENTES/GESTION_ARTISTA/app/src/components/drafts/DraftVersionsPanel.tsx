@@ -133,8 +133,8 @@ export default function DraftVersionsPanel({ draftId, draftTitle }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 bg-secondary/20">
         <div className="flex items-center gap-2">
-          <History className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-xs font-medium text-muted-foreground">
+          <History className="h-3.5 w-3.5 text-primary/60 drop-shadow-[0_0_3px_currentColor]" />
+          <span className="text-xs font-semibold text-muted-foreground">
             Versiones{" "}
             {!loading && versions.length > 0 && (
               <span className="text-primary">({versions.length})</span>
@@ -206,12 +206,12 @@ export default function DraftVersionsPanel({ draftId, draftTitle }: Props) {
             <div
               key={v.id}
               className={cn(
-                "flex items-center gap-3 px-4 py-2.5 transition-all group",
+                "row-interactive flex items-center gap-3 px-4 py-2.5 transition-all group",
                 isPlaying
                   ? "bg-primary/5"
                   : isActive
                   ? "bg-primary/3"
-                  : "hover:bg-secondary/30"
+                  : ""
               )}
             >
               {/* Version badge or waveform */}
@@ -220,8 +220,10 @@ export default function DraftVersionsPanel({ draftId, draftTitle }: Props) {
                   <WaveformBars />
                 ) : (
                   <span className={cn(
-                    "text-[10px] font-bold px-1.5 py-0.5 rounded",
-                    isActive ? "bg-primary/20 text-primary" : "text-muted-foreground bg-secondary"
+                    "text-[10px] font-black px-1.5 py-0.5 rounded-md border",
+                    isActive
+                      ? "bg-primary/20 text-primary border-primary/30 shadow-[0_0_6px_hsl(var(--primary)/0.3)]"
+                      : "text-muted-foreground bg-secondary border-border/50"
                   )}>
                     v{v.version_number}
                   </span>

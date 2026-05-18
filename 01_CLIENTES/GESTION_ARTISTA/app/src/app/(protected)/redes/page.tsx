@@ -371,28 +371,62 @@ export default function RedesPage() {
   );
   const urlRef = useRef<HTMLInputElement>(null);
 
+  const [syncResults, setSyncResults] = useState<null | Array<{ platform: string; status: string; followers?: number | null; error?: string }>>(null);
+
   async function handleAutoSync() {
     setIsSyncing(true);
+    setSyncResults(null);
     try {
       const result = await syncSocialStats();
       if (result.error) {
         toast.error(result.error);
-      } else if (result.synced === 0) {
-        const errors = result.results.filter(r => r.status === "error");
-        if (errors.length > 0) {
-          toast.error(`Error al sincronizar: ${errors[0].error ?? "desconocido"}`);
+        return;
+      }
+
+      setSyncResults(result.results);
+
+      const ok      = result.results.filter(r => r.status === "ok");
+      const errors  = result.results.filter(r => r.status === "error");
+      const skipped = result.results.filter(r => r.status === "skipped");
+
+      // Reload data if at least one platform synced successfully
+      if (ok.length > 0) {
+        const names = ok.map(r => capitalize(r.platform)).join(", ");
+        toast.success(`✅ Sincronizado: ${names}`);
+        await load();
+      }
+
+      if (errors.length > 0 && ok.length === 0) {
+        // All failed — show the first meaningful error
+        const first = errors[0];
+        const isKeyMissing = first.error?.toLowerCase().includes("api_key") || first.error?.toLowerCase().includes("no configurada");
+        toast.error(
+          isKeyMissing
+            ? `Falta configurar API key para ${capitalize(first.platform)}. Ver sección "Configuración" más abajo.`
+            : `Error en ${capitalize(first.platform)}: ${first.error ?? "desconocido"}`
+        );
+      } else if (errors.length > 0 && ok.length > 0) {
+        // Partial success
+        const errNames = errors.map(r => capitalize(r.platform)).join(", ");
+        toast.info(`⚠️ ${errNames}: no se pudo sincronizar (ver detalles)`);
+      }
+
+      if (ok.length === 0 && errors.length === 0) {
+        if (skipped.length > 0) {
+          toast.info("Instagram y TikTok no tienen auto-sync (requieren OAuth)");
         } else {
-          toast.info("No hay plataformas con auto-sync configuradas");
+          toast.info("No hay plataformas con auto-sync disponibles");
         }
-      } else {
-        toast.success(`✅ ${result.synced} plataforma${result.synced !== 1 ? "s" : ""} sincronizadas automáticamente`);
-        await load(); // Refresh stats
       }
     } catch {
-      toast.error("Error al sincronizar");
+      toast.error("Error inesperado al sincronizar");
     } finally {
       setIsSyncing(false);
     }
+  }
+
+  function capitalize(s: string) {
+    return s.charAt(0).toUpperCase() + s.slice(1);
   }
 
   // Batch stats form
@@ -1094,6 +1128,70 @@ export default function RedesPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* ── Sync Results Panel ─────────────────────────────────────────────── */}
+      {syncResults && syncResults.length > 0 && (
+        <div className="card-premium rounded-2xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black text-muted-foreground uppercase tracking-widest">Resultado del sync</span>
+            <button onClick={() => setSyncResults(null)} className="p-1 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-all active:scale-95">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="space-y-2">
+            {syncResults.map((r) => {
+              const meta = PLATFORM_META[r.platform as SocialPlatform];
+              const isOk = r.status === "ok";
+              const isSkipped = r.status === "skipped";
+              const isError = r.status === "error";
+              const isKeyMissing = r.error?.toLowerCase().includes("no configurada") || r.error?.toLowerCase().includes("api_key");
+              return (
+                <div key={r.platform} className={cn(
+                  "flex items-start gap-3 px-3 py-2 rounded-xl text-xs",
+                  isOk ? "bg-green-500/8 border border-green-500/20" :
+                  isError ? "bg-red-500/8 border border-red-500/20" :
+                  "bg-secondary/50"
+                )}>
+                  {meta && <span className={cn("w-2.5 h-2.5 rounded-full flex-shrink-0 mt-0.5", meta.color)} />}
+                  <div className="flex-1 min-w-0">
+                    <span className="font-black">
+                      {meta?.label ?? capitalize(r.platform)}
+                    </span>
+                    {isOk && r.followers != null && (
+                      <span className="text-green-400 ml-2">
+                        ✓ {formatNumber(r.followers)} seguidores
+                      </span>
+                    )}
+                    {isOk && r.followers == null && <span className="text-green-400 ml-2">✓ Sincronizado</span>}
+                    {isSkipped && <span className="text-muted-foreground ml-2">— Sin auto-sync (requiere OAuth)</span>}
+                    {isError && (
+                      <p className={cn("mt-0.5", isKeyMissing ? "text-yellow-400" : "text-red-400")}>
+                        {isKeyMissing
+                          ? `⚠ API key no configurada en Vercel (${r.platform === "youtube" ? "YOUTUBE_API_KEY" : "SPOTIFY_CLIENT_ID + SPOTIFY_CLIENT_SECRET"})`
+                          : `✗ ${r.error}`}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {syncResults.some(r => r.status === "error" && (r.error?.includes("no configurada") || r.error?.includes("api_key"))) && (
+            <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-yellow-500/8 border border-yellow-500/20 text-xs text-yellow-400">
+              <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+              <p>
+                Para activar el auto-sync, configurá las variables de entorno en tu{" "}
+                <a href="https://vercel.com/dashboard" target="_blank" rel="noopener noreferrer" className="underline hover:text-yellow-300">
+                  proyecto de Vercel
+                </a>
+                : <code className="bg-yellow-500/10 px-1 rounded">YOUTUBE_API_KEY</code> y/o{" "}
+                <code className="bg-yellow-500/10 px-1 rounded">SPOTIFY_CLIENT_ID</code> +{" "}
+                <code className="bg-yellow-500/10 px-1 rounded">SPOTIFY_CLIENT_SECRET</code>
+              </p>
+            </div>
+          )}
+        </div>
       )}
 
       {ConfirmDialog}

@@ -1,0 +1,43 @@
+{
+  "name": "Gestión Artista · BERTIAKA",
+  "short_name": "BERTIAKA",
+  "description": "Gestión integral de artista musical — discografía, maquetas, proyectos y más",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#111111",
+  "theme_color": "#7c3aed",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["music", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Discografía",
+      "url": "/discografia",
+      "description": "Ver todas las canciones"
+    },
+    {
+      "name": "Maquetas",
+      "url": "/maquetas",
+      "description": "Gestionar demos en producción"
+    },
+    {
+      "name": "Calendario",
+      "url": "/calendario",
+      "description": "Ver próximos eventos"
+    }
+  ]
+}

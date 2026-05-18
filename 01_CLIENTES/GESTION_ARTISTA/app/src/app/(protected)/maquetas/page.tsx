@@ -92,8 +92,8 @@ const STATUS_WAVEFORM_COLOR: Record<DraftStatus, string> = {
   lista_para_publicar: "bg-emerald-300",
 };
 
-// Alturas (px) de las 5 barras del waveform — perfil asimétrico estilo audio
-const WAVEFORM_BARS = [5, 9, 13, 7, 11];
+// Waveform decorativo: 11 barras asimétricas, estilo forma de onda real
+const WAVEFORM_BARS = [4, 9, 14, 11, 16, 10, 13, 7, 12, 8, 5];
 
 // Solid hex colors for the pipeline bar segments
 const STATUS_BAR_COLOR: Record<DraftStatus, string> = {
@@ -297,12 +297,8 @@ export default function MaquetasPage() {
       player.pause();
       return;
     }
-    const playable = displayedDrafts.filter(d => !!d.drive_file_id || !!d.drive_file_url);
-    if (playable.length <= 1) {
-      player.play(draftToTrack(draft));
-    } else {
-      player.play(draftToTrack(draft), playable.map(draftToTrack));
-    }
+    // Play only this single track — use "Reproducir todo" to load the full queue
+    player.play(draftToTrack(draft));
   }
 
   function handlePlayAll() {
@@ -1101,20 +1097,42 @@ function DraftRow({
           /* eslint-disable-next-line @next/next/no-img-element */
           <img src={draft.cover_art_url} alt="" className="w-full h-full object-cover" />
         ) : (
-          /* Waveform decorativo — barras asimétricas, animadas si está reproduciendo */
-          <div className="flex gap-[2.5px] items-end h-4 px-0.5">
-            {WAVEFORM_BARS.map((h, i) => (
-              <div
-                key={i}
-                className={cn(
-                  "w-[3px] rounded-full",
-                  isPlaying
-                    ? cn("opacity-90 waveform-bar-animated", STATUS_WAVEFORM_COLOR[draft.status])
-                    : cn("opacity-60", STATUS_WAVEFORM_COLOR[draft.status])
-                )}
-                style={{ height: `${h}px` }}
-              />
-            ))}
+          /* Waveform decorativo — barras centradas, 2 mitades (arriba/abajo), animadas si reproduce */
+          <div className="flex flex-col items-center justify-center gap-[1px] w-full h-full px-1">
+            {/* Mitad superior */}
+            <div className="flex gap-[1.5px] items-end">
+              {WAVEFORM_BARS.map((h, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    "w-[2px] rounded-t-full",
+                    isPlaying
+                      ? cn("waveform-bar-animated", STATUS_WAVEFORM_COLOR[draft.status])
+                      : cn("opacity-70", STATUS_WAVEFORM_COLOR[draft.status])
+                  )}
+                  style={{
+                    height: `${Math.round(h * 0.62)}px`,
+                    animationDelay: isPlaying ? `${i * 60}ms` : undefined,
+                    boxShadow: isPlaying ? `0 0 4px currentColor` : undefined,
+                  }}
+                />
+              ))}
+            </div>
+            {/* Línea central */}
+            <div className={cn("w-full h-px opacity-30", STATUS_WAVEFORM_COLOR[draft.status])} />
+            {/* Mitad inferior (espejo, 40% de altura) */}
+            <div className="flex gap-[1.5px] items-start">
+              {WAVEFORM_BARS.map((h, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    "w-[2px] rounded-b-full opacity-40",
+                    STATUS_WAVEFORM_COLOR[draft.status]
+                  )}
+                  style={{ height: `${Math.round(h * 0.30)}px` }}
+                />
+              ))}
+            </div>
           </div>
         )}
         {/* Play overlay */}

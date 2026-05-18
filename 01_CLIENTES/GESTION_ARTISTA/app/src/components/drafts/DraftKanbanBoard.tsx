@@ -198,18 +198,17 @@ export default function DraftKanbanBoard({
             )}>
               <div className="flex items-center gap-2">
                 <span className={cn(
-                  "w-2 h-2 rounded-full transition-all",
+                  "w-2.5 h-2.5 rounded-full transition-all shadow-[0_0_6px_currentColor]",
                   col.dot,
-                  isDropTarget && "scale-125 shadow-[0_0_6px_currentColor]"
+                  isDropTarget && "scale-125 shadow-[0_0_10px_currentColor]"
                 )} />
-                <span className={cn("text-xs font-bold tracking-wide", col.color)}>
+                <span className={cn("text-xs font-black tracking-tight", col.color)}>
                   {col.label}
                 </span>
               </div>
               <span className={cn(
-                "text-[11px] font-bold tabular-nums w-5 h-5 flex items-center justify-center rounded-full",
+                "text-[11px] font-bold tabular-nums px-1.5 py-0.5 rounded-full bg-black/20",
                 col.color,
-                colDrafts.length > 0 ? col.bg.split(" ")[0] : ""
               )}>
                 {colDrafts.length}
               </span>
@@ -318,7 +317,7 @@ function DraftCard({
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       className={cn(
-        "relative bg-card border border-border/60 rounded-2xl overflow-hidden group transition-all duration-150 select-none",
+        "relative card-premium rounded-2xl overflow-hidden group transition-all duration-150 select-none",
         isDragging && "opacity-40 scale-95 shadow-xl",
         !isDragging && cn(
           "cursor-grab active:cursor-grabbing",
@@ -328,13 +327,13 @@ function DraftCard({
       )}
     >
       {/* Colored top accent strip */}
-      <div className={cn("h-0.5 w-full bg-gradient-to-r", col.accent)} />
+      <div className={cn("h-[3px] w-full bg-gradient-to-r", col.accent)} />
 
       {/* Drag handle + title row */}
       <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-0">
         <GripVertical className="h-3 w-3 text-muted-foreground/25 flex-shrink-0 group-hover:text-muted-foreground/50 transition-colors" />
         <p className={cn(
-          "text-sm font-semibold leading-snug flex-1 min-w-0 truncate",
+          "text-sm font-black leading-snug flex-1 min-w-0 truncate",
           isPlaying ? col.color : ""
         )}>
           {draft.title}
@@ -450,7 +449,7 @@ function DraftCard({
         {col.status === "lista_para_publicar" ? (
           <button
             onClick={onPublish}
-            className="flex items-center gap-1 px-2 py-1 rounded-xl bg-green-500/15 border border-green-500/30 text-green-400 text-[10px] font-semibold hover:bg-green-500/25 transition-all active:scale-95"
+            className="flex items-center gap-1 px-2 py-1 rounded-xl bg-green-500/15 border border-green-500/30 text-green-400 text-[10px] font-black hover:bg-green-500/25 transition-all active:scale-95"
           >
             <Upload className="h-3 w-3" />
             Publicar
@@ -461,7 +460,7 @@ function DraftCard({
             disabled={isAdvancing}
             title={`Mover a ${translateDraftStatus(STATUS_NEXT[draft.status]!)}`}
             className={cn(
-              "flex items-center gap-0.5 px-2 py-1 rounded-xl text-[10px] font-medium transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed",
+              "flex items-center gap-0.5 px-2 py-1 rounded-xl text-[10px] font-black transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed",
               col.color,
               col.bg.split(" ")[0],
               "hover:opacity-80"

@@ -1,14 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Mail, Loader2, Lock, Eye, EyeOff, ArrowLeft, KeyRound } from "lucide-react";
 
 type Mode = "password" | "magic" | "forgot";
 
 export default function LoginPage() {
+  const searchParams = useSearchParams();
   const [mode, setMode] = useState<Mode>("password");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(searchParams.get("email") ?? "");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -89,21 +91,42 @@ export default function LoginPage() {
       {/* ── Animated background ───────────────────────────────────────── */}
       <div className="absolute inset-0 -z-10">
         {/* Base dark gradient */}
-        <div className="absolute inset-0 bg-[hsl(224_16%_5%)]" />
-        {/* Primary glow top-left */}
-        <div className="absolute -top-32 -left-32 w-[600px] h-[600px] rounded-full bg-primary/10 blur-[120px] animate-pulse" style={{ animationDuration: "6s" }} />
+        <div className="absolute inset-0 bg-[hsl(224_16%_4%)]" />
+        {/* Primary glow top-left — stronger */}
+        <div className="absolute -top-40 -left-40 w-[700px] h-[700px] rounded-full bg-primary/15 blur-[130px] animate-pulse" style={{ animationDuration: "7s" }} />
         {/* Secondary accent top-right */}
-        <div className="absolute -top-20 right-0 w-[400px] h-[400px] rounded-full bg-violet-600/8 blur-[100px]" />
-        {/* Tertiary glow bottom */}
-        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] rounded-full bg-primary/6 blur-[120px]" />
+        <div className="absolute -top-20 right-0 w-[500px] h-[500px] rounded-full bg-violet-600/10 blur-[120px] animate-pulse" style={{ animationDuration: "10s", animationDelay: "2s" }} />
+        {/* Deep bloom bottom-center */}
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[700px] h-[350px] rounded-full bg-primary/10 blur-[130px]" />
+        {/* Mid-screen right accent */}
+        <div className="absolute top-1/2 right-0 w-[300px] h-[300px] rounded-full bg-blue-600/8 blur-[100px]" />
         {/* Subtle grid lines */}
         <div
-          className="absolute inset-0 opacity-[0.03]"
+          className="absolute inset-0 opacity-[0.025]"
           style={{
             backgroundImage: "linear-gradient(hsl(var(--primary)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--primary)) 1px, transparent 1px)",
             backgroundSize: "60px 60px",
           }}
         />
+        {/* Floating waveform bars decoration */}
+        <div className="absolute bottom-8 left-8 flex items-end gap-1 opacity-[0.06]">
+          {[18, 32, 24, 40, 28, 36, 20, 44, 30, 22, 38, 26].map((h, i) => (
+            <div
+              key={i}
+              className="w-1 rounded-full bg-primary animate-pulse"
+              style={{ height: h, animationDelay: `${i * 0.15}s`, animationDuration: "1.8s" }}
+            />
+          ))}
+        </div>
+        <div className="absolute top-8 right-8 flex items-end gap-1 opacity-[0.06] rotate-180">
+          {[22, 36, 18, 44, 30, 26, 40, 20, 34, 28, 42, 16].map((h, i) => (
+            <div
+              key={i}
+              className="w-1 rounded-full bg-violet-400 animate-pulse"
+              style={{ height: h, animationDelay: `${i * 0.12}s`, animationDuration: "2.2s" }}
+            />
+          ))}
+        </div>
       </div>
 
       {/* ── Card ─────────────────────────────────────────────────────────── */}
@@ -111,11 +134,12 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div className="text-center">
-          <div className="relative w-24 h-24 mx-auto mb-5">
-            {/* Outer glow */}
-            <div className="absolute inset-0 rounded-2xl bg-primary/25 blur-xl scale-110" />
+          <div className="relative w-28 h-28 mx-auto mb-5">
+            {/* Outer glow — layered */}
+            <div className="absolute inset-0 rounded-3xl bg-primary/30 blur-2xl scale-125" />
+            <div className="absolute inset-0 rounded-3xl bg-violet-500/15 blur-xl scale-110" />
             {/* Photo */}
-            <div className="relative w-24 h-24 rounded-2xl overflow-hidden border-2 border-primary/30 shadow-[0_0_40px_hsl(var(--primary)/0.35)]">
+            <div className="relative w-28 h-28 rounded-3xl overflow-hidden border-2 border-primary/40 shadow-[0_0_50px_hsl(var(--primary)/0.45),0_0_0_1px_hsl(0_0%_100%/0.08)_inset]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/artist.jpg"
@@ -125,12 +149,12 @@ export default function LoginPage() {
               />
             </div>
           </div>
-          <h1 className="text-3xl font-black tracking-tight gradient-text">BERTIAKA</h1>
-          <p className="text-sm text-muted-foreground mt-1 font-medium tracking-widest uppercase">Studio</p>
+          <h1 className="text-4xl font-black tracking-tight gradient-text drop-shadow-[0_0_20px_hsl(var(--primary)/0.5)]">BERTIAKA</h1>
+          <p className="text-xs text-muted-foreground/60 mt-1.5 font-semibold tracking-[0.25em] uppercase">Studio · Gestión Musical</p>
         </div>
 
         {/* Glass card */}
-        <div className="bg-card/80 backdrop-blur-xl border border-border/60 rounded-2xl p-6 shadow-[0_24px_80px_hsl(0_0%_0%/0.4)] space-y-5">
+        <div className="bg-card/85 backdrop-blur-2xl border border-border/50 rounded-2xl p-6 shadow-[0_32px_80px_hsl(0_0%_0%/0.5),0_0_0_1px_hsl(0_0%_100%/0.04)_inset] space-y-5">
 
           {/* ── FORGOT PASSWORD mode ── */}
           {mode === "forgot" ? (

@@ -83,7 +83,7 @@ export default function DriveFilePicker({ onSelect, onClose }: Props) {
       <div className="relative w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
         {/* Glow ring */}
         <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-green-500/20 via-transparent to-emerald-500/10 pointer-events-none" />
-        <div className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl max-h-[80vh] flex flex-col shadow-2xl shadow-black/40">
+        <div className="relative glass-panel rounded-2xl max-h-[80vh] flex flex-col">
         <div className="flex items-center justify-between p-4 border-b border-border/60">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-green-500/15 border border-green-500/20 flex items-center justify-center flex-shrink-0">

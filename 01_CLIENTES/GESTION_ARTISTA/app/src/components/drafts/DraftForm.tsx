@@ -140,10 +140,10 @@ export default function DraftForm({ draft, onClose, onSaved }: DraftFormProps) {
       <div className="relative w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
         {/* Glow ring */}
         <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-blue-500/20 via-transparent to-purple-500/10 pointer-events-none" />
-        <div className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl max-h-[90vh] overflow-y-auto shadow-[0_32px_80px_hsl(0_0%_0%/0.5)]">
+        <div className="relative glass-panel rounded-2xl max-h-[90vh] overflow-y-auto">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border/60 sticky top-0 bg-card/95 backdrop-blur-xl z-10 rounded-t-2xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border/60 sticky top-0 sticky-frosted z-10 rounded-t-2xl">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-blue-500/15 flex items-center justify-center border border-blue-500/20 flex-shrink-0">
               <Music className="h-4 w-4 text-blue-400" />

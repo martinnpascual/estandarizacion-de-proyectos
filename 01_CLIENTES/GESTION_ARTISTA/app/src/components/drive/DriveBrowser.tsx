@@ -127,7 +127,7 @@ export default function DriveBrowser({ fileType, onSelect, onClose }: Props) {
       <div className="relative w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
         {/* Glow ring */}
         <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-[#4285f4]/20 via-transparent to-[#4285f4]/10 pointer-events-none" />
-        <div className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl max-h-[85vh] flex flex-col shadow-2xl shadow-black/40">
+        <div className="relative glass-panel rounded-2xl max-h-[85vh] flex flex-col">
 
         {/* ── Header ─────────────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">

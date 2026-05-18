@@ -74,6 +74,7 @@ export interface Song {
   cover_art_url: string | null;
   drive_file_id: string | null;
   drive_file_url: string | null;
+  audio_url: string | null;        // Supabase Storage URL (songs not linked via Drive)
   spotify_url: string | null;
   youtube_url: string | null;
   apple_music_url: string | null;
@@ -244,6 +245,9 @@ export interface TeamInvitation {
   // HIGH-03: Campos de soft-delete
   deleted_at?: string | null;
   deleted_by?: string | null;
+  // Invite link token (migration_013)
+  invite_token?: string | null;
+  invite_token_expires_at?: string | null;
 }
 
 // ─── Royalties / Ingresos ─────────────────────────────────────────────────────
@@ -292,6 +296,9 @@ export interface Goal {
   created_at: string;
   updated_at: string;
   created_by: string;
+  // Auto-update via cron (migration_014)
+  platform_url?: string | null;  // YouTube channel or video URL
+  auto_update?: boolean;
 }
 
 // ─── Release Checklist ────────────────────────────────────────────────────────

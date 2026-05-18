@@ -4,7 +4,7 @@ export default function DashboardLoading() {
   return (
     <div className="space-y-5 animate-fade-in">
       {/* Hero banner skeleton */}
-      <div className="rounded-2xl border border-border/60 bg-card/80 p-6 h-[120px] skeleton" />
+      <div className="card-premium rounded-2xl p-6 h-[120px] skeleton-shimmer" />
 
       {/* Stats row */}
       <DashboardStatsSkeleton />

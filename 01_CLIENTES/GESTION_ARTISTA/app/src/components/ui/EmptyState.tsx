@@ -37,9 +37,9 @@ export function EmptyState({
   className,
 }: EmptyStateProps) {
   const sizes = {
-    sm: { wrapper: "py-12", iconWrap: "w-12 h-12 rounded-xl", iconSize: "h-5 w-5", title: "text-sm font-semibold", desc: "text-xs" },
-    md: { wrapper: "py-20", iconWrap: "w-16 h-16 rounded-2xl", iconSize: "h-7 w-7", title: "text-base font-semibold", desc: "text-sm" },
-    lg: { wrapper: "py-28", iconWrap: "w-20 h-20 rounded-2xl", iconSize: "h-9 w-9", title: "text-lg font-bold", desc: "text-sm" },
+    sm: { wrapper: "py-12", iconWrap: "w-12 h-12 rounded-xl", iconSize: "h-5 w-5", title: "text-sm font-black", desc: "text-xs" },
+    md: { wrapper: "py-20", iconWrap: "w-16 h-16 rounded-2xl", iconSize: "h-7 w-7", title: "text-base font-black", desc: "text-sm" },
+    lg: { wrapper: "py-28", iconWrap: "w-20 h-20 rounded-2xl", iconSize: "h-9 w-9", title: "text-lg font-black", desc: "text-sm" },
   }[size];
 
   return (
@@ -53,9 +53,14 @@ export function EmptyState({
         initial={{ scale: 0.75, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.4, delay: 0.05, type: "spring", stiffness: 260, damping: 20 }}
-        className={cn("flex items-center justify-center mb-4", sizes.iconWrap, iconBg)}
+        className="relative mb-4 flex items-center justify-center"
       >
-        <Icon className={cn(sizes.iconSize, iconColor)} />
+        {/* Ambient glow */}
+        <div className={cn("absolute inset-0 rounded-2xl blur-xl opacity-30 scale-150", iconBg)} />
+        <div className={cn("relative flex items-center justify-center", sizes.iconWrap, iconBg,
+          "border border-white/5 shadow-[0_4px_20px_hsl(0_0%_0%/0.15)]")}>
+          <Icon className={cn(sizes.iconSize, iconColor)} />
+        </div>
       </motion.div>
 
       <motion.div
@@ -82,7 +87,7 @@ export function EmptyState({
           {action && (
             action.href
               ? <Link href={action.href} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-all hover:shadow-[0_0_20px_hsl(var(--primary)/0.3)] active:scale-95">{action.label}</Link>
-              : <button onClick={action.onClick} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-all hover:shadow-[0_0_20px_hsl(var(--primary)/0.3)] active:scale-95">{action.label}</button>
+              : <button onClick={action.onClick} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-black bg-primary text-primary-foreground hover:bg-primary/90 transition-all hover:shadow-[0_0_20px_hsl(var(--primary)/0.3)] active:scale-95">{action.label}</button>
           )}
           {secondaryAction && (
             secondaryAction.href

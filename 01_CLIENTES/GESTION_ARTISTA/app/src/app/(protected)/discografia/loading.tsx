@@ -23,7 +23,7 @@ export default function DiscografiaLoading() {
       </div>
 
       {/* Song list */}
-      <div className="rounded-2xl border border-border/60 bg-card/80 overflow-hidden">
+      <div className="card-premium rounded-2xl overflow-hidden">
         {Array.from({ length: 10 }).map((_, i) => (
           <SongRowSkeleton key={i} delay={i * 30} />
         ))}

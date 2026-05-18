@@ -17,6 +17,7 @@ import {
   Check,
   AlertTriangle,
   ArrowUpDown,
+  Link2,
 } from "lucide-react";
 import {
   getTeamMembers,
@@ -24,6 +25,7 @@ import {
   inviteTeamMember,
   revokeInvitation,
   updateMemberRole,
+  refreshInviteToken,
   InviteSchema,
   type InviteFormData,
 } from "@/lib/actions/team";
@@ -32,6 +34,32 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import type { Profile, TeamInvitation, UserRole } from "@/types/database";
+
+// ─── Avatar color helper ──────────────────────────────────────────────────────
+const AVATAR_PALETTES = [
+  { bg: "bg-violet-500/25", text: "text-violet-300", border: "border-violet-500/30" },
+  { bg: "bg-blue-500/25",   text: "text-blue-300",   border: "border-blue-500/30" },
+  { bg: "bg-emerald-500/25",text: "text-emerald-300",border: "border-emerald-500/30" },
+  { bg: "bg-amber-500/25",  text: "text-amber-300",  border: "border-amber-500/30" },
+  { bg: "bg-pink-500/25",   text: "text-pink-300",   border: "border-pink-500/30" },
+  { bg: "bg-cyan-500/25",   text: "text-cyan-300",   border: "border-cyan-500/30" },
+  { bg: "bg-orange-500/25", text: "text-orange-300", border: "border-orange-500/30" },
+  { bg: "bg-indigo-500/25", text: "text-indigo-300", border: "border-indigo-500/30" },
+];
+function getAvatarPalette(seed: string) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = seed.charCodeAt(i) + ((h << 5) - h);
+  return AVATAR_PALETTES[Math.abs(h) % AVATAR_PALETTES.length];
+}
+function getInitials(name: string | null | undefined, email: string | null | undefined): string {
+  if (name) {
+    const parts = name.trim().split(/\s+/);
+    return parts.length >= 2
+      ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+      : parts[0].slice(0, 2).toUpperCase();
+  }
+  return (email?.[0] ?? "?").toUpperCase();
+}
 
 const ROLE_META: Record<
   UserRole,
@@ -74,6 +102,8 @@ export default function EquipoPage() {
 
   const [revokingId, setRevokingId] = useState<string | null>(null);
   const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
+  const [generatingLinkId, setGeneratingLinkId] = useState<string | null>(null);
+  const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<UserRole | "todos">(() =>
     typeof window !== "undefined"
@@ -110,6 +140,24 @@ export default function EquipoPage() {
       setCopiedEmail(id);
       setTimeout(() => setCopiedEmail(null), 2000);
     });
+  }
+
+  async function handleCopyInviteLink(inv: TeamInvitation) {
+    setGeneratingLinkId(inv.id);
+    // Generate (or refresh) the token and return the URL
+    const { url, error } = await refreshInviteToken(inv.id);
+    setGeneratingLinkId(null);
+
+    if (error || !url) {
+      toast.error(error ?? "No se pudo generar el link");
+      return;
+    }
+
+    // Update the local state with the new token URL (optional — just for UX)
+    await navigator.clipboard.writeText(url);
+    setCopiedLinkId(inv.id);
+    setTimeout(() => setCopiedLinkId(null), 3000);
+    toast.success("Link de invitación copiado al portapapeles", 4000);
   }
 
   function getInviteExpiry(createdAt: string): { label: string; isExpiring: boolean } {
@@ -194,16 +242,17 @@ export default function EquipoPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card">
+      <div className="card-premium relative overflow-hidden rounded-2xl">
         <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/8 via-transparent to-transparent pointer-events-none" />
         <div className="absolute -top-10 -right-10 w-40 h-40 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-blue-400/6 rounded-full blur-2xl pointer-events-none" />
         <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-5">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/30 to-cyan-600/10 border border-cyan-500/20 flex items-center justify-center flex-shrink-0">
               <UserCog className="h-5 w-5 text-cyan-400" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">Equipo</h1>
+              <h1 className="text-xl font-black tracking-tight gradient-text">Equipo</h1>
               <p className="text-muted-foreground text-xs mt-0.5">
                 Gestión de miembros y roles del equipo
               </p>
@@ -216,7 +265,7 @@ export default function EquipoPage() {
               setShowInviteForm(true);
             }}
             title="Invitar miembro (N)"
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-all active:scale-95 text-sm font-semibold shadow-[0_0_16px_hsl(var(--primary)/0.2)]"
+            className="btn-shine flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 hover:scale-[1.02] transition-all active:scale-95 text-sm font-black shadow-[0_0_20px_hsl(var(--primary)/0.35)]"
           >
             <Plus className="h-4 w-4" />
             Invitar miembro
@@ -237,19 +286,20 @@ export default function EquipoPage() {
                 key={role}
                 onClick={isClickable ? () => setRoleFilter(isFiltered ? "todos" : role) : undefined}
                 className={cn(
-                  "bg-card rounded-2xl border p-4 transition-all",
-                  meta.borderColor,
-                  isClickable && "cursor-pointer hover:bg-secondary/40 hover:-translate-y-0.5 hover:shadow-sm",
-                  isFiltered && "ring-1 ring-primary/30"
+                  "card-premium rounded-2xl p-4 transition-all",
+                  isClickable && "cursor-pointer hover:-translate-y-1 hover:shadow-[0_12px_28px_hsl(0_0%_0%/0.28)]",
+                  isFiltered
+                    ? "ring-1 ring-primary/50 shadow-[0_0_16px_hsl(var(--primary)/0.12)] border-primary/30"
+                    : ""
                 )}
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <Shield className={cn("h-4 w-4", meta.iconColor)} />
-                    <h3 className="font-semibold text-sm">{meta.label}</h3>
+                    <Shield className={cn("h-4 w-4 drop-shadow-[0_0_6px_currentColor]", meta.iconColor)} />
+                    <h3 className="font-black text-sm">{meta.label}</h3>
                   </div>
                   {!loading && count > 0 && (
-                    <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums", meta.color)}>
+                    <span className={cn("text-[10px] font-black px-1.5 py-0.5 rounded-full tabular-nums border", meta.color, meta.borderColor, "shadow-[0_0_6px_currentColor/30]")}>
                       {count}
                     </span>
                   )}
@@ -284,7 +334,7 @@ export default function EquipoPage() {
                   )}>
                     <Shield className="h-3 w-3 flex-shrink-0" />
                     <span>{meta.label}</span>
-                    <span className="font-semibold tabular-nums">{count}</span>
+                    <span className="font-black tabular-nums">{count}</span>
                   </span>
                 );
               })}
@@ -355,9 +405,9 @@ export default function EquipoPage() {
       )}
 
       {/* Miembros */}
-      <div className="bg-card rounded-2xl border border-border/60 overflow-hidden">
+      <div className="card-premium rounded-2xl overflow-hidden">
         <div className="px-4 py-3 border-b border-border/60 flex items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold">
+          <h2 className="text-sm font-black">
             Miembros actuales
             {members.length > 0 && (
               <span className="ml-1.5 text-xs font-normal text-muted-foreground">({members.length})</span>
@@ -465,31 +515,41 @@ export default function EquipoPage() {
                   return (
                     <div
                       key={member.id}
-                      className="flex items-center gap-3 px-4 py-3.5 group"
+                      className="row-interactive flex items-center gap-3 px-4 py-3.5 hover:bg-secondary/30 transition-all group"
                     >
                       {/* Avatar */}
-                      <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center flex-shrink-0">
-                        {member.avatar_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={member.avatar_url}
-                            alt={member.full_name}
-                            className="w-9 h-9 rounded-full object-cover"
-                          />
-                        ) : (
-                          <span className="text-sm font-bold text-muted-foreground">
-                            {member.full_name?.[0]?.toUpperCase() ?? "?"}
-                          </span>
-                        )}
-                      </div>
+                      {(() => {
+                        const palette = getAvatarPalette(member.email ?? member.full_name ?? member.id);
+                        const initials = getInitials(member.full_name, member.email);
+                        return (
+                          <div className={cn(
+                            "w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-all overflow-hidden avatar-initials border",
+                            member.avatar_url ? "bg-secondary border-border/50" : cn(palette.bg, palette.border),
+                            "group-hover:shadow-[0_0_12px_hsl(var(--primary)/0.25)] group-hover:scale-105"
+                          )}>
+                            {member.avatar_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={member.avatar_url}
+                                alt={member.full_name ?? ""}
+                                className="w-9 h-9 rounded-full object-cover"
+                              />
+                            ) : (
+                              <span className={cn("text-xs font-black tracking-tight", palette.text)}>
+                                {initials}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <p className="text-sm font-medium truncate">{member.full_name}</p>
+                          <p className="text-sm font-black truncate group-hover:text-primary transition-colors">{member.full_name}</p>
                           {isCurrentUser && (
                             <span className="text-[10px] text-muted-foreground">(tú)</span>
                           )}
-                          {isArtist && <Crown className="h-3 w-3 text-primary flex-shrink-0" />}
+                          {isArtist && <Crown className="h-3 w-3 text-primary drop-shadow-[0_0_5px_hsl(var(--primary)/0.9)] flex-shrink-0" />}
                         </div>
                         <div className="flex items-center gap-1">
                           <p className="text-xs text-muted-foreground truncate">{member.email}</p>
@@ -532,7 +592,7 @@ export default function EquipoPage() {
                           )}
                         </div>
                       ) : (
-                        <span className={cn("px-2 py-0.5 rounded-full text-[11px] font-medium flex-shrink-0", meta.color)}>
+                        <span className={cn("px-2 py-0.5 rounded-full text-[11px] font-black flex-shrink-0 border", meta.color, meta.borderColor)}>
                           {meta.label}
                         </span>
                       )}
@@ -589,9 +649,9 @@ export default function EquipoPage() {
 
       {/* Invitaciones pendientes */}
       {invitations.length > 0 && (
-        <div className="bg-card rounded-2xl border border-border/60 overflow-hidden">
+        <div className="card-premium rounded-2xl overflow-hidden">
           <div className="px-4 py-3 border-b border-border/60">
-            <h2 className="text-sm font-semibold">
+            <h2 className="text-sm font-black">
               Invitaciones pendientes
               <span className="ml-1.5 text-xs text-muted-foreground">
                 ({invitations.length})
@@ -601,6 +661,8 @@ export default function EquipoPage() {
           <div className="divide-y divide-border/50">
             {invitations.map((inv) => {
               const meta = ROLE_META[inv.role];
+              const isCopiedLink = copiedLinkId === inv.id;
+              const isGenerating = generatingLinkId === inv.id;
               return (
                 <div key={inv.id} className="flex items-center gap-3 px-4 py-3 group">
                   <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
@@ -627,6 +689,28 @@ export default function EquipoPage() {
                   <span className={cn("px-2 py-0.5 rounded-full text-[11px] font-medium flex-shrink-0", meta.color)}>
                     {meta.label}
                   </span>
+
+                  {/* Copy invite link button */}
+                  <button
+                    onClick={() => handleCopyInviteLink(inv)}
+                    disabled={isGenerating || isCopiedLink}
+                    title={isCopiedLink ? "¡Link copiado!" : "Copiar link de invitación (72h)"}
+                    className={cn(
+                      "flex items-center gap-1 px-2 py-1 rounded-xl text-xs transition-all active:scale-95 flex-shrink-0",
+                      isCopiedLink
+                        ? "bg-green-500/10 text-green-400 border border-green-500/20"
+                        : "opacity-0 group-hover:opacity-100 hover:bg-primary/10 text-muted-foreground hover:text-primary border border-transparent hover:border-primary/20",
+                      "disabled:cursor-not-allowed"
+                    )}
+                  >
+                    {isGenerating
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      : isCopiedLink
+                        ? <><Check className="h-3.5 w-3.5" /><span>Copiado</span></>
+                        : <><Link2 className="h-3.5 w-3.5" /><span className="hidden sm:inline">Link</span></>
+                    }
+                  </button>
+
                   <button
                     onClick={() => handleRevoke(inv)}
                     disabled={revokingId === inv.id}
@@ -656,13 +740,13 @@ export default function EquipoPage() {
         >
           <div className="relative w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
             <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-primary/20 via-transparent to-violet-500/10 pointer-events-none" />
-            <div className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl shadow-2xl shadow-black/40">
+            <div className="relative glass-panel rounded-2xl">
             <div className="flex items-center justify-between p-5 border-b border-border/60">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center flex-shrink-0">
                   <Users className="h-4 w-4 text-primary" />
                 </div>
-                <h2 className="text-base font-semibold">Invitar al equipo</h2>
+                <h2 className="text-base font-black">Invitar al equipo</h2>
               </div>
               <button onClick={() => setShowInviteForm(false)} className="p-1.5 rounded-xl hover:bg-muted/50 transition-all active:scale-95 text-muted-foreground hover:text-foreground">
                 <X className="h-4 w-4" />
@@ -699,8 +783,8 @@ export default function EquipoPage() {
                 </select>
               </div>
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setShowInviteForm(false)} className="flex-1 py-2.5 rounded-xl border border-border/60 text-sm font-semibold hover:bg-secondary/60 transition-all active:scale-95">Cancelar</button>
-                <button type="submit" disabled={submitting} className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                <button type="button" onClick={() => setShowInviteForm(false)} className="flex-1 py-2.5 rounded-xl border border-border/60 text-sm font-black hover:bg-secondary/60 transition-all active:scale-95">Cancelar</button>
+                <button type="submit" disabled={submitting} className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-black hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                   {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
                   Invitar
                 </button>

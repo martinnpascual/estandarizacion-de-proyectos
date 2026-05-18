@@ -171,27 +171,43 @@ export default function SongDetailPage() {
         </div>
 
         {/* Hero */}
-        <div className="bg-card border border-border/60 rounded-2xl overflow-hidden shadow-sm">
+        <div className="card-premium rounded-2xl overflow-hidden">
           <div className="flex flex-col sm:flex-row gap-0">
             {/* Cover art */}
-            <div className="relative sm:w-64 sm:h-64 w-full aspect-square flex-shrink-0 bg-secondary flex items-center justify-center">
+            <div className="relative sm:w-64 sm:h-64 w-full aspect-square flex-shrink-0 bg-gradient-to-br from-secondary to-secondary/60 flex items-center justify-center group overflow-hidden">
               {song.cover_art_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={song.cover_art_url} alt={song.title} className="w-full h-full object-cover" />
+                <>
+                  {/* Cover image */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={song.cover_art_url} alt={song.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  {/* Ambient glow from cover behind info panel */}
+                  <div className="absolute inset-0 opacity-30 pointer-events-none"
+                    style={{ boxShadow: "inset -40px 0 80px hsl(var(--primary)/0.3)" }} />
+                </>
               ) : (
-                <Music className="h-20 w-20 text-muted-foreground/20" />
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center">
+                    <Music className="h-10 w-10 text-primary/30" />
+                  </div>
+                </div>
               )}
               {/* Play overlay */}
               {audioUrl && (
                 <button
                   onClick={handlePlay}
                   className={cn(
-                    "absolute inset-0 flex items-center justify-center bg-black/40 transition-opacity",
-                    isPlaying ? "opacity-100" : "opacity-0 hover:opacity-100"
+                    "absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-[2px] transition-all duration-200",
+                    isPlaying ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                   )}
                 >
-                  <div className="w-16 h-16 rounded-full bg-primary/90 flex items-center justify-center shadow-xl">
-                    {isPlaying ? <Pause className="h-7 w-7 text-white" /> : <Play className="h-7 w-7 text-white ml-1" />}
+                  <div className={cn(
+                    "w-18 h-18 rounded-full flex items-center justify-center transition-all duration-200",
+                    "bg-primary shadow-[0_0_30px_hsl(var(--primary)/0.6),0_0_60px_hsl(var(--primary)/0.3)]",
+                    "hover:scale-110 active:scale-95"
+                  )} style={{ width: 64, height: 64 }}>
+                    {isPlaying
+                      ? <Pause className="h-7 w-7 text-white" />
+                      : <Play className="h-7 w-7 text-white ml-1" />}
                   </div>
                 </button>
               )}
@@ -202,7 +218,7 @@ export default function SongDetailPage() {
               {/* Title + year */}
               <div>
                 <div className="flex items-start gap-2">
-                  <h1 className="text-2xl font-bold leading-tight flex-1">{song.title}</h1>
+                  <h1 className="text-3xl font-black leading-tight flex-1 tracking-tight">{song.title}</h1>
                   {/* Public/private badge */}
                   <button
                     onClick={handleTogglePublic}
@@ -235,29 +251,29 @@ export default function SongDetailPage() {
 
               {/* Meta chips */}
               <div className="flex flex-wrap gap-2">
-                <span className="flex items-center gap-1 text-xs bg-secondary px-2.5 py-1 rounded-full">
-                  <Tag className="h-3 w-3" />{song.year}
+                <span className="flex items-center gap-1 text-xs bg-secondary/80 border border-border/40 px-2.5 py-1 rounded-full font-medium">
+                  <Tag className="h-3 w-3 text-muted-foreground" />{song.year}
                 </span>
                 {song.genre && (
-                  <span className="text-xs bg-secondary px-2.5 py-1 rounded-full">{song.genre}</span>
+                  <span className="text-xs bg-primary/10 text-primary border border-primary/20 px-2.5 py-1 rounded-full font-black">{song.genre}</span>
                 )}
                 {song.duration_seconds && (
-                  <span className="flex items-center gap-1 text-xs bg-secondary px-2.5 py-1 rounded-full">
-                    <Clock className="h-3 w-3" />{formatTime(song.duration_seconds)}
+                  <span className="flex items-center gap-1 text-xs bg-secondary/80 border border-border/40 px-2.5 py-1 rounded-full font-medium">
+                    <Clock className="h-3 w-3 text-muted-foreground" />{formatTime(song.duration_seconds)}
                   </span>
                 )}
                 {song.bpm && (
-                  <span className="flex items-center gap-1 text-xs bg-blue-500/10 text-blue-400 px-2.5 py-1 rounded-full font-mono" title="BPM">
+                  <span className="flex items-center gap-1 text-xs bg-blue-500/12 text-blue-400 border border-blue-500/20 px-2.5 py-1 rounded-full font-mono font-bold" title="BPM">
                     <Zap className="h-3 w-3" />{song.bpm} BPM
                   </span>
                 )}
                 {song.key_signature && (
-                  <span className="text-xs bg-purple-500/10 text-purple-400 px-2.5 py-1 rounded-full font-medium" title="Tonalidad">
+                  <span className="text-xs bg-purple-500/12 text-purple-400 border border-purple-500/20 px-2.5 py-1 rounded-full font-bold" title="Tonalidad">
                     ♪ {song.key_signature}
                   </span>
                 )}
                 {song.tags?.map(tag => (
-                  <span key={tag} className="text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full">#{tag}</span>
+                  <span key={tag} className="text-xs bg-primary/10 text-primary border border-primary/20 px-2.5 py-1 rounded-full font-medium">#{tag}</span>
                 ))}
               </div>
 
@@ -286,7 +302,7 @@ export default function SongDetailPage() {
                   <a
                     href={downloadUrl}
                     download={song.drive_file_id ? song.title : undefined}
-                    className="flex items-center gap-2 px-3 py-2 bg-primary/90 hover:bg-primary text-primary-foreground rounded-xl text-sm font-semibold transition-all active:scale-95 shadow-sm shadow-primary/20"
+                    className="flex items-center gap-2 px-3 py-2 bg-primary/90 hover:bg-primary text-primary-foreground rounded-xl text-sm font-black transition-all active:scale-95 shadow-sm shadow-primary/20"
                   >
                     <ArrowDownToLine className="h-4 w-4" />
                     Descargar
@@ -340,15 +356,15 @@ export default function SongDetailPage() {
         </div>
 
         {/* Metadata completeness card */}
-        <div className="bg-card border border-border/60 rounded-2xl p-5 space-y-3">
+        <div className="card-premium rounded-2xl p-5 space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Completitud de metadata</h2>
-            <span className={cn("text-2xl font-bold tabular-nums", scoreColor)}>{score}%</span>
+            <h2 className="text-sm font-black">Completitud de metadata</h2>
+            <span className={cn("text-2xl font-black tabular-nums", scoreColor)}>{score}%</span>
           </div>
           {/* Progress bar */}
           <div className="h-2 bg-secondary rounded-full overflow-hidden">
             <div
-              className={cn("h-full rounded-full transition-all duration-500", scoreBg)}
+              className={cn("h-full transition-all duration-500", score >= 100 ? "rounded-full bg-green-500 shadow-[0_0_10px_hsl(142_70%_45%/0.6)]" : "progress-fill-gradient")}
               style={{ width: `${score}%` }}
             />
           </div>
@@ -364,11 +380,11 @@ export default function SongDetailPage() {
         {/* Lyrics preview */}
         {song.lyrics && (
           <div
-            className="bg-card border border-border/60 rounded-2xl p-5 space-y-3 cursor-pointer hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-sm transition-all group"
+            className="card-premium rounded-2xl p-5 space-y-3 cursor-pointer hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-sm transition-all group"
             onClick={() => setShowLyrics(true)}
           >
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold flex items-center gap-2">
+              <h2 className="text-sm font-black flex items-center gap-2">
                 <FileText className="h-4 w-4 text-primary group-hover:scale-110 transition-transform" />
                 Letra
               </h2>
@@ -382,9 +398,9 @@ export default function SongDetailPage() {
 
         {/* Featuring */}
         {song.featuring?.length > 0 && (
-          <div className="bg-card border border-border/60 rounded-2xl p-5">
-            <h2 className="text-sm font-semibold flex items-center gap-2 mb-3">
-              <Users className="h-4 w-4 text-primary" />
+          <div className="card-premium rounded-2xl p-5">
+            <h2 className="text-sm font-black flex items-center gap-2 mb-3">
+              <Users className="h-4 w-4 text-primary drop-shadow-[0_0_4px_hsl(var(--primary)/0.6)]" />
               Colaboraciones
             </h2>
             <div className="flex flex-wrap gap-2">

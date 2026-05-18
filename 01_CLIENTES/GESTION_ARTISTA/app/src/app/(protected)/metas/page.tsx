@@ -23,6 +23,7 @@ import {
   Pencil,
   Download,
   ChevronRight,
+  RefreshCw,
 } from "lucide-react";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -70,6 +71,8 @@ function GoalForm({ onClose, onSave, initial, isEditing }: GoalFormProps & { isE
     current_value: initial?.current_value ?? 0,
     target_date: initial?.target_date ?? null,
     notes: initial?.notes ?? null,
+    platform_url: (initial as Partial<GoalFormData & { platform_url?: string | null }>)?.platform_url ?? null,
+    auto_update: (initial as Partial<GoalFormData & { auto_update?: boolean }>)?.auto_update ?? false,
   });
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -214,6 +217,54 @@ function GoalForm({ onClose, onSave, initial, isEditing }: GoalFormProps & { isE
             />
           </div>
 
+          {/* ── Auto-update via YouTube ─────────────────────────────────── */}
+          <div className="space-y-2.5 border border-border/50 rounded-xl p-3.5 bg-secondary/30">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <RefreshCw className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-xs font-medium">Actualización automática</span>
+              </div>
+              {/* Toggle */}
+              <button
+                type="button"
+                role="switch"
+                aria-checked={form.auto_update}
+                onClick={() => setForm((f) => ({ ...f, auto_update: !f.auto_update }))}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                  form.auto_update ? "bg-primary" : "bg-muted-foreground/30"
+                }`}
+              >
+                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                  form.auto_update ? "translate-x-4" : "translate-x-0.5"
+                }`} />
+              </button>
+            </div>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              El cron diario actualizará el progreso automáticamente desde YouTube
+              (suscriptores de un canal o reproducciones de un video).
+            </p>
+            {form.auto_update && (
+              <div>
+                <label className="text-xs font-medium text-muted-foreground block mb-1.5">
+                  URL de YouTube *
+                </label>
+                <input
+                  type="url"
+                  className={field("platform_url")}
+                  value={form.platform_url ?? ""}
+                  onChange={(e) => setForm((f) => ({ ...f, platform_url: e.target.value || null }))}
+                  placeholder="youtube.com/@TuCanal  o  youtube.com/watch?v=…"
+                />
+                {errors.platform_url && (
+                  <p className="text-red-400 text-xs mt-1">{errors.platform_url}</p>
+                )}
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Canal → suscriptores · Video → reproducciones
+                </p>
+              </div>
+            )}
+          </div>
+
           <div className="flex gap-2 pt-1">
             <button
               type="button"
@@ -275,7 +326,18 @@ function GoalCard({ goal, onToggle, onDelete, onUpdateProgress, onEdit }: GoalCa
               <p className={`font-black text-sm leading-snug ${goal.is_completed ? "line-through text-muted-foreground" : ""}`}>
                 {goal.title}
               </p>
-              <p className="text-[11px] text-muted-foreground">{CATEGORY_LABELS[goal.category]}</p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-[11px] text-muted-foreground">{CATEGORY_LABELS[goal.category]}</p>
+                {goal.auto_update && (
+                  <span
+                    className="flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/20 font-medium"
+                    title="Se actualiza automáticamente desde YouTube"
+                  >
+                    <RefreshCw className="h-2.5 w-2.5" />
+                    Auto
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-0.5 shrink-0">
@@ -734,7 +796,9 @@ export default function MetasPage() {
             current_value: editingGoal.current_value,
             target_date: editingGoal.target_date ?? null,
             notes: editingGoal.notes ?? null,
-          }}
+            platform_url: editingGoal.platform_url ?? null,
+            auto_update: editingGoal.auto_update ?? false,
+          } as GoalFormData}
         />
       )}
 

@@ -169,6 +169,9 @@ export const GoalSchema = z.object({
   current_value: z.number().min(0).default(0),
   target_date: z.string().nullable().default(null),
   notes: z.string().nullable().default(null),
+  // Auto-update via cron (migration_014)
+  platform_url: z.string().url("URL inválida").nullable().default(null).or(z.literal("").transform(() => null)),
+  auto_update: z.boolean().default(false),
 });
 export type GoalFormData = z.infer<typeof GoalSchema>;
 

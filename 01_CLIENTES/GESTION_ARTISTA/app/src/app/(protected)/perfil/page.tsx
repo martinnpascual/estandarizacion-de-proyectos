@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   User,
   Mail,
@@ -25,6 +25,9 @@ import {
   CalendarDays,
   Activity,
   Globe,
+  Loader2,
+  Upload,
+  X,
 } from "lucide-react";
 import { getProfile, updateProfile, disconnectGoogle } from "@/lib/actions/profile";
 import { getDashboardStats, getRecentActivity } from "@/lib/actions/dashboard";
@@ -78,6 +81,10 @@ export default function PerfilPage() {
   const [avatarUrl, setAvatarUrl] = useState("");
   const [artistSlug, setArtistSlug] = useState("");
   const [bio, setBio] = useState("");
+
+  // Avatar upload
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Password change
   const [newPassword, setNewPassword] = useState("");
@@ -168,6 +175,41 @@ export default function PerfilPage() {
     }
   }
 
+  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Validate: image, max 3MB
+    if (!file.type.startsWith("image/")) {
+      toast.error("Solo se permiten archivos de imagen");
+      return;
+    }
+    if (file.size > 3 * 1024 * 1024) {
+      toast.error("La imagen no puede superar 3MB");
+      return;
+    }
+    setUploadingAvatar(true);
+    try {
+      const supabase = createClient();
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+      const userId = profile?.id ?? "unknown";
+      const fileName = `${userId}_${Date.now()}.${ext}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(fileName, file, { upsert: true, contentType: file.type });
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage
+        .from("avatars")
+        .getPublicUrl(uploadData.path);
+      setAvatarUrl(urlData.publicUrl);
+      toast.success("Foto subida — guardá los cambios para aplicarla");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al subir la imagen");
+    } finally {
+      setUploadingAvatar(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  }
+
   async function handleChangePassword(e: React.FormEvent) {
     e.preventDefault();
     setPasswordError(null);
@@ -197,12 +239,12 @@ export default function PerfilPage() {
   if (loading) {
     return (
       <div className="space-y-6 max-w-2xl">
-        <div className="h-8 bg-secondary rounded-xl w-48 animate-pulse" />
-        <div className="bg-card border border-border/60 rounded-2xl p-6 space-y-4">
+        <div className="h-8 skeleton rounded-xl w-48" />
+        <div className="card-premium rounded-2xl p-6 space-y-4">
           {[1, 2, 3].map((i) => (
             <div key={i} className="space-y-2">
-              <div className="h-3 bg-secondary rounded-xl w-24 animate-pulse" />
-              <div className="h-10 bg-secondary rounded-xl animate-pulse" />
+              <div className="h-3 skeleton rounded-xl w-24" />
+              <div className="h-10 skeleton rounded-xl" />
             </div>
           ))}
         </div>
@@ -213,45 +255,62 @@ export default function PerfilPage() {
   return (
     <div className="space-y-6 max-w-2xl">
       {/* Header */}
-      <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card">
+      <div className="card-premium relative overflow-hidden rounded-2xl">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-transparent to-transparent pointer-events-none" />
-        <div className="absolute -top-10 -right-10 w-40 h-40 bg-primary/6 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-primary/8 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-8 -left-8 w-28 h-28 bg-violet-400/5 rounded-full blur-2xl pointer-events-none" />
         <div className="relative flex items-center gap-3 px-6 py-5">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/30 to-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
-            <User className="h-5 w-5 text-primary" />
+            <User className="h-5 w-5 text-primary drop-shadow-[0_0_6px_currentColor]" />
           </div>
           <div>
-            <h1 className="text-lg font-bold leading-tight">Mi perfil</h1>
+            <h1 className="text-xl font-black tracking-tight leading-tight gradient-text">Mi perfil</h1>
             <p className="text-muted-foreground text-xs mt-0.5">Administra tu información personal</p>
           </div>
         </div>
       </div>
 
       {/* Avatar preview */}
-      <div className="bg-card border border-border/60 rounded-2xl p-6">
+      <div className="card-premium rounded-2xl p-6">
         <div className="flex items-center gap-5">
           <div className="relative">
-            {avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={avatarUrl}
-                alt="Avatar"
-                className="w-20 h-20 rounded-full object-cover border-2 border-border"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = "none";
-                }}
-              />
-            ) : (
-              <div className="w-20 h-20 rounded-full bg-primary/20 border-2 border-border flex items-center justify-center">
-                <User className="h-8 w-8 text-primary" />
+            {/* Glow ring */}
+            <div className="absolute -inset-1 rounded-full bg-primary/20 blur-md" />
+            <button
+              type="button"
+              onClick={() => avatarInputRef.current?.click()}
+              disabled={uploadingAvatar}
+              className="relative avatar-hover-wrap rounded-full cursor-pointer disabled:cursor-not-allowed"
+              title="Cambiar foto de perfil"
+            >
+              {avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={avatarUrl}
+                  alt="Avatar"
+                  className="w-20 h-20 rounded-full object-cover border-2 border-primary/40 shadow-[0_0_24px_hsl(var(--primary)/0.35)]"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = "none";
+                  }}
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-primary/20 border-2 border-primary/40 flex items-center justify-center shadow-[0_0_24px_hsl(var(--primary)/0.25)]">
+                  <User className="h-8 w-8 text-primary" />
+                </div>
+              )}
+              {/* Camera hover overlay */}
+              <div className="avatar-camera-overlay rounded-full">
+                {uploadingAvatar
+                  ? <Loader2 className="h-5 w-5 text-white animate-spin" />
+                  : <Camera className="h-6 w-6 text-white drop-shadow-[0_0_6px_rgba(255,255,255,0.5)]" />}
               </div>
-            )}
-            <div className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-secondary border border-border/60 flex items-center justify-center">
+            </button>
+            <div className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-secondary border border-border/60 flex items-center justify-center shadow-sm pointer-events-none">
               <Camera className="h-3 w-3 text-muted-foreground" />
             </div>
           </div>
           <div>
-            <p className="font-semibold text-lg">{profile?.full_name || "—"}</p>
+            <p className="font-black text-lg">{profile?.full_name || "—"}</p>
             <p className="text-sm text-muted-foreground">{profile?.email}</p>
             {profile?.role && (
               <span
@@ -270,9 +329,9 @@ export default function PerfilPage() {
       {/* Edit form */}
       <form
         onSubmit={handleSave}
-        className="bg-card border border-border/60 rounded-2xl p-6 space-y-5"
+        className="card-premium rounded-2xl p-6 space-y-5"
       >
-        <h2 className="font-semibold flex items-center gap-2 text-sm">
+        <h2 className="font-black flex items-center gap-2 text-sm">
           <User className="h-4 w-4 text-muted-foreground" />
           Información personal
         </h2>
@@ -309,17 +368,70 @@ export default function PerfilPage() {
           </p>
         </div>
 
-        {/* Avatar URL */}
-        <div className="space-y-1.5">
+        {/* Avatar photo upload */}
+        <div className="space-y-2">
           <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            URL de avatar (opcional)
+            Foto de perfil
           </label>
+          {/* Hidden file input */}
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            className="hidden"
+            onChange={handleAvatarUpload}
+          />
+          <div className="flex items-center gap-3">
+            {/* Current avatar preview */}
+            <div className="w-14 h-14 rounded-full overflow-hidden border border-border/60 flex-shrink-0 bg-secondary flex items-center justify-center">
+              {avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatarUrl} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+              ) : (
+                <User className="h-6 w-6 text-muted-foreground/40" />
+              )}
+            </div>
+            <div className="flex-1 space-y-1.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={uploadingAvatar}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/25 text-primary text-xs font-medium hover:bg-primary/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {uploadingAvatar
+                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    : <Upload className="h-3.5 w-3.5" />}
+                  {uploadingAvatar ? "Subiendo…" : "Subir foto"}
+                </button>
+                {avatarUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setAvatarUrl("")}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-red-500/10 text-red-400 text-xs hover:bg-red-500/20 transition-all active:scale-95"
+                  >
+                    <X className="h-3 w-3" />
+                    Quitar
+                  </button>
+                )}
+              </div>
+              <p className="text-[11px] text-muted-foreground/60">
+                JPG, PNG o WebP · máx. 3MB
+              </p>
+            </div>
+          </div>
+          {/* Manual URL fallback */}
+          <div className="flex items-center gap-2">
+            <div className="h-px flex-1 bg-border/40" />
+            <span className="text-[10px] text-muted-foreground/40 uppercase tracking-wide">o URL</span>
+            <div className="h-px flex-1 bg-border/40" />
+          </div>
           <input
             type="url"
             value={avatarUrl}
             onChange={(e) => setAvatarUrl(e.target.value)}
-            placeholder="https://..."
-            className="w-full bg-background border border-border/60 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            placeholder="https://... (opcional)"
+            className="w-full bg-background border border-border/60 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-muted-foreground/35"
           />
         </div>
 
@@ -389,7 +501,7 @@ export default function PerfilPage() {
             <Shield className="h-3 w-3" />
             Rol
           </label>
-          <div className="flex items-center gap-2 px-3 py-2 bg-secondary rounded-2xl border border-border/60">
+          <div className="flex items-center gap-2 px-3 py-2 card-premium rounded-2xl">
             {profile?.role && (
               <span
                 className={cn(
@@ -410,7 +522,7 @@ export default function PerfilPage() {
           <button
             type="submit"
             disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-shine flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-black hover:bg-primary/90 hover:scale-[1.02] transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_hsl(var(--primary)/0.3)]"
           >
             <Save className="h-4 w-4" />
             {saving ? "Guardando…" : "Guardar cambios"}
@@ -420,8 +532,8 @@ export default function PerfilPage() {
       </form>
 
       {/* Google integration */}
-      <div className="bg-card border border-border/60 rounded-2xl p-6 space-y-4">
-        <h2 className="font-semibold flex items-center gap-2 text-sm">
+      <div className="card-premium rounded-2xl p-6 space-y-4">
+        <h2 className="font-black flex items-center gap-2 text-sm">
           <svg
             className="h-4 w-4"
             viewBox="0 0 24 24"
@@ -479,7 +591,7 @@ export default function PerfilPage() {
             </p>
             <a
               href="/api/auth/google"
-              className="flex items-center gap-2 text-xs px-3 py-1.5 bg-primary text-primary-foreground rounded-xl font-semibold hover:bg-primary/80 transition-all active:scale-95 w-fit"
+              className="flex items-center gap-2 text-xs px-3 py-1.5 bg-primary text-primary-foreground rounded-xl font-black hover:bg-primary/80 transition-all active:scale-95 w-fit"
             >
               <Link2 className="h-3.5 w-3.5" />
               Conectar Google
@@ -489,8 +601,8 @@ export default function PerfilPage() {
       </div>
 
       {/* Password change */}
-      <form onSubmit={handleChangePassword} className="bg-card border border-border/60 rounded-2xl p-6 space-y-4">
-        <h2 className="font-semibold flex items-center gap-2 text-sm">
+      <form onSubmit={handleChangePassword} className="card-premium rounded-2xl p-6 space-y-4">
+        <h2 className="font-black flex items-center gap-2 text-sm">
           <KeyRound className="h-4 w-4 text-muted-foreground" />
           Cambiar contraseña
         </h2>
@@ -578,7 +690,7 @@ export default function PerfilPage() {
           <button
             type="submit"
             disabled={savingPassword || !newPassword || !confirmPassword}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-black hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Lock className="h-4 w-4" />
             {savingPassword ? "Guardando…" : "Actualizar contraseña"}
@@ -587,8 +699,8 @@ export default function PerfilPage() {
       </form>
 
       {/* Keyboard shortcuts */}
-      <div className="bg-card border border-border/60 rounded-2xl p-6 space-y-4">
-        <h2 className="font-semibold flex items-center gap-2 text-sm">
+      <div className="card-premium rounded-2xl p-6 space-y-4">
+        <h2 className="font-black flex items-center gap-2 text-sm">
           <Keyboard className="h-4 w-4 text-muted-foreground" />
           Atajos de teclado
         </h2>
@@ -638,8 +750,8 @@ export default function PerfilPage() {
       </div>
 
       {/* Theme */}
-      <div className="bg-card border border-border/60 rounded-2xl p-6 space-y-4">
-        <h2 className="font-semibold flex items-center gap-2 text-sm">
+      <div className="card-premium rounded-2xl p-6 space-y-4">
+        <h2 className="font-black flex items-center gap-2 text-sm">
           {theme === "dark" ? <Moon className="h-4 w-4 text-muted-foreground" /> : <Sun className="h-4 w-4 text-muted-foreground" />}
           Apariencia
         </h2>
@@ -672,8 +784,8 @@ export default function PerfilPage() {
 
       {/* Quick stats */}
       {stats && (
-        <div className="bg-card border border-border/60 rounded-2xl p-6 space-y-4">
-          <h2 className="font-semibold text-sm text-muted-foreground">Resumen del catálogo</h2>
+        <div className="card-premium rounded-2xl p-6 space-y-4">
+          <h2 className="font-black text-sm">Resumen del catálogo</h2>
           <div className="grid grid-cols-3 gap-3">
             {[
               { icon: Disc3,         label: "Canciones",          value: stats.totalSongs,       color: "text-primary",     href: "/discografia" },
@@ -690,7 +802,7 @@ export default function PerfilPage() {
               >
                 <Icon className={cn("h-4 w-4 flex-shrink-0 group-hover:scale-110 transition-transform", color)} />
                 <div className="min-w-0">
-                  <p className="text-xl font-bold tabular-nums leading-none">{value}</p>
+                  <p className="text-xl font-black tabular-nums leading-none">{value}</p>
                   <p className="text-[10px] text-muted-foreground mt-1 leading-tight">{label}</p>
                 </div>
               </a>
@@ -701,9 +813,9 @@ export default function PerfilPage() {
 
       {/* Recent activity */}
       {recentActivity.length > 0 && (
-        <div className="bg-card border border-border/60 rounded-2xl p-6 space-y-4">
-          <h2 className="font-semibold text-sm text-muted-foreground flex items-center gap-2">
-            <Activity className="h-4 w-4" />
+        <div className="card-premium rounded-2xl p-6 space-y-4">
+          <h2 className="font-black text-sm flex items-center gap-2">
+            <Activity className="h-4 w-4 text-primary drop-shadow-[0_0_3px_currentColor]" />
             Actividad reciente
           </h2>
           <div className="space-y-1">
@@ -747,8 +859,8 @@ export default function PerfilPage() {
       {ConfirmDialog}
 
       {/* Account info */}
-      <div className="bg-card border border-border/60 rounded-2xl p-6 space-y-3">
-        <h2 className="font-semibold text-sm text-muted-foreground">
+      <div className="card-premium rounded-2xl p-6 space-y-3">
+        <h2 className="font-black text-sm">
           Información de cuenta
         </h2>
         <div className="grid grid-cols-2 gap-4 text-xs">

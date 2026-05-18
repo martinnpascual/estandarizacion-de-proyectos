@@ -19,7 +19,7 @@ function Sk({ className, delay = 0, style }: { className?: string; delay?: numbe
 // ─── Stat Card Skeleton ───────────────────────────────────────────────────────
 export function StatCardSkeleton() {
   return (
-    <div className="rounded-2xl border border-border/60 bg-card/80 p-4 pb-5 space-y-3">
+    <div className="card-premium rounded-2xl p-4 pb-5 space-y-3">
       <div className="flex items-center gap-2.5">
         <Sk className="h-8 w-8 rounded-xl" />
         <Sk className="h-3 w-24" delay={40} />
@@ -32,7 +32,7 @@ export function StatCardSkeleton() {
 // ─── Chart Skeleton ───────────────────────────────────────────────────────────
 export function ChartSkeleton({ height = "h-64" }: { height?: string }) {
   return (
-    <div className={cn("rounded-2xl border border-border/60 bg-card/80 p-5", height)}>
+    <div className={cn("card-premium rounded-2xl p-5", height)}>
       <div className="flex items-center justify-between mb-4">
         <Sk className="h-4 w-40" />
         <Sk className="h-7 w-24 rounded-full" delay={40} />
@@ -65,7 +65,7 @@ export function TableRowSkeleton({ cols = 4 }: { cols?: number }) {
 
 export function TableSkeleton({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
   return (
-    <div className="rounded-2xl border border-border/60 bg-card/80 overflow-hidden">
+    <div className="card-premium rounded-2xl overflow-hidden">
       {Array.from({ length: rows }).map((_, i) => (
         <TableRowSkeleton key={i} cols={cols} />
       ))}
@@ -78,7 +78,7 @@ export function CardGridSkeleton({ count = 6 }: { count?: number }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="rounded-2xl border border-border/60 bg-card/80 p-4 space-y-3">
+        <div key={i} className="card-premium rounded-2xl p-4 space-y-3">
           <Sk className="h-32 w-full rounded-xl" delay={i * 20} />
           <Sk className="h-4 w-3/4" delay={i * 20 + 30} />
           <Sk className="h-3 w-1/2" delay={i * 20 + 60} />
@@ -100,7 +100,7 @@ export function KanbanSkeleton({ columns = 4 }: { columns?: number }) {
         <div key={col} className="shrink-0 w-64 space-y-3">
           <Sk className="h-7 w-32 rounded-xl" delay={col * 40} />
           {Array.from({ length: 2 + (col % 2) }).map((_, card) => (
-            <div key={card} className="rounded-2xl border border-border/60 bg-card/80 p-3 space-y-2">
+            <div key={card} className="card-premium rounded-2xl p-3 space-y-2">
               <Sk className="h-4 w-3/4" delay={col * 40 + card * 30} />
               <Sk className="h-3 w-1/2" delay={col * 40 + card * 30 + 20} />
               <Sk className="h-3 w-2/3" delay={col * 40 + card * 30 + 40} />
@@ -133,7 +133,7 @@ export function SongCardSkeleton({ count = 8 }: { count?: number }) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-4">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="rounded-2xl border border-border/60 bg-card/80 overflow-hidden">
+        <div key={i} className="card-premium rounded-2xl overflow-hidden">
           <Sk className="aspect-square w-full rounded-none" delay={i * 25} />
           <div className="p-3 space-y-2">
             <Sk className="h-4 w-3/4" delay={i * 25 + 40} />
@@ -151,7 +151,7 @@ export function DraftCardSkeleton({ count = 6 }: { count?: number }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="rounded-2xl border border-border/60 bg-card/80 p-4 space-y-3">
+        <div key={i} className="card-premium rounded-2xl p-4 space-y-3">
           <div className="flex items-center gap-3">
             <Sk className="h-12 w-12 rounded-xl flex-shrink-0" delay={i * 30} />
             <div className="flex-1 space-y-1.5">
@@ -192,7 +192,7 @@ export function RoyaltyRowSkeleton({ delay = 0 }: { delay?: number }) {
 // ─── Goal Card Skeleton ───────────────────────────────────────────────────────
 export function GoalCardSkeleton({ delay = 0 }: { delay?: number }) {
   return (
-    <div className="rounded-2xl border border-border/60 bg-card/80 p-5 space-y-3">
+    <div className="card-premium rounded-2xl p-5 space-y-3">
       <div className="flex items-start justify-between gap-3">
         <Sk className="h-5 w-40" delay={delay} />
         <Sk className="h-6 w-20 rounded-full" delay={delay + 20} />
@@ -211,7 +211,7 @@ export function ListSkeleton({ rows = 5 }: { rows?: number }) {
   return (
     <div className="space-y-2">
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="flex items-center gap-3 p-3 rounded-2xl border border-border/60 bg-card/80">
+        <div key={i} className="flex items-center gap-3 p-3 card-premium rounded-2xl">
           <Sk className="h-8 w-8 rounded-full shrink-0" delay={i * 25} />
           <div className="flex-1 space-y-1.5">
             <Sk className="h-4 w-3/4" delay={i * 25 + 20} />
@@ -238,7 +238,7 @@ export function ProfileSkeleton() {
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="rounded-2xl border border-border/60 bg-card/80 p-4 space-y-2">
+          <div key={i} className="card-premium rounded-2xl p-4 space-y-2">
             <Sk className="h-3 w-20" delay={i * 30} />
             <Sk className="h-5 w-40" delay={i * 30 + 20} />
           </div>
@@ -253,7 +253,7 @@ export function SetlistSkeleton({ count = 4 }: { count?: number }) {
   return (
     <div className="space-y-3">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="rounded-2xl border border-border/60 bg-card/80 p-4 flex items-center gap-4">
+        <div key={i} className="card-premium rounded-2xl p-4 flex items-center gap-4">
           <Sk className="h-12 w-12 rounded-xl flex-shrink-0" delay={i * 30} />
           <div className="flex-1 space-y-1.5">
             <Sk className="h-4 w-48" delay={i * 30 + 20} />

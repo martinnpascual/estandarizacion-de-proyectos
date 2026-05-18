@@ -253,12 +253,12 @@ function CommandMenuModal({ onClose }: { onClose: () => void }) {
         onMouseEnter={() => setActiveIdx(idx)}
         className={cn(
           "w-full flex items-center gap-3 px-4 py-2.5 text-left transition-all",
-          idx === activeIdx ? "bg-secondary" : "hover:bg-secondary/50"
+          idx === activeIdx ? "bg-primary/10 border-l-2 border-primary/50" : "hover:bg-secondary/50 border-l-2 border-transparent"
         )}
       >
         <Icon className={cn("h-4 w-4 flex-shrink-0", meta.color)} />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">{result.title}</p>
+          <p className="text-sm font-semibold truncate">{result.title}</p>
           {result.subtitle && (
             <p className="text-xs text-muted-foreground truncate">{result.subtitle}</p>
           )}
@@ -282,12 +282,12 @@ function CommandMenuModal({ onClose }: { onClose: () => void }) {
         onMouseEnter={() => setActiveIdx(idx)}
         className={cn(
           "w-full flex items-center gap-3 px-4 py-2 text-left transition-all",
-          idx === activeIdx ? "bg-secondary" : "hover:bg-secondary/50"
+          idx === activeIdx ? "bg-primary/10 border-l-2 border-primary/50" : "hover:bg-secondary/50 border-l-2 border-transparent"
         )}
       >
         <Icon className={cn("h-4 w-4 flex-shrink-0", item.color)} />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">{item.label}</p>
+          <p className="text-sm font-semibold truncate">{item.label}</p>
           <p className="text-[11px] text-muted-foreground truncate">{item.description}</p>
         </div>
         {idx === activeIdx ? (
@@ -308,7 +308,7 @@ function CommandMenuModal({ onClose }: { onClose: () => void }) {
         onMouseEnter={() => setActiveIdx(idx)}
         className={cn(
           "w-full flex items-center gap-3 px-4 py-2 text-left transition-all",
-          idx === activeIdx ? "bg-secondary" : "hover:bg-secondary/50"
+          idx === activeIdx ? "bg-primary/10 border-l-2 border-primary/50" : "hover:bg-secondary/50 border-l-2 border-transparent"
         )}
       >
         <div className={cn("w-4 h-4 flex-shrink-0 relative flex items-center justify-center")}>
@@ -316,7 +316,7 @@ function CommandMenuModal({ onClose }: { onClose: () => void }) {
           <Plus className="h-2 w-2 text-foreground absolute -bottom-0.5 -right-0.5" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">{item.label}</p>
+          <p className="text-sm font-semibold truncate">{item.label}</p>
           <p className="text-[11px] text-muted-foreground truncate">{item.description}</p>
         </div>
         {idx === activeIdx ? (
@@ -332,7 +332,7 @@ function CommandMenuModal({ onClose }: { onClose: () => void }) {
   function SectionLabel({ label }: { label: string }) {
     return (
       <div className="px-4 py-1.5 border-b border-border/50">
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
           {label}
         </span>
       </div>
@@ -353,16 +353,18 @@ function CommandMenuModal({ onClose }: { onClose: () => void }) {
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm"
+        className="fixed inset-0 z-[100] modal-backdrop"
         onClick={onClose}
       />
 
       {/* Modal */}
       <div className="fixed top-[10%] left-1/2 -translate-x-1/2 z-[101] w-full max-w-xl px-4">
-        <div className="bg-card border border-border/60 rounded-2xl shadow-2xl shadow-black/40 overflow-hidden">
+        {/* Outer glow ring */}
+        <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-primary/25 via-transparent to-cyan-500/15 pointer-events-none" />
+        <div className="relative card-premium rounded-2xl shadow-2xl shadow-black/50 overflow-hidden">
           {/* Input */}
           <div className="flex items-center gap-3 px-4 py-3.5 border-b border-border/60">
-            <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <Search className="h-4 w-4 text-primary/60 drop-shadow-[0_0_3px_currentColor] flex-shrink-0" />
             <input
               ref={inputRef}
               type="text"
@@ -453,20 +455,20 @@ function CommandMenuModal({ onClose }: { onClose: () => void }) {
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between px-4 py-2 border-t border-border/60 bg-secondary/20">
+          <div className="flex items-center justify-between px-4 py-2 border-t border-border/60 bg-gradient-to-r from-primary/5 to-transparent">
             <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
               <span className="flex items-center gap-1">
-                <kbd className="bg-secondary px-1 rounded">↑↓</kbd> navegar
+                <kbd className="bg-secondary/80 border border-border/40 px-1.5 py-0.5 rounded-md text-[9px] font-mono shadow-sm">↑↓</kbd> navegar
               </span>
               <span className="flex items-center gap-1">
-                <kbd className="bg-secondary px-1 rounded">↵</kbd> abrir
+                <kbd className="bg-secondary/80 border border-border/40 px-1.5 py-0.5 rounded-md text-[9px] font-mono shadow-sm">↵</kbd> abrir
               </span>
               <span className="flex items-center gap-1">
-                <kbd className="bg-secondary px-1 rounded">ESC</kbd> cerrar
+                <kbd className="bg-secondary/80 border border-border/40 px-1.5 py-0.5 rounded-md text-[9px] font-mono shadow-sm">ESC</kbd> cerrar
               </span>
             </div>
             {isSearching && results.length > 0 && (
-              <span className="text-[10px] text-muted-foreground hidden sm:block">
+              <span className="text-[10px] text-primary/60 hidden sm:block tabular-nums">
                 {results.length} resultado{results.length !== 1 ? "s" : ""}
               </span>
             )}

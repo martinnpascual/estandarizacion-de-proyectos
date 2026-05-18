@@ -635,9 +635,9 @@ export default function CommandPalette() {
         <div
           className="
             w-full max-w-xl pointer-events-auto overflow-hidden
-            rounded-2xl border border-white/10
-            bg-[#0f0f14]/90 backdrop-blur-2xl shadow-2xl
-            shadow-black/60 ring-1 ring-white/5
+            rounded-2xl border border-white/[0.08]
+            bg-[#0c0b12]/92 backdrop-blur-3xl
+            shadow-[0_40px_100px_hsl(0_0%_0%/0.65),0_0_0_1px_hsl(0_0%_100%/0.04)_inset,0_0_40px_hsl(var(--primary)/0.06)]
             animate-in fade-in zoom-in-95 duration-150 ease-out
           "
         >

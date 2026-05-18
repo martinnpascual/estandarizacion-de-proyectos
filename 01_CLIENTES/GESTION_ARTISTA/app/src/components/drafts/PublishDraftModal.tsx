@@ -124,7 +124,7 @@ export default function PublishDraftModal({
       <div className="relative w-full max-w-md" onClick={(e) => e.stopPropagation()}>
         {/* Glow ring */}
         <div className="absolute -inset-px rounded-2xl bg-gradient-to-br from-green-500/20 via-transparent to-emerald-500/10 pointer-events-none" />
-        <div className="relative bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl max-h-[90vh] flex flex-col shadow-2xl shadow-black/40">
+        <div className="relative glass-panel rounded-2xl max-h-[90vh] flex flex-col">
 
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-border/60 flex-shrink-0">

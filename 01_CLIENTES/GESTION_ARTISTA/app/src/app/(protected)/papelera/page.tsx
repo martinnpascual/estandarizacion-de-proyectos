@@ -140,16 +140,17 @@ export default function PapeleraPage() {
       {ConfirmDialog}
       <div className="min-h-screen p-6 max-w-4xl mx-auto">
         {/* Header */}
-        <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card mb-6">
+        <div className="card-premium relative overflow-hidden rounded-2xl mb-6">
           <div className="absolute inset-0 bg-gradient-to-br from-red-500/8 via-transparent to-transparent pointer-events-none" />
           <div className="absolute -top-10 -right-10 w-40 h-40 bg-red-500/6 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-orange-400/5 rounded-full blur-2xl pointer-events-none" />
           <div className="relative flex items-center justify-between px-6 py-5">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500/30 to-red-600/10 border border-red-500/20 flex items-center justify-center flex-shrink-0">
-                <Trash2 className="h-5 w-5 text-red-400" />
+                <Trash2 className="h-5 w-5 text-red-400 drop-shadow-[0_0_6px_currentColor]" />
               </div>
               <div>
-                <h1 className="text-lg font-bold leading-tight">Papelera</h1>
+                <h1 className="text-xl font-black tracking-tight leading-tight gradient-text">Papelera</h1>
                 <p className="text-muted-foreground text-xs mt-0.5">
                   {items.length} elemento{items.length !== 1 ? "s" : ""} eliminado{items.length !== 1 ? "s" : ""}
                 </p>
@@ -181,7 +182,7 @@ export default function PapeleraPage() {
           <button
             onClick={() => setFilter("all")}
             className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all active:scale-95 ${
-              filter === "all" ? "bg-primary text-primary-foreground font-semibold shadow-sm" : "bg-secondary/50 text-muted-foreground hover:bg-secondary"
+              filter === "all" ? "bg-primary text-primary-foreground font-black shadow-sm" : "bg-secondary/50 text-muted-foreground hover:bg-secondary"
             }`}
           >
             Todos ({items.length})
@@ -229,14 +230,14 @@ export default function PapeleraPage() {
 
               return (
                 <StaggerItem key={`${item.type}-${item.id}`}>
-                  <div className="flex items-center gap-4 p-4 bg-card/60 border border-border/40 rounded-2xl hover:border-border/60 hover:shadow-sm hover:-translate-y-0.5 transition-all">
-                    <div className={`w-9 h-9 rounded-xl ${cfg.bg} flex items-center justify-center flex-shrink-0`}>
-                      <Icon className={`h-4 w-4 ${cfg.color}`} />
+                  <div className="card-premium flex items-center gap-4 p-4 rounded-2xl hover:-translate-y-0.5 hover:shadow-[0_8px_24px_hsl(0_0%_0%/0.25)] transition-all group">
+                    <div className={`w-10 h-10 rounded-xl ${cfg.bg} flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform border border-white/5`}>
+                      <Icon className={`h-4 w-4 ${cfg.color} drop-shadow-[0_0_4px_currentColor]`} />
                     </div>
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium truncate">{item.title}</p>
+                        <p className="text-sm font-black truncate">{item.title}</p>
                         <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${cfg.bg} ${cfg.color} flex-shrink-0`}>
                           {cfg.label}
                         </span>
