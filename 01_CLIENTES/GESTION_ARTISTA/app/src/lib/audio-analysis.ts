@@ -11,7 +11,6 @@
  */
 
 // music-tempo ships without TypeScript declarations — suppress the error.
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import MusicTempo from "music-tempo";
 
@@ -50,7 +49,6 @@ function toMono(buf: AudioBuffer, maxSeconds = 120): Float32Array {
 function detectBPM(mono: Float32Array, sampleRate: number): number {
   let raw: number;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
     const mt = new MusicTempo(mono, { sampleRate }) as { tempo: number };
     raw = mt.tempo;
   } catch {
