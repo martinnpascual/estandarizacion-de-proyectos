@@ -1931,6 +1931,24 @@ select:focus-visible {
   animation: play-ring-spin-ccw 7s linear infinite;
 }
 
+/* Very slow outer ring CW — third orbital arc */
+@keyframes play-ring-spin-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.player-ring-spin-slow {
+  animation: play-ring-spin-slow 15s linear infinite;
+}
+
+/* Cover art floating levitation when playing */
+@keyframes cover-float {
+  0%, 100% { transform: translateY(0px) scale(1); }
+  50%       { transform: translateY(-4px) scale(1.005); }
+}
+.player-cover-float {
+  animation: cover-float 4s ease-in-out infinite;
+}
+
 /* Shimmer sweep over progress fill while playing */
 @keyframes progress-shimmer {
   0%   { transform: translateX(-200%); opacity: 0; }

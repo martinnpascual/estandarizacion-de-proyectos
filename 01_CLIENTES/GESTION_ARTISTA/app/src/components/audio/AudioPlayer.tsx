@@ -38,9 +38,10 @@ const BAR_GAP     = 0.55;        // minimal gap for ultra-thin look
 const MIN_FREQ_HZ = 20;
 const MAX_FREQ_HZ = 18000;
 const NYQUIST     = 22050;
-const ALPHA_UP    = 0.62;        // very snappy to transients & beats
-const ALPHA_DOWN  = 0.060;       // long musical tail on decay
-const MIN_AMP     = 0.022;       // nearly flat floor when truly silent
+const ALPHA_UP    = 0.65;        // very snappy to transients & beats
+const ALPHA_DOWN  = 0.055;       // long musical tail on decay
+const MIN_AMP     = 0.018;       // nearly flat floor when truly silent
+const PEAK_DECAY  = 0.0012;      // slow peak-hold tick decay per frame at 60 fps
 
 function barToFreq(i: number, count: number): number {
   return MIN_FREQ_HZ * Math.pow(MAX_FREQ_HZ / MIN_FREQ_HZ, i / (count - 1));
@@ -69,6 +70,7 @@ function SpectrumAnalyzer({
   const canvasRef  = useRef<HTMLCanvasElement>(null);
   const rafRef     = useRef<number>(0);
   const smoothed   = useRef<Float32Array>(new Float32Array(BAR_COUNT));
+  const peakHold   = useRef<Float32Array>(new Float32Array(BAR_COUNT));
   const binRanges  = useRef<Array<[number, number]> | null>(null);
   const idlePhase  = useRef(0);
   const prevDpr    = useRef(0);
@@ -132,16 +134,26 @@ function SpectrumAnalyzer({
           smoothed.current[i] += alpha * (raw - smoothed.current[i]);
         }
       } else {
-        // Organic breathing when paused — more visible & alive
-        idlePhase.current += 0.016;
+        // Organic multi-layer breathing when paused
+        idlePhase.current += 0.018;
         const t = idlePhase.current;
         for (let i = 0; i < BAR_COUNT; i++) {
-          const x   = i / BAR_COUNT;
-          const wave = 0.5 * Math.sin(t + x * 6.2)
-                     + 0.3 * Math.sin(t * 1.3 + x * 12.4)
-                     + 0.2 * Math.sin(t * 0.7 + x * 3.1);
-          const target = MIN_AMP + 0.12 * (1 + wave) * 0.5;  // was 0.065 — more organic movement
-          smoothed.current[i] += 0.05 * (target - smoothed.current[i]);
+          const x    = i / BAR_COUNT;
+          const wave = 0.50 * Math.sin(t + x * 5.8)
+                     + 0.28 * Math.sin(t * 1.4 + x * 11.6)
+                     + 0.14 * Math.sin(t * 0.8 + x * 2.9)
+                     + 0.08 * Math.sin(t * 2.1 + x * 17.4);
+          const target = MIN_AMP + 0.16 * (1 + wave) * 0.5;
+          smoothed.current[i] += 0.048 * (target - smoothed.current[i]);
+        }
+      }
+
+      // ── Update peak-hold ticks ──────────────────────────────────────
+      for (let i = 0; i < BAR_COUNT; i++) {
+        if (smoothed.current[i] >= peakHold.current[i]) {
+          peakHold.current[i] = smoothed.current[i];
+        } else {
+          peakHold.current[i] = Math.max(MIN_AMP, peakHold.current[i] - PEAK_DECAY);
         }
       }
 
@@ -149,50 +161,42 @@ function SpectrumAnalyzer({
       const totalGap = BAR_GAP * (BAR_COUNT - 1);
       const barW     = Math.max(1, (W - totalGap) / BAR_COUNT);
       const midY     = H / 2;
-      const halfH    = midY - 1;   // max half-height per bar arm
+      const halfH    = midY - 2;
 
-      const pct        = duration > 0 ? currentTime / duration : 0;
-      const playheadX  = pct * W;
+      const pct       = duration > 0 ? currentTime / duration : 0;
+      const playheadX = pct * W;
 
-      // ── Center axis baseline ─────────────────────────────────────────────
+      // ── Center axis baseline ─────────────────────────────────────────
       ctx.beginPath();
       ctx.moveTo(0, midY);
       ctx.lineTo(W, midY);
-      ctx.strokeStyle = `rgba(255,255,255,0.06)`;
+      ctx.strokeStyle = `rgba(255,255,255,0.045)`;
       ctx.lineWidth   = 0.5;
       ctx.stroke();
 
-      // ── Played-region ambient tint ───────────────────────────────────────
+      // ── Played-region ambient tint ───────────────────────────────────
       if (pct > 0.002) {
         const tintGrd = ctx.createLinearGradient(0, 0, playheadX, 0);
         tintGrd.addColorStop(0, `hsla(${pH}, ${pS}%, ${pL}%, 0.04)`);
-        tintGrd.addColorStop(1, `hsla(${pH}, ${pS}%, ${pL}%, 0.09)`);
+        tintGrd.addColorStop(1, `hsla(${pH}, ${pS}%, ${pL}%, 0.11)`);
         ctx.fillStyle = tintGrd;
         ctx.fillRect(0, 0, playheadX, H);
       }
 
-      // ── Pre-build 3 amplitude-tier gradients + paused  (reused every frame) ──
-      // Low amplitude — subtle glow
-      const gradLow = ctx.createLinearGradient(0, midY - halfH * 0.5, 0, midY + halfH * 0.5);
-      gradLow.addColorStop(0,   `hsla(${pH},     ${pS}%,       ${pL + 10}%, 0.78)`);
-      gradLow.addColorStop(0.5, `hsla(${pH},     ${pS}%,       ${pL}%,      0.68)`);
-      gradLow.addColorStop(1,   `hsla(${pH},     ${pS}%,       ${pL + 10}%, 0.78)`);
-      // Mid amplitude — vivid primary
-      const gradMid = ctx.createLinearGradient(0, midY - halfH * 0.75, 0, midY + halfH * 0.75);
-      gradMid.addColorStop(0,   `hsla(${pH + 5}, ${pS + 5}%, ${Math.min(pL + 22, 90)}%, 0.92)`);
-      gradMid.addColorStop(0.5, `hsla(${pH},     ${pS}%,     ${pL}%,                    0.85)`);
-      gradMid.addColorStop(1,   `hsla(${pH + 5}, ${pS + 5}%, ${Math.min(pL + 22, 90)}%, 0.92)`);
-      // Peak amplitude — bright near-white tips
-      const gradPeak = ctx.createLinearGradient(0, midY - halfH, 0, midY + halfH);
-      gradPeak.addColorStop(0,   `hsla(${pH + 12}, ${pS + 8}%, ${Math.min(pL + 34, 95)}%, 0.98)`);
-      gradPeak.addColorStop(0.38,`hsla(${pH + 4},  ${pS + 4}%, ${pL + 8}%,               0.92)`);
-      gradPeak.addColorStop(0.62,`hsla(${pH + 4},  ${pS + 4}%, ${pL + 8}%,               0.92)`);
-      gradPeak.addColorStop(1,   `hsla(${pH + 12}, ${pS + 8}%, ${Math.min(pL + 34, 95)}%, 0.98)`);
+      // ── Horizontal frequency color gradients (warm bass → cool highs) ──
+      // Playing state: full vivid spectrum
+      const gradFreqPlay = ctx.createLinearGradient(0, 0, W, 0);
+      gradFreqPlay.addColorStop(0,    `hsla(${pH - 24}, ${Math.min(pS + 22, 100)}%, ${pL + 4}%, 0.97)`);
+      gradFreqPlay.addColorStop(0.12, `hsla(${pH - 10}, ${pS + 8}%,                 ${pL + 5}%, 0.95)`);
+      gradFreqPlay.addColorStop(0.35, `hsla(${pH},       ${pS}%,                    ${pL + 9}%, 0.93)`);
+      gradFreqPlay.addColorStop(0.60, `hsla(${pH + 8},  ${pS - 4}%,                ${pL + 14}%, 0.94)`);
+      gradFreqPlay.addColorStop(1.0,  `hsla(${pH + 42}, ${Math.max(pS - 25, 56)}%, ${pL + 26}%, 0.91)`);
 
-      const gradPaused = ctx.createLinearGradient(0, midY - halfH, 0, midY + halfH);
-      gradPaused.addColorStop(0,   `hsla(${pH}, ${pS}%, ${pL + 14}%, 0.72)`);
-      gradPaused.addColorStop(0.5, `hsla(${pH}, ${pS}%, ${pL}%,      0.58)`);
-      gradPaused.addColorStop(1,   `hsla(${pH}, ${pS}%, ${pL + 14}%, 0.72)`);
+      // Paused state: muted version
+      const gradFreqPause = ctx.createLinearGradient(0, 0, W, 0);
+      gradFreqPause.addColorStop(0,   `hsla(${pH - 16}, ${pS}%, ${pL + 2}%, 0.50)`);
+      gradFreqPause.addColorStop(0.5, `hsla(${pH},      ${pS}%, ${pL}%,     0.44)`);
+      gradFreqPause.addColorStop(1.0, `hsla(${pH + 28}, ${pS}%, ${pL + 12}%, 0.46)`);
 
       // ── Draw bars (symmetric: grow up + down from midY) ─────────────
       for (let i = 0; i < BAR_COUNT; i++) {
@@ -200,83 +204,127 @@ function SpectrumAnalyzer({
         const cx     = x + barW / 2;
         const val    = smoothed.current[i];
         const arm    = Math.max(1, val * halfH);
-        const radius = Math.min(barW / 2, 1.2);
+        const radius = Math.min(barW / 2, 1.5);
 
         const barFrac  = cx / W;
         const isFilled = barFrac <= pct;
 
         if (isFilled && isPlaying) {
-          // Amplitude-tiered color response
-          if (val > 0.72) ctx.fillStyle = gradPeak;
-          else if (val > 0.40) ctx.fillStyle = gradMid;
-          else ctx.fillStyle = gradLow;
+          ctx.fillStyle = gradFreqPlay;
         } else if (isFilled) {
-          ctx.fillStyle = gradPaused;
+          ctx.fillStyle = gradFreqPause;
         } else {
-          ctx.fillStyle = `rgba(255,255,255,${isPlaying ? 0.20 : 0.14})`;
+          ctx.fillStyle = `rgba(255,255,255,${isPlaying ? 0.16 : 0.10})`;
         }
 
-        // Top arm (up from center)
+        // Top arm
         ctx.beginPath();
         ctx.roundRect(x, midY - arm, barW, arm, [radius, radius, 0, 0]);
         ctx.fill();
-
-        // Bottom arm (down from center) — mirror
+        // Bottom arm (mirror)
         ctx.beginPath();
         ctx.roundRect(x, midY, barW, arm, [0, 0, radius, radius]);
         ctx.fill();
 
-        // ── Peak glow dot at tips of very loud bars ─────────────────
+        // ── Bright tip overlay for loud bars (near-white highlights) ─
         if (isFilled && isPlaying && val > 0.62) {
-          const dotPct   = Math.min((val - 0.62) / 0.38, 1);
-          const dotAlpha = dotPct * 0.90;
-          const dotL     = Math.min(pL + 42, 96);
-          const dotR     = barW * 0.60;
-          ctx.fillStyle  = `hsla(${pH + 10}, ${pS}%, ${dotL}%, ${dotAlpha})`;
+          const t    = (val - 0.62) / 0.38;
+          const tipH = Math.max(1.5, arm * 0.20);
+          ctx.fillStyle = `rgba(255,255,255,${t * 0.32})`;
           ctx.beginPath();
-          ctx.arc(cx, midY - arm, dotR, 0, Math.PI * 2);
+          ctx.roundRect(x, midY - arm, barW, tipH, [radius, radius, 0, 0]);
           ctx.fill();
           ctx.beginPath();
-          ctx.arc(cx, midY + arm, dotR, 0, Math.PI * 2);
+          ctx.roundRect(x, midY + arm - tipH, barW, tipH, [0, 0, radius, radius]);
           ctx.fill();
         }
       }
 
+      // ── Peak-hold ticks — professional spectrum analyzer signature ──
+      if (isPlaying) {
+        for (let i = 0; i < BAR_COUNT; i++) {
+          const ph = peakHold.current[i];
+          if (ph <= MIN_AMP + 0.01) continue;
+          const x        = i * (barW + BAR_GAP);
+          const cx       = x + barW / 2;
+          const pArm     = Math.max(1, ph * halfH);
+          const barFrac  = cx / W;
+          const isFilled = barFrac <= pct;
+          const alpha    = isFilled ? 0.88 : 0.28;
+
+          // Frequency-matched tick color
+          const freqFrac = i / (BAR_COUNT - 1);
+          const tickHue  = freqFrac < 0.18
+            ? pH - 24 * (1 - freqFrac / 0.18)
+            : freqFrac > 0.65
+              ? pH + 42 * ((freqFrac - 0.65) / 0.35)
+              : pH;
+          const tickL = Math.min(pL + 32, 92);
+          ctx.fillStyle = `hsla(${tickHue}, ${pS}%, ${tickL}%, ${alpha})`;
+
+          // Top tick
+          ctx.fillRect(x, midY - pArm - 1.5, barW, 1.5);
+          // Bottom tick (mirror)
+          ctx.fillRect(x, midY + pArm,         barW, 1.5);
+        }
+      }
+
+      // ── Depth vignette: fade extreme top & bottom into background ───
+      const topVig = ctx.createLinearGradient(0, 0, 0, midY * 0.40);
+      topVig.addColorStop(0,   'rgba(6,6,10,0.52)');
+      topVig.addColorStop(1,   'rgba(6,6,10,0)');
+      ctx.fillStyle = topVig;
+      ctx.fillRect(0, 0, W, midY * 0.40);
+
+      const botVig = ctx.createLinearGradient(0, H - midY * 0.40, 0, H);
+      botVig.addColorStop(0,   'rgba(6,6,10,0)');
+      botVig.addColorStop(1,   'rgba(6,6,10,0.52)');
+      ctx.fillStyle = botVig;
+      ctx.fillRect(0, H - midY * 0.40, W, midY * 0.40);
+
       // ── Playhead ─────────────────────────────────────────────────────
       if (duration > 0 && pct > 0.001) {
         // Wide soft glow halo
-        const grd = ctx.createLinearGradient(playheadX - 10, 0, playheadX + 10, 0);
+        const grd = ctx.createLinearGradient(playheadX - 14, 0, playheadX + 14, 0);
         grd.addColorStop(0,    `hsla(${pH},${pS}%,${pL+10}%,0)`);
-        grd.addColorStop(0.45, `hsla(${pH},${pS}%,${pL+20}%,0.24)`);
-        grd.addColorStop(0.55, `hsla(${pH},${pS}%,${pL+20}%,0.24)`);
+        grd.addColorStop(0.38, `hsla(${pH},${pS}%,${pL+22}%,0.28)`);
+        grd.addColorStop(0.62, `hsla(${pH},${pS}%,${pL+22}%,0.28)`);
         grd.addColorStop(1,    `hsla(${pH},${pS}%,${pL+10}%,0)`);
         ctx.fillStyle = grd;
-        ctx.fillRect(playheadX - 10, 0, 20, H);
+        ctx.fillRect(playheadX - 14, 0, 28, H);
 
-        // Crisp 1.5px line with stronger glow
+        // Crisp 1.5 px line
         ctx.save();
         ctx.beginPath();
-        ctx.moveTo(playheadX, 1);
-        ctx.lineTo(playheadX, H - 1);
-        ctx.strokeStyle = `hsla(${pH},${pS}%,${Math.min(pL+32,96)}%,0.98)`;
+        ctx.moveTo(playheadX, 0);
+        ctx.lineTo(playheadX, H);
+        ctx.strokeStyle = `hsla(${pH},${pS}%,${Math.min(pL + 36, 97)}%,0.97)`;
         ctx.lineWidth   = 1.5;
-        ctx.shadowColor = `hsl(${pH} ${pS}% ${Math.min(pL+20,90)}%)`;
-        ctx.shadowBlur  = 8;
+        ctx.shadowColor = `hsl(${pH} ${pS}% ${Math.min(pL + 22, 92)}%)`;
+        ctx.shadowBlur  = 11;
         ctx.stroke();
         ctx.restore();
 
-        // Prominent knob at center
+        // Outer knob ring
         ctx.beginPath();
-        ctx.arc(playheadX, midY, 4.5, 0, Math.PI * 2);
-        ctx.fillStyle   = `hsl(${pH} ${pS}% ${Math.min(pL+32,96)}%)`;
+        ctx.arc(playheadX, midY, 6.5, 0, Math.PI * 2);
+        ctx.strokeStyle = `hsla(${pH},${pS}%,${Math.min(pL + 28, 90)}%,0.45)`;
+        ctx.lineWidth   = 1;
+        ctx.stroke();
+
+        // Main knob
+        ctx.beginPath();
+        ctx.arc(playheadX, midY, 5, 0, Math.PI * 2);
+        ctx.fillStyle   = `hsl(${pH} ${pS}% ${Math.min(pL + 36, 97)}%)`;
         ctx.shadowColor = `hsl(${pH} ${pS}% ${pL}%)`;
-        ctx.shadowBlur  = 14;
+        ctx.shadowBlur  = 18;
         ctx.fill();
         ctx.shadowBlur  = 0;
-        // White center dot on knob
+
+        // White center dot
         ctx.beginPath();
         ctx.arc(playheadX, midY, 1.8, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(255,255,255,0.95)";
+        ctx.fillStyle = "rgba(255,255,255,0.97)";
         ctx.fill();
       }
 
@@ -285,10 +333,10 @@ function SpectrumAnalyzer({
         if (duration <= 0) break;
         const mx = (ts / duration) * W;
         ctx.beginPath();
-        ctx.arc(mx, midY, 3, 0, Math.PI * 2);
-        ctx.fillStyle   = "rgba(234,179,8,0.92)";
-        ctx.shadowColor = "rgba(234,179,8,0.7)";
-        ctx.shadowBlur  = 6;
+        ctx.arc(mx, midY, 3.5, 0, Math.PI * 2);
+        ctx.fillStyle   = "rgba(234,179,8,0.95)";
+        ctx.shadowColor = "rgba(234,179,8,0.75)";
+        ctx.shadowBlur  = 8;
         ctx.fill();
         ctx.shadowBlur  = 0;
       }
@@ -299,7 +347,7 @@ function SpectrumAnalyzer({
   }, [analyserRef, isPlaying, currentTime, duration, commentMarkers]);
 
   return (
-    <div className="relative w-full" style={{ height: 36 }}>
+    <div className="relative w-full" style={{ height: 64 }}>
       {/* Timestamp hover tooltip */}
       {hoverTime !== null && hoverPct !== null && (
         <div
@@ -598,20 +646,31 @@ export default function AudioPlayer() {
             background: "rgba(6,6,10,0.98)",
             backdropFilter: "blur(52px) saturate(2.2)",
           }} />
-          {/* Ambient color bloom from primary */}
+          {/* Ambient multi-color bloom */}
           <div className="absolute inset-0 pointer-events-none" style={{
-            background: "linear-gradient(135deg, hsl(var(--primary)/0.18) 0%, transparent 50%, hsl(var(--primary)/0.10) 100%)",
+            background: "linear-gradient(135deg, hsl(var(--primary)/0.22) 0%, transparent 48%, hsl(var(--primary)/0.12) 100%)",
           }} />
-          {/* Central glow pulse — gives depth to flat background */}
+          {/* Side accent glows — left warm, right cool */}
+          <div className="absolute inset-0 pointer-events-none" style={{
+            background: "radial-gradient(ellipse 40% 100% at 0% 50%, hsl(var(--primary)/0.14) 0%, transparent 100%)",
+          }} />
+          <div className="absolute inset-0 pointer-events-none" style={{
+            background: "radial-gradient(ellipse 30% 100% at 100% 50%, hsl(200 80% 60%/0.08) 0%, transparent 100%)",
+          }} />
+          {/* Central upward glow — depth from bottom */}
           <div className="absolute left-1/2 top-0 -translate-x-1/2 pointer-events-none" style={{
-            width: "50%", height: "120%",
-            background: "radial-gradient(ellipse at 50% 100%, hsl(var(--primary)/0.14) 0%, transparent 70%)",
+            width: "65%", height: "130%",
+            background: `radial-gradient(ellipse at 50% 100%, hsl(var(--primary)/${isPlaying ? "0.20" : "0.11"}) 0%, transparent 70%)`,
+            transition: "background 0.6s ease",
           }} />
+          {/* Cover art color bleed — stronger */}
           {coverUrl && (
-            <div className="absolute inset-0 pointer-events-none opacity-[0.14] blur-3xl scale-110" style={{
+            <div className="absolute inset-0 pointer-events-none blur-3xl scale-110" style={{
               backgroundImage: `url(${coverUrl})`,
               backgroundSize: "cover",
               backgroundPosition: "center",
+              opacity: isPlaying ? 0.22 : 0.10,
+              transition: "opacity 0.7s ease",
             }} />
           )}
           {/* Subtle grain texture for premium material feel */}
@@ -623,12 +682,12 @@ export default function AudioPlayer() {
 
         {/* ── Top accent line ──────────────────────────────────────────── */}
         <div className="absolute top-0 left-0 right-0 h-[2px] pointer-events-none" style={{
-          background: "linear-gradient(90deg, transparent 0%, hsl(var(--primary)/0.55) 12%, hsl(var(--primary)) 50%, hsl(var(--primary)/0.55) 88%, transparent 100%)",
-          boxShadow: "0 0 20px hsl(var(--primary)/0.55), 0 0 40px hsl(var(--primary)/0.22)",
+          background: "linear-gradient(90deg, transparent 0%, hsl(200 80% 72%/0.55) 8%, hsl(var(--primary)/0.75) 25%, hsl(var(--primary)) 50%, hsl(var(--primary)/0.75) 75%, hsl(262 90% 82%/0.55) 92%, transparent 100%)",
+          boxShadow: "0 0 24px hsl(var(--primary)/0.65), 0 0 48px hsl(var(--primary)/0.28)",
         }} />
 
         {/* ── Spectrum + time labels ────────────────────────────────────── */}
-        <div className="relative z-10 px-3 pt-2">
+        <div className="relative z-10 px-3 pt-1.5">
           <SpectrumAnalyzer
             analyserRef={analyserRef}
             isPlaying={isPlaying}
@@ -703,37 +762,44 @@ export default function AudioPlayer() {
           <div className="relative z-10 flex items-center gap-2 px-4 py-2.5 max-w-screen-xl mx-auto">
 
             {/* ── LEFT: Cover + info ────────────────────────────────── */}
-            <div className="flex items-center gap-3 w-[270px] min-w-0 flex-shrink-0">
+            <div className="flex items-center gap-3 w-[292px] min-w-0 flex-shrink-0">
               {/* Cover art */}
-              <div className="relative flex-shrink-0">
+              <div className={cn("relative flex-shrink-0", isPlaying && "player-cover-float")}>
+                {/* Ambient pulse halo */}
                 {isPlaying && (
-                  <div className="absolute -inset-[4px] rounded-[18px] pointer-events-none animate-pulse" style={{
-                    boxShadow: "0 0 0 1.5px hsl(var(--primary)/0.75), 0 0 32px hsl(var(--primary)/0.58), 0 0 64px hsl(var(--primary)/0.28)",
-                    animationDuration: "2.0s",
+                  <div className="absolute -inset-[5px] rounded-[24px] pointer-events-none animate-pulse" style={{
+                    boxShadow: "0 0 0 2px hsl(var(--primary)/0.70), 0 0 48px hsl(var(--primary)/0.65), 0 0 96px hsl(var(--primary)/0.28)",
+                    animationDuration: "2.2s",
                   }} />
                 )}
                 {isPlaying && (
                   <>
-                    {/* Inner ring — vivid primary CW */}
-                    <div className="absolute -inset-[5px] rounded-full pointer-events-none player-ring-spin" style={{
-                      background: "conic-gradient(from 0deg, hsl(var(--primary)) 0%, hsl(var(--primary)/0.70) 20%, transparent 38%, hsl(var(--primary)/0.50) 62%, transparent 80%, hsl(var(--primary)) 100%)",
+                    {/* Inner ring — vivid primary CW fast */}
+                    <div className="absolute -inset-[6px] rounded-full pointer-events-none player-ring-spin" style={{
+                      background: "conic-gradient(from 0deg, hsl(var(--primary)) 0%, hsl(var(--primary)/0.75) 20%, transparent 38%, hsl(var(--primary)/0.55) 62%, transparent 80%, hsl(var(--primary)) 100%)",
                       WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 3px), black calc(100% - 3px))",
                       mask: "radial-gradient(farthest-side, transparent calc(100% - 3px), black calc(100% - 3px))",
                     }} />
-                    {/* Outer ring — lighter purple CCW slow */}
-                    <div className="absolute -inset-[11px] rounded-full pointer-events-none player-ring-spin-ccw" style={{
-                      background: "conic-gradient(from 120deg, transparent 0%, hsl(262 85% 82%/0.80) 18%, transparent 42%, hsl(var(--primary)/0.45) 72%, transparent 100%)",
+                    {/* Middle ring — lavender CCW */}
+                    <div className="absolute -inset-[13px] rounded-full pointer-events-none player-ring-spin-ccw" style={{
+                      background: "conic-gradient(from 120deg, transparent 0%, hsl(262 90% 82%/0.85) 16%, transparent 40%, hsl(var(--primary)/0.50) 70%, transparent 100%)",
                       WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 2px), black calc(100% - 2px))",
                       mask: "radial-gradient(farthest-side, transparent calc(100% - 2px), black calc(100% - 2px))",
+                    }} />
+                    {/* Outer ring — cool cyan/teal, very slow CW */}
+                    <div className="absolute -inset-[20px] rounded-full pointer-events-none player-ring-spin-slow" style={{
+                      background: "conic-gradient(from 240deg, transparent 0%, hsl(200 80% 72%/0.42) 14%, transparent 34%, hsl(var(--primary)/0.24) 60%, transparent 100%)",
+                      WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 1.5px), black calc(100% - 1.5px))",
+                      mask: "radial-gradient(farthest-side, transparent calc(100% - 1.5px), black calc(100% - 1.5px))",
                     }} />
                   </>
                 )}
                 <div className={cn(
-                  "relative w-16 h-16 rounded-xl overflow-hidden flex items-center justify-center transition-all duration-500",
+                  "relative w-20 h-20 rounded-2xl overflow-hidden flex items-center justify-center transition-all duration-500",
                   "border player-cover-vinyl player-cover-shine",
                   isPlaying
-                    ? "border-primary/50 shadow-[0_6px_28px_hsl(var(--primary)/0.40)]"
-                    : "border-white/12 shadow-[0_4px_18px_rgba(0,0,0,0.5)]"
+                    ? "border-primary/55 shadow-[0_0_0_1px_hsl(var(--primary)/0.22),0_10px_44px_hsl(var(--primary)/0.58),0_20px_64px_rgba(0,0,0,0.65)]"
+                    : "border-white/12 shadow-[0_4px_22px_rgba(0,0,0,0.58)]"
                 )}>
                   {coverUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -744,39 +810,44 @@ export default function AudioPlayer() {
                   ) : (
                     <>
                       {/* Base dark fill */}
-                      <div className="absolute inset-0" style={{ background: "hsl(262 55% 7%)" }} />
-                      {/* Spinning vinyl groove texture (only spins, no EQ inside) */}
+                      <div className="absolute inset-0" style={{ background: "hsl(262 58% 6%)" }} />
+                      {/* Spinning vinyl groove texture */}
                       <div className={cn("absolute inset-0", isPlaying && "player-grooves-spin")} style={{
                         background: `
-                          radial-gradient(circle at center, hsl(var(--primary)/0.22) 0%, transparent 65%),
-                          repeating-radial-gradient(circle at center, transparent 0px, transparent 4px, rgba(0,0,0,0.18) 4px, rgba(0,0,0,0.18) 5px)
+                          radial-gradient(circle at center, hsl(var(--primary)/0.28) 0%, transparent 68%),
+                          repeating-radial-gradient(circle at center, transparent 0px, transparent 4px, rgba(0,0,0,0.20) 4px, rgba(0,0,0,0.20) 5px)
                         `,
                       }} />
-                      {/* Static center label — doesn't spin */}
-                      <div className="relative z-[2] w-9 h-9 rounded-full flex items-center justify-center" style={{
-                        background: "radial-gradient(circle at 32% 28%, hsl(var(--primary)/0.90) 0%, hsl(262 72% 30%) 50%, hsl(262 55% 13%) 100%)",
-                        border: "1px solid hsl(var(--primary)/0.50)",
+                      {/* Outer ring groove highlight */}
+                      <div className="absolute inset-[4px] rounded-full pointer-events-none" style={{
+                        border: "1px solid rgba(255,255,255,0.06)",
+                        boxShadow: "inset 0 0 12px rgba(0,0,0,0.5)",
+                      }} />
+                      {/* Static center label */}
+                      <div className="relative z-[2] w-11 h-11 rounded-full flex items-center justify-center" style={{
+                        background: "radial-gradient(circle at 32% 28%, hsl(var(--primary)/0.95) 0%, hsl(262 72% 28%) 52%, hsl(262 55% 11%) 100%)",
+                        border: "1.5px solid hsl(var(--primary)/0.55)",
                         boxShadow: isPlaying
-                          ? "0 0 0 1px hsl(var(--primary)/0.18), 0 0 20px hsl(var(--primary)/0.60), inset 0 1px 0 rgba(255,255,255,0.18)"
-                          : "0 0 8px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.07)",
+                          ? "0 0 0 1px hsl(var(--primary)/0.20), 0 0 28px hsl(var(--primary)/0.70), inset 0 1px 0 rgba(255,255,255,0.22)"
+                          : "0 0 12px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.07)",
                       }}>
                         {/* Center hole */}
-                        <div className="absolute w-2.5 h-2.5 rounded-full" style={{
-                          background: "rgba(0,0,0,0.75)",
-                          border: "1px solid rgba(255,255,255,0.14)",
+                        <div className="absolute w-3 h-3 rounded-full" style={{
+                          background: "rgba(0,0,0,0.82)",
+                          border: "1px solid rgba(255,255,255,0.16)",
                         }} />
                         {isPlaying ? (
-                          <div className="relative z-[1] flex gap-[2px] items-end h-3.5">
+                          <div className="relative z-[1] flex gap-[2px] items-end h-4">
                             {[1,2,3,4,5].map((idx) => (
                               <div key={idx} className="eq-bar rounded-full" style={{
                                 width: "2px",
                                 height: `${[55,100,40,75,50][idx - 1]}%`,
-                                background: "linear-gradient(to top, hsl(var(--primary)/0.9), rgba(255,255,255,0.92))",
+                                background: "linear-gradient(to top, hsl(var(--primary)/0.9), rgba(255,255,255,0.95))",
                               }} />
                             ))}
                           </div>
                         ) : (
-                          <Music className="h-3 w-3 text-white/40 relative z-[1]" />
+                          <Music className="h-3.5 w-3.5 text-white/42 relative z-[1]" />
                         )}
                       </div>
                     </>
