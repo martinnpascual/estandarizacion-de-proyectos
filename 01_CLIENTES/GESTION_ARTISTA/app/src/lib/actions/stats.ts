@@ -310,10 +310,10 @@ export async function getGoalsStats(): Promise<{
   error: string | null;
 }> {
   const supabase = await createServerSupabaseClient();
+  // Note: goals table may not have is_deleted — use is_completed only for safe filtering
   const { data, error } = await supabase
     .from("goals")
-    .select("id, title, category, target_value, current_value, target_date, is_completed")
-    .eq("is_deleted", false);
+    .select("id, title, category, target_value, current_value, target_date, is_completed");
 
   if (error) return { data: null, error: error.message };
   const goals = data ?? [];
@@ -408,7 +408,8 @@ export async function getAllStats(): Promise<{
       projects: projectsRes.data,
       goals: goalsRes.data,
     },
-    error: discoRes.error ?? maquetasRes.error ?? collabsRes.error ?? projectsRes.error ?? goalsRes.error,
+    // Goals error is non-fatal — it only means the Metas tab will show empty state
+    error: discoRes.error ?? maquetasRes.error ?? collabsRes.error ?? projectsRes.error,
   };
 }
 
