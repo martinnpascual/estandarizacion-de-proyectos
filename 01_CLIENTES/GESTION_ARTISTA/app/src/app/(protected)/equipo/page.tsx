@@ -26,9 +26,8 @@ import {
   revokeInvitation,
   updateMemberRole,
   refreshInviteToken,
-  InviteSchema,
-  type InviteFormData,
 } from "@/lib/actions/team";
+import { InviteSchema, type InviteFormData } from "@/lib/schemas";
 import { useUser } from "@/hooks/useUser";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/ToastProvider";

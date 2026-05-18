@@ -2,15 +2,9 @@
 
 import { createServerSupabaseClient, createAdminSupabaseClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
-import { z } from "zod";
 import type { Profile, TeamInvitation, UserRole } from "@/types/database";
-
-export const InviteSchema = z.object({
-  email: z.string().email("Email inválido"),
-  role: z.enum(["productor", "manager"]),
-});
-
-export type InviteFormData = z.infer<typeof InviteSchema>;
+import { InviteSchema } from "@/lib/schemas";
+import type { InviteFormData } from "@/lib/schemas";
 
 export async function getTeamMembers(): Promise<{
   data: Profile[] | null;
