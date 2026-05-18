@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Mail, Loader2, Lock, Eye, EyeOff, ArrowLeft, KeyRound } from "lucide-react";
@@ -8,6 +8,14 @@ import { Mail, Loader2, Lock, Eye, EyeOff, ArrowLeft, KeyRound } from "lucide-re
 type Mode = "password" | "magic" | "forgot";
 
 export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
+  );
+}
+
+function LoginContent() {
   const searchParams = useSearchParams();
   const [mode, setMode] = useState<Mode>("password");
   const [email, setEmail] = useState(searchParams.get("email") ?? "");
