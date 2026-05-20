@@ -57,14 +57,43 @@ import { cn } from "@/lib/utils";
 
 const PLATFORM_META: Record<
   SocialPlatform,
-  { label: string; color: string; chartColor: string; placeholder: string }
+  {
+    label: string;
+    color: string;
+    chartColor: string;
+    placeholder: string;
+    followersLabel: string;
+    playsLabel: string;
+    autoSync: boolean;
+    syncNote?: string;
+  }
 > = {
-  spotify: { label: "Spotify", color: "bg-green-500", chartColor: "#22c55e", placeholder: "https://open.spotify.com/artist/..." },
-  youtube: { label: "YouTube", color: "bg-red-500", chartColor: "#ef4444", placeholder: "https://youtube.com/@..." },
-  instagram: { label: "Instagram", color: "bg-pink-500", chartColor: "#ec4899", placeholder: "https://instagram.com/..." },
-  tiktok: { label: "TikTok", color: "bg-slate-400", chartColor: "#94a3b8", placeholder: "https://tiktok.com/@..." },
-  soundcloud: { label: "SoundCloud", color: "bg-orange-500", chartColor: "#f97316", placeholder: "https://soundcloud.com/..." },
-  twitter: { label: "Twitter/X", color: "bg-sky-500", chartColor: "#0ea5e9", placeholder: "https://x.com/..." },
+  spotify:   {
+    label: "Spotify",   color: "bg-green-500",  chartColor: "#22c55e",
+    placeholder: "https://open.spotify.com/artist/...",
+    followersLabel: "Seguidores", playsLabel: "Oyentes/mes",
+    autoSync: true,
+  },
+  youtube:   {
+    label: "YouTube",   color: "bg-red-500",    chartColor: "#ef4444",
+    placeholder: "https://youtube.com/@...",
+    followersLabel: "Suscriptores", playsLabel: "Vistas totales",
+    autoSync: true,
+  },
+  instagram: {
+    label: "Instagram", color: "bg-pink-500",   chartColor: "#ec4899",
+    placeholder: "https://instagram.com/...",
+    followersLabel: "Seguidores", playsLabel: "Posts",
+    autoSync: true,
+    syncNote: "Sync vía endpoint público (best-effort)",
+  },
+  tiktok:    {
+    label: "TikTok",    color: "bg-slate-400",  chartColor: "#94a3b8",
+    placeholder: "https://tiktok.com/@...",
+    followersLabel: "Seguidores", playsLabel: "Likes totales",
+    autoSync: true,
+    syncNote: "Sync vía scraping público (best-effort)",
+  },
 };
 
 const ALL_PLATFORMS = Object.keys(PLATFORM_META) as SocialPlatform[];
@@ -412,11 +441,7 @@ export default function RedesPage() {
       }
 
       if (ok.length === 0 && errors.length === 0) {
-        if (skipped.length > 0) {
-          toast.info("Instagram y TikTok no tienen auto-sync (requieren OAuth)");
-        } else {
-          toast.info("No hay plataformas con auto-sync disponibles");
-        }
+        toast.info("No se registraron datos — verificá que las plataformas estén configuradas");
       }
     } catch {
       toast.error("Error inesperado al sincronizar");
@@ -908,7 +933,10 @@ export default function RedesPage() {
                           <span className="text-xs text-muted-foreground">@{link.username}</span>
                         )}
                         {supportsAutoSync(link.platform) && (
-                          <span className="flex items-center gap-0.5 text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded-full font-medium" title="Se sincroniza automáticamente cada día">
+                          <span
+                            className="flex items-center gap-0.5 text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded-full font-medium"
+                            title={meta.syncNote ?? "Se sincroniza automáticamente cada lunes"}
+                          >
                             <Zap className="h-2.5 w-2.5" />
                             Auto
                           </span>
@@ -957,7 +985,7 @@ export default function RedesPage() {
 
                     <div className="space-y-3">
                       <div>
-                        <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wider font-black mb-0.5">Seguidores</p>
+                        <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wider font-black mb-0.5">{meta.followersLabel}</p>
                         <div className="flex items-end gap-2">
                           <p className="text-2xl font-black tabular-nums tracking-tight" style={{ color: stat?.followers ? meta.chartColor : undefined }}>
                             {formatNumber(stat?.followers)}
@@ -966,7 +994,7 @@ export default function RedesPage() {
                         </div>
                       </div>
                       <div>
-                        <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wider font-black mb-0.5">Reproducciones/mes</p>
+                        <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wider font-black mb-0.5">{meta.playsLabel}</p>
                         <div className="flex items-end gap-2">
                           <p className="text-2xl font-black tabular-nums tracking-tight" style={{ color: stat?.monthly_plays ? meta.chartColor : undefined }}>
                             {formatNumber(stat?.monthly_plays)}
@@ -1164,7 +1192,7 @@ export default function RedesPage() {
                       </span>
                     )}
                     {isOk && r.followers == null && <span className="text-green-400 ml-2">✓ Sincronizado</span>}
-                    {isSkipped && <span className="text-muted-foreground ml-2">— Sin auto-sync (requiere OAuth)</span>}
+                    {isSkipped && <span className="text-muted-foreground ml-2">— Saltado</span>}
                     {isError && (
                       <p className={cn("mt-0.5", isKeyMissing ? "text-yellow-400" : "text-red-400")}>
                         {isKeyMissing
@@ -1177,17 +1205,18 @@ export default function RedesPage() {
               );
             })}
           </div>
-          {syncResults.some(r => r.status === "error" && (r.error?.includes("no configurada") || r.error?.includes("api_key"))) && (
+          {syncResults.some(r => r.status === "error" && r.error?.includes("no configurada")) && (
             <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-yellow-500/8 border border-yellow-500/20 text-xs text-yellow-400">
               <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
               <p>
-                Para activar el auto-sync, configurá las variables de entorno en tu{" "}
+                Para YouTube y Spotify, configurá en tu{" "}
                 <a href="https://vercel.com/dashboard" target="_blank" rel="noopener noreferrer" className="underline hover:text-yellow-300">
                   proyecto de Vercel
                 </a>
-                : <code className="bg-yellow-500/10 px-1 rounded">YOUTUBE_API_KEY</code> y/o{" "}
-                <code className="bg-yellow-500/10 px-1 rounded">SPOTIFY_CLIENT_ID</code> +{" "}
-                <code className="bg-yellow-500/10 px-1 rounded">SPOTIFY_CLIENT_SECRET</code>
+                : <code className="bg-yellow-500/10 px-1 rounded">YOUTUBE_API_KEY</code>,{" "}
+                <code className="bg-yellow-500/10 px-1 rounded">SPOTIFY_CLIENT_ID</code> y{" "}
+                <code className="bg-yellow-500/10 px-1 rounded">SPOTIFY_CLIENT_SECRET</code>.{" "}
+                Instagram y TikTok usan endpoints públicos — si fallan, es temporal.
               </p>
             </div>
           )}

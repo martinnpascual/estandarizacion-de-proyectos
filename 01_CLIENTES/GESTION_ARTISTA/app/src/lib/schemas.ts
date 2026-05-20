@@ -94,7 +94,7 @@ export type CalendarEventFormData = z.infer<typeof CalendarEventSchema>;
 
 // ─── Social Links ─────────────────────────────────────────────────────────────
 export const SocialLinkSchema = z.object({
-  platform: z.enum(["spotify", "youtube", "instagram", "tiktok", "soundcloud", "twitter"]),
+  platform: z.enum(["spotify", "youtube", "instagram", "tiktok"]),
   url: z.string().url("URL inválida"),
   username: z.string().nullable().default(null),
 });

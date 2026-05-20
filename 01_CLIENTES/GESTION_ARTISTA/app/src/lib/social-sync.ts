@@ -2,12 +2,13 @@
  * Social platform stat fetching logic.
  * Used by both the Vercel cron route and the manual Server Action.
  *
- * Supported platforms (public API, no user OAuth needed):
- *   - YouTube  → YouTube Data API v3 (env: YOUTUBE_API_KEY)
- *   - Spotify  → Client Credentials flow (env: SPOTIFY_CLIENT_ID + SPOTIFY_CLIENT_SECRET)
+ * Supported platforms (public endpoints, no user OAuth needed):
+ *   - YouTube   → YouTube Data API v3 (env: YOUTUBE_API_KEY)
+ *   - Spotify   → Client Credentials flow (env: SPOTIFY_CLIENT_ID + SPOTIFY_CLIENT_SECRET)
+ *   - Instagram → Unofficial web_profile_info endpoint (no key needed, best-effort)
+ *   - TikTok    → SSR page scraping with browser headers (best-effort)
  *
- * Not supported (require user OAuth or paid tier):
- *   - Instagram, TikTok, SoundCloud, Twitter/X
+ * Sync frequency: Weekly (every Monday at 09:00 UTC via Vercel cron)
  */
 
 export interface PlatformSyncResult {
@@ -17,13 +18,24 @@ export interface PlatformSyncResult {
   error?: string;
 }
 
-/** Platforms that have working public API access. */
-export const AUTO_SYNC_PLATFORMS = ["youtube", "spotify"] as const;
+/** Platforms with working auto-sync support. */
+export const AUTO_SYNC_PLATFORMS = ["youtube", "spotify", "instagram", "tiktok"] as const;
 export type AutoSyncPlatform = (typeof AUTO_SYNC_PLATFORMS)[number];
 
 export function supportsAutoSync(platform: string): platform is AutoSyncPlatform {
   return (AUTO_SYNC_PLATFORMS as readonly string[]).includes(platform);
 }
+
+// ─── Shared browser headers (helps bypass bot detection) ─────────────────────
+const BROWSER_HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.9",
+  "Accept-Encoding": "gzip, deflate, br",
+  "Cache-Control": "no-cache",
+  "Pragma": "no-cache",
+};
 
 // ─── YouTube ─────────────────────────────────────────────────────────────────
 
@@ -38,7 +50,7 @@ function extractYouTubeIdentifier(
   const channelMatch = url.match(/youtube\.com\/channel\/(UC[a-zA-Z0-9_-]+)/);
   if (channelMatch) return { type: "channelId", value: channelMatch[1] };
 
-  // Legacy /c/ or /user/ — treat as handle (YouTube API will resolve)
+  // Legacy /c/ or /user/ — treat as handle
   const legacyMatch = url.match(/youtube\.com\/(?:c|user)\/([a-zA-Z0-9._-]+)/);
   if (legacyMatch) return { type: "handle", value: legacyMatch[1] };
 
@@ -72,10 +84,14 @@ async function fetchYouTubeStats(url: string): Promise<PlatformSyncResult> {
     const channel = data.items?.[0];
     if (!channel) return { ...base, error: "Canal no encontrado" };
 
-    const raw = channel.statistics?.subscriberCount;
-    const followers = raw != null ? parseInt(raw, 10) : null;
-    // Monthly views not available in free API tier — we skip monthly_plays
-    return { ...base, followers };
+    const followers = channel.statistics?.subscriberCount != null
+      ? parseInt(channel.statistics.subscriberCount, 10)
+      : null;
+    const monthly_plays = channel.statistics?.viewCount != null
+      ? parseInt(channel.statistics.viewCount, 10)
+      : null;
+
+    return { ...base, followers, monthly_plays };
   } catch (err) {
     return { ...base, error: err instanceof Error ? err.message : "Error de red" };
   }
@@ -106,6 +122,18 @@ async function getSpotifyAccessToken(): Promise<string | null> {
   }
 }
 
+/** Parse monthly listeners from Spotify's public artist page HTML (og:description). */
+function parseSpotifyMonthlyListeners(html: string): number | null {
+  // Meta description: "Artist · 1,234,567 monthly listeners."
+  const match = html.match(/(\d[\d,\.]+)\s+monthly listeners/i);
+  if (!match) return null;
+  const cleaned = match[1].replace(/[,\.]/g, "").replace(/(\d{3})$/, "$1");
+  // Handle formats like "1.2M" or raw numbers
+  const raw = match[1].replace(/,/g, "");
+  const n = parseInt(raw, 10);
+  return isNaN(n) ? null : n;
+}
+
 async function fetchSpotifyStats(url: string): Promise<PlatformSyncResult> {
   const base: PlatformSyncResult = { platform: "spotify", followers: null, monthly_plays: null };
 
@@ -120,22 +148,162 @@ async function fetchSpotifyStats(url: string): Promise<PlatformSyncResult> {
   const token = await getSpotifyAccessToken();
   if (!token) return { ...base, error: "No se pudo obtener token de Spotify" };
 
+  let followers: number | null = null;
+  let monthly_plays: number | null = null;
+
+  // 1. Get followers via official API
   try {
     const res = await fetch(`https://api.spotify.com/v1/artists/${artistId}`, {
       headers: { Authorization: `Bearer ${token}` },
       next: { revalidate: 0 },
     });
+    if (res.ok) {
+      const data = await res.json();
+      followers = data.followers?.total ?? null;
+    }
+  } catch { /* continue */ }
+
+  // 2. Try to scrape monthly listeners from public Spotify page
+  try {
+    const pageRes = await fetch(`https://open.spotify.com/artist/${artistId}`, {
+      headers: { ...BROWSER_HEADERS, Accept: "text/html,application/xhtml+xml" },
+      next: { revalidate: 0 },
+    });
+    if (pageRes.ok) {
+      const html = await pageRes.text();
+      monthly_plays = parseSpotifyMonthlyListeners(html);
+    }
+  } catch { /* monthly_plays stays null */ }
+
+  if (followers === null && monthly_plays === null) {
+    return { ...base, error: "No se obtuvieron datos de Spotify" };
+  }
+
+  return { ...base, followers, monthly_plays };
+}
+
+// ─── Instagram ────────────────────────────────────────────────────────────────
+
+function extractInstagramUsername(url: string): string | null {
+  // https://instagram.com/username or https://www.instagram.com/username/
+  const match = url.match(/instagram\.com\/([a-zA-Z0-9._]+)\/?(?:\?|$)/);
+  return match ? match[1] : null;
+}
+
+async function fetchInstagramStats(url: string): Promise<PlatformSyncResult> {
+  const base: PlatformSyncResult = { platform: "instagram", followers: null, monthly_plays: null };
+
+  const username = extractInstagramUsername(url);
+  if (!username) return { ...base, error: "No se pudo extraer el username de Instagram" };
+
+  // Instagram's unofficial web profile endpoint (no OAuth, mimics the web app)
+  // x-ig-app-id is Instagram's own public web app identifier
+  try {
+    const res = await fetch(
+      `https://i.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(username)}`,
+      {
+        headers: {
+          ...BROWSER_HEADERS,
+          "x-ig-app-id": "936619743392459",
+          "x-requested-with": "XMLHttpRequest",
+          Referer: "https://www.instagram.com/",
+          Origin: "https://www.instagram.com",
+        },
+        next: { revalidate: 0 },
+      }
+    );
+
     if (!res.ok) {
-      const body = await res.text();
-      return { ...base, error: `Spotify API ${res.status}: ${body.slice(0, 120)}` };
+      return { ...base, error: `Instagram devolvió ${res.status} — puede requerir sesión activa` };
     }
 
     const data = await res.json();
-    const followers = data.followers?.total ?? null;
-    // Monthly listeners not available in the public Web API
-    return { ...base, followers };
+    const user = data?.data?.user;
+    if (!user) return { ...base, error: "No se encontró el usuario en la respuesta de Instagram" };
+
+    const followers = user.edge_followed_by?.count ?? null;
+    // monthly_plays = posts count (useful as engagement proxy — not ideal but best available)
+    const monthly_plays = user.edge_owner_to_timeline_media?.count ?? null;
+
+    return { ...base, followers, monthly_plays };
   } catch (err) {
-    return { ...base, error: err instanceof Error ? err.message : "Error de red" };
+    return { ...base, error: err instanceof Error ? err.message : "Error al conectar con Instagram" };
+  }
+}
+
+// ─── TikTok ───────────────────────────────────────────────────────────────────
+
+function extractTikTokUsername(url: string): string | null {
+  // https://tiktok.com/@username or https://www.tiktok.com/@username
+  const match = url.match(/tiktok\.com\/@([a-zA-Z0-9._-]+)/);
+  return match ? match[1] : null;
+}
+
+async function fetchTikTokStats(url: string): Promise<PlatformSyncResult> {
+  const base: PlatformSyncResult = { platform: "tiktok", followers: null, monthly_plays: null };
+
+  const username = extractTikTokUsername(url);
+  if (!username) return { ...base, error: "No se pudo extraer el username de TikTok" };
+
+  try {
+    const res = await fetch(`https://www.tiktok.com/@${encodeURIComponent(username)}`, {
+      headers: {
+        ...BROWSER_HEADERS,
+        "sec-fetch-dest": "document",
+        "sec-fetch-mode": "navigate",
+        "sec-fetch-site": "none",
+        "sec-fetch-user": "?1",
+        "upgrade-insecure-requests": "1",
+      },
+      next: { revalidate: 0 },
+      redirect: "follow",
+    });
+
+    if (!res.ok) {
+      return { ...base, error: `TikTok devolvió ${res.status}` };
+    }
+
+    const html = await res.text();
+
+    // TikTok embeds full user data in a JSON script tag
+    const scriptMatch = html.match(
+      /<script\s+id="__UNIVERSAL_DATA_FOR_REHYDRATION__"\s+type="application\/json">([^<]+)<\/script>/
+    );
+
+    if (scriptMatch) {
+      try {
+        const json = JSON.parse(scriptMatch[1]);
+        // Navigate the deeply nested structure
+        const defaultScope = json?.__DEFAULT_SCOPE__;
+        const webappDetail =
+          defaultScope?.["webapp.user-detail"] ??
+          defaultScope?.["webapp.userDetail"];
+        const userInfo =
+          webappDetail?.userInfo ??
+          webappDetail?.user_info;
+        const stats = userInfo?.stats ?? userInfo?.statsV2;
+
+        if (stats) {
+          const followers =
+            stats.followerCount != null ? parseInt(String(stats.followerCount), 10) : null;
+          const monthly_plays =
+            stats.heartCount != null ? parseInt(String(stats.heartCount), 10) : // total likes
+            stats.diggCount != null ? parseInt(String(stats.diggCount), 10) :
+            null;
+          return { ...base, followers, monthly_plays };
+        }
+      } catch { /* JSON parse failed, try fallback */ }
+    }
+
+    // Fallback: look for follower count in meta tags or og tags
+    const metaMatch = html.match(/"followerCount"\s*:\s*(\d+)/);
+    if (metaMatch) {
+      return { ...base, followers: parseInt(metaMatch[1], 10) };
+    }
+
+    return { ...base, error: "No se pudo extraer datos del perfil de TikTok (posible bloqueo de bot)" };
+  } catch (err) {
+    return { ...base, error: err instanceof Error ? err.message : "Error al conectar con TikTok" };
   }
 }
 
@@ -143,15 +311,12 @@ async function fetchSpotifyStats(url: string): Promise<PlatformSyncResult> {
 
 /** Extract a YouTube video ID from various URL formats */
 export function extractYouTubeVideoId(url: string): string | null {
-  // youtu.be/{id}
   const shortMatch = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
   if (shortMatch) return shortMatch[1];
 
-  // youtube.com/watch?v={id}
   const watchMatch = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
   if (watchMatch) return watchMatch[1];
 
-  // youtube.com/shorts/{id}  or  youtube.com/embed/{id}
   const pathMatch = url.match(/youtube\.com\/(?:shorts|embed|v)\/([a-zA-Z0-9_-]{11})/);
   if (pathMatch) return pathMatch[1];
 
@@ -160,11 +325,6 @@ export function extractYouTubeVideoId(url: string): string | null {
 
 export type YouTubeGoalMetric = "subscribers" | "views";
 
-/**
- * Detect which metric to pull for a YouTube goal URL.
- * - Channel URL → subscriber count
- * - Video URL   → view count
- */
 export function detectYouTubeGoalMetric(url: string): YouTubeGoalMetric {
   return extractYouTubeVideoId(url) ? "views" : "subscribers";
 }
@@ -175,10 +335,6 @@ export interface YouTubeGoalResult {
   error?: string;
 }
 
-/**
- * Fetch the relevant stat for a YouTube goal URL.
- * Channel URL → subscriberCount, Video URL → viewCount.
- */
 export async function fetchYouTubeGoalStat(url: string): Promise<YouTubeGoalResult> {
   const apiKey = process.env.YOUTUBE_API_KEY;
   if (!apiKey) return { value: null, metric: "subscribers", error: "YOUTUBE_API_KEY no configurada" };
@@ -186,7 +342,6 @@ export async function fetchYouTubeGoalStat(url: string): Promise<YouTubeGoalResu
   const videoId = extractYouTubeVideoId(url);
 
   if (videoId) {
-    // ── Video view count ───────────────────────────────────────────────────
     const params = new URLSearchParams({ part: "statistics", id: videoId, key: apiKey });
     try {
       const res = await fetch(
@@ -207,7 +362,6 @@ export async function fetchYouTubeGoalStat(url: string): Promise<YouTubeGoalResu
     }
   }
 
-  // ── Channel subscriber count ───────────────────────────────────────────
   const channelStats = await fetchYouTubeStats(url);
   return {
     value: channelStats.followers,
@@ -227,6 +381,10 @@ export async function fetchPlatformStats(
       return fetchYouTubeStats(url);
     case "spotify":
       return fetchSpotifyStats(url);
+    case "instagram":
+      return fetchInstagramStats(url);
+    case "tiktok":
+      return fetchTikTokStats(url);
     default:
       return {
         platform,

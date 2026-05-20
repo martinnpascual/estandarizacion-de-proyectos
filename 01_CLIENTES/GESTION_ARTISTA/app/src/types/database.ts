@@ -37,9 +37,7 @@ export type SocialPlatform =
   | "spotify"
   | "youtube"
   | "instagram"
-  | "tiktok"
-  | "soundcloud"
-  | "twitter";
+  | "tiktok";
 
 // --- Entidades de la base de datos ---
 
