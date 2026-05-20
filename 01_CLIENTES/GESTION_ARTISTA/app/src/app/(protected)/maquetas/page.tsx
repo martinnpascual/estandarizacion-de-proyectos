@@ -1408,7 +1408,7 @@ function DraftRow({
           "flex-shrink-0 p-1.5 rounded-xl transition-all active:scale-90",
           isFavorited
             ? "text-pink-400 hover:text-pink-300"
-            : "text-muted-foreground/30 hover:text-pink-400 opacity-0 group-hover:opacity-100"
+            : "text-muted-foreground/25 hover:text-pink-400"
         )}
       >
         <Heart className={cn("h-3.5 w-3.5", isFavorited && "fill-current")} />
