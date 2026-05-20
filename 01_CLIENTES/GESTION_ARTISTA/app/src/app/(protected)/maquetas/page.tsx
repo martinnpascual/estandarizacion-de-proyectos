@@ -30,6 +30,7 @@ import {
   Zap,
   ListPlus,
   Clock,
+  Heart,
 } from "lucide-react";
 import DraftVersionsPanel from "@/components/drafts/DraftVersionsPanel";
 import LyricsPanel from "@/components/lyrics/LyricsPanel";
@@ -167,6 +168,22 @@ export default function MaquetasPage() {
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const searchInputRef = useRef<HTMLInputElement>(null);
   const debouncedSearch = useDebounce(searchQuery, 280);
+
+  const [activeTab, setActiveTab] = useState<"todas" | "favoritas">("todas");
+  const [favoritedIds, setFavoritedIds] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try { return new Set(JSON.parse(localStorage.getItem("maquetas_favorites") ?? "[]")); }
+    catch { return new Set(); }
+  });
+
+  function toggleFavorite(id: string) {
+    setFavoritedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) { next.delete(id); } else { next.add(id); }
+      localStorage.setItem("maquetas_favorites", JSON.stringify(Array.from(next)));
+      return next;
+    });
+  }
 
   const loadDrafts = useCallback(async () => {
     setLoading(true);
@@ -377,8 +394,12 @@ export default function MaquetasPage() {
 
   const displayedDrafts = (() => {
     let result = [...drafts];
-    // Year filter — only when not searching
-    if (!isSearching) {
+    // Favorites filter — applied first, skips year filter
+    if (activeTab === "favoritas") {
+      result = result.filter(d => favoritedIds.has(d.id));
+    }
+    // Year filter — only when not searching and not on favorites tab
+    if (!isSearching && activeTab !== "favoritas") {
       result = result.filter(d =>
         d.month_created ? d.month_created.startsWith(String(selectedYear)) : false
       );
@@ -411,7 +432,7 @@ export default function MaquetasPage() {
   })();
 
   // Group by month_created for the "Recientes" view
-  const showMonthGroups = sortBy === "default" && !isSearching && statusFilter === "todos" && !missingAudioFilter && !missingBpmFilter && !staleFilter;
+  const showMonthGroups = sortBy === "default" && !isSearching && statusFilter === "todos" && !missingAudioFilter && !missingBpmFilter && !staleFilter && activeTab === "todas";
   const draftsByMonth: { month: string; label: string; drafts: Draft[] }[] = [];
   if (showMonthGroups) {
     const seen = new Map<string, Draft[]>();
@@ -610,8 +631,49 @@ export default function MaquetasPage() {
       </div>
 
 
+      {/* Tabs: Todas / Favoritas */}
+      <div className="flex items-center gap-1 bg-secondary/40 rounded-2xl p-1 w-fit">
+        <button
+          onClick={() => setActiveTab("todas")}
+          className={cn(
+            "flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-sm font-medium transition-all active:scale-95",
+            activeTab === "todas"
+              ? "bg-card shadow-sm text-foreground font-black border border-border/40"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <FileAudio className="h-3.5 w-3.5" />
+          Todas
+          <span className="text-[10px] tabular-nums px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground">
+            {drafts.length}
+          </span>
+        </button>
+        <button
+          onClick={() => setActiveTab("favoritas")}
+          className={cn(
+            "flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-sm font-medium transition-all active:scale-95",
+            activeTab === "favoritas"
+              ? "bg-card shadow-sm text-pink-400 font-black border border-pink-500/30"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Heart className={cn("h-3.5 w-3.5", activeTab === "favoritas" && "fill-pink-400 text-pink-400")} />
+          Favoritas
+          {favoritedIds.size > 0 && (
+            <span className={cn(
+              "text-[10px] tabular-nums px-1.5 py-0.5 rounded-full",
+              activeTab === "favoritas"
+                ? "bg-pink-500/20 text-pink-400 border border-pink-500/30"
+                : "bg-secondary text-muted-foreground"
+            )}>
+              {favoritedIds.size}
+            </span>
+          )}
+        </button>
+      </div>
+
       {/* Lista para publicar alert */}
-      {!loading && !error && (counts["lista_para_publicar"] ?? 0) > 0 && statusFilter !== "lista_para_publicar" && (
+      {!loading && !error && (counts["lista_para_publicar"] ?? 0) > 0 && statusFilter !== "lista_para_publicar" && activeTab === "todas" && (
         <button
           onClick={() => setStatusFilter("lista_para_publicar")}
           className="flex items-center justify-between px-4 py-2.5 rounded-2xl bg-green-500/10 border border-green-500/30 hover:bg-green-500/15 hover:-translate-y-0.5 hover:shadow-sm transition-all w-full group"
@@ -627,7 +689,7 @@ export default function MaquetasPage() {
       )}
 
       {/* Tabs de años */}
-      {!isSearching && (
+      {!isSearching && activeTab === "todas" && (
         <div className="flex items-center gap-3">
           {/* Select all toggle */}
           {!loading && displayedDrafts.length > 0 && (
@@ -785,6 +847,26 @@ export default function MaquetasPage() {
               Reintentar
             </button>
           </div>
+        ) : activeTab === "favoritas" && favoritedIds.size === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center px-4">
+            <div className="relative mb-5 empty-state-icon">
+              <div className="absolute inset-0 bg-pink-500/20 rounded-2xl blur-xl scale-125" />
+              <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-pink-500/20 to-pink-700/10 border border-pink-500/20 flex items-center justify-center">
+                <Heart className="h-8 w-8 text-pink-400/60" />
+              </div>
+            </div>
+            <p className="text-sm font-medium text-foreground/70">Sin favoritas todavía</p>
+            <p className="text-xs text-muted-foreground/50 mt-1">
+              Tocá el ❤ en cualquier maqueta para guardarla aquí
+            </p>
+            <button
+              onClick={() => setActiveTab("todas")}
+              className="mt-4 flex items-center gap-2 px-4 py-2 bg-pink-500/10 border border-pink-500/25 text-pink-400 rounded-2xl text-sm font-medium hover:bg-pink-500/20 transition-all active:scale-95"
+            >
+              <FileAudio className="h-4 w-4" />
+              Ver todas las maquetas
+            </button>
+          </div>
         ) : drafts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center px-4">
             <div className="relative mb-5 empty-state-icon">
@@ -858,6 +940,8 @@ export default function MaquetasPage() {
                           onToggleComments={() => setCommentsOpenId((prev) => prev === draft.id ? null : draft.id)}
                           onOpenLyrics={() => setLyricsDraft(draft)}
                           onAddToQueue={() => { player.addToQueue(draftToTrack(draft)); toast.success(`"${draft.title}" añadida a la cola`); }}
+                          isFavorited={favoritedIds.has(draft.id)}
+                          onToggleFavorite={() => toggleFavorite(draft.id)}
                         />
                         {versionsOpenId === draft.id && (
                           <DraftVersionsPanel draftId={draft.id} draftTitle={draft.title} />
@@ -895,6 +979,8 @@ export default function MaquetasPage() {
                       onToggleVersions={() => setVersionsOpenId((prev) => prev === draft.id ? null : draft.id)}
                       onToggleComments={() => setCommentsOpenId((prev) => prev === draft.id ? null : draft.id)}
                       onOpenLyrics={() => setLyricsDraft(draft)}
+                      isFavorited={favoritedIds.has(draft.id)}
+                      onToggleFavorite={() => toggleFavorite(draft.id)}
                     />
                     {versionsOpenId === draft.id && (
                       <DraftVersionsPanel draftId={draft.id} draftTitle={draft.title} />
@@ -1023,6 +1109,8 @@ interface DraftRowProps {
   onToggleComments: () => void;
   onOpenLyrics: () => void;
   onAddToQueue?: () => void;
+  isFavorited: boolean;
+  onToggleFavorite: () => void;
 }
 
 function DraftRow({
@@ -1044,6 +1132,8 @@ function DraftRow({
   onToggleComments,
   onOpenLyrics,
   onAddToQueue,
+  isFavorited,
+  onToggleFavorite,
 }: DraftRowProps) {
   const hasAudio = !!draft.drive_file_id || !!draft.drive_file_url;
   const canAdvance = STATUS_NEXT[draft.status] !== null;
@@ -1309,6 +1399,20 @@ function DraftRow({
           BPM
         </a>
       )}
+
+      {/* Favorito */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
+        title={isFavorited ? "Quitar de favoritas" : "Añadir a favoritas"}
+        className={cn(
+          "flex-shrink-0 p-1.5 rounded-xl transition-all active:scale-90",
+          isFavorited
+            ? "text-pink-400 hover:text-pink-300"
+            : "text-muted-foreground/30 hover:text-pink-400 opacity-0 group-hover:opacity-100"
+        )}
+      >
+        <Heart className={cn("h-3.5 w-3.5", isFavorited && "fill-current")} />
+      </button>
 
       {/* Comentarios / Versiones / Copiar enlace / Letras / Editar / Eliminar */}
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
