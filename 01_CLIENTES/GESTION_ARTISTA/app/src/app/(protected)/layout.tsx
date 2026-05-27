@@ -152,6 +152,22 @@ export default function ProtectedLayout({
       <CommandMenuProvider>
         <AudioPlayerProvider>
           <div className="flex min-h-screen">
+            {/* ── Logo fantasma — top-left (igual que login) ── */}
+            <div
+              className="fixed pointer-events-none select-none z-0 opacity-[0.038]"
+              style={{ top: "-140px", left: "calc(256px - 160px)", width: "540px", height: "540px", transform: "rotate(-22deg)" }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo.png" alt="" className="w-full h-full object-contain" style={{ mixBlendMode: "screen", filter: "blur(1.5px)" }} />
+            </div>
+            {/* ── Logo fantasma — bottom-right (igual que login) ── */}
+            <div
+              className="fixed pointer-events-none select-none z-0 opacity-[0.030]"
+              style={{ bottom: "-120px", right: "-120px", width: "460px", height: "460px", transform: "rotate(18deg)" }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo.png" alt="" className="w-full h-full object-contain" style={{ mixBlendMode: "screen", filter: "blur(1px)" }} />
+            </div>
             {/* ── Waveform bars decorativas — bottom-left (igual que login) ── */}
             <div className="fixed bottom-8 left-72 flex items-end gap-1 pointer-events-none select-none z-0" style={{ opacity: 0.04 }}>
               {[18, 32, 24, 40, 28, 36, 20, 44, 30, 22, 38, 26].map((h, i) => (
