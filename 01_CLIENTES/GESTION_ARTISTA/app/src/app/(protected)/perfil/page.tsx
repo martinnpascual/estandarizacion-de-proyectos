@@ -30,8 +30,7 @@ import {
   X,
   Building2,
 } from "lucide-react";
-import { updateProfile, disconnectGoogle } from "@/lib/actions/profile";
-import { getDashboardStats, getRecentActivity } from "@/lib/actions/dashboard";
+import { disconnectGoogle } from "@/lib/actions/profile";
 import { createClient } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
@@ -39,7 +38,28 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { cn } from "@/lib/utils";
 import type { Profile, UserRole } from "@/types/database";
-import type { DashboardStats, ActivityItem } from "@/lib/actions/dashboard";
+
+// Local types — mirrors lib/actions/dashboard but avoids importing "use server" module
+interface DashboardStats {
+  totalSongs: number;
+  activeDrafts: number;
+  readyToPublish: number;
+  pendingCollabs: number;
+  eventsThisMonth: number;
+  activeProjects: number;
+  listoProjects: number;
+  listoCollabs: number;
+}
+
+interface ActivityItem {
+  id: string;
+  type: "song" | "draft" | "collab" | "project";
+  action: "created" | "updated";
+  title: string;
+  subtitle: string;
+  ts: string;
+  href: string;
+}
 
 function getPasswordStrength(pwd: string): { score: number; label: string; color: string; barColor: string } {
   if (!pwd) return { score: 0, label: "", color: "", barColor: "" };
@@ -114,19 +134,74 @@ export default function PerfilPage() {
     }
   }, [userProfile, formInitialized]);
 
-  // ── Load stats + activity via server actions ──────────────────────────────
+  // ── Load stats + activity via direct Supabase client queries ─────────────
+  // NOTE: Server actions (getDashboardStats / getRecentActivity) were removed
+  // because calling "use server" functions from a client component triggers an
+  // RSC re-render POST to /perfil that fails with 500 in production.
   useEffect(() => {
-    Promise.allSettled([
-      getDashboardStats(),
-      getRecentActivity(8),
-    ]).then(([statsSettled, activitySettled]) => {
-      if (statsSettled.status === "fulfilled" && statsSettled.value.data) {
-        setStats(statsSettled.value.data);
+    const supabase = createClient();
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0];
+
+    // Stats
+    Promise.all([
+      supabase.from("songs").select("id", { count: "exact", head: true }).eq("is_deleted", false),
+      supabase.from("drafts").select("id", { count: "exact", head: true }).eq("is_deleted", false).neq("status", "lista_para_publicar"),
+      supabase.from("drafts").select("id", { count: "exact", head: true }).eq("is_deleted", false).eq("status", "lista_para_publicar"),
+      supabase.from("collaborations").select("id", { count: "exact", head: true }).eq("is_deleted", false).neq("status", "listo"),
+      supabase.from("calendar_events").select("id", { count: "exact", head: true }).eq("is_deleted", false).gte("start_date", monthStart).lte("start_date", monthEnd),
+      supabase.from("projects").select("id", { count: "exact", head: true }).eq("is_deleted", false).not("status", "in", '("idea","publicado")'),
+      supabase.from("projects").select("id", { count: "exact", head: true }).eq("is_deleted", false).eq("status", "listo"),
+      supabase.from("collaborations").select("id", { count: "exact", head: true }).eq("is_deleted", false).eq("status", "listo"),
+    ]).then(([songsRes, draftsRes, readyRes, collabsRes, eventsRes, projectsRes, listoProjectsRes, listoCollabsRes]) => {
+      setStats({
+        totalSongs: songsRes.count ?? 0,
+        activeDrafts: draftsRes.count ?? 0,
+        readyToPublish: readyRes.count ?? 0,
+        pendingCollabs: collabsRes.count ?? 0,
+        eventsThisMonth: eventsRes.count ?? 0,
+        activeProjects: projectsRes.count ?? 0,
+        listoProjects: listoProjectsRes.count ?? 0,
+        listoCollabs: listoCollabsRes.count ?? 0,
+      });
+    }).catch(() => { /* stats are non-critical */ });
+
+    // Recent activity
+    Promise.all([
+      supabase.from("songs").select("id, title, artist_name, year, created_at").eq("is_deleted", false).order("created_at", { ascending: false }).limit(6),
+      supabase.from("drafts").select("id, title, status, producer, created_at, updated_at").eq("is_deleted", false).order("updated_at", { ascending: false }).limit(6),
+      supabase.from("collaborations").select("id, song_title, artist_name, status, created_at, updated_at").eq("is_deleted", false).order("updated_at", { ascending: false }).limit(6),
+      supabase.from("projects").select("id, name, type, status, created_at, updated_at").eq("is_deleted", false).order("updated_at", { ascending: false }).limit(4),
+    ]).then(([songsRes, draftsRes, collabsRes, projectsRes]) => {
+      const STATUS_LABEL: Record<string, string> = {
+        borrador: "Borrador", en_mezcla: "En mezcla", masterizada: "Masterizada",
+        lista_para_publicar: "Lista para publicar", propuesta_enviada: "Propuesta enviada",
+        en_grabacion: "En grabación", recibido: "Recibido", mezclando: "Mezclando", listo: "Listo",
+      };
+      const PROJECT_STATUS_LABEL: Record<string, string> = {
+        idea: "Idea", en_produccion: "En producción", en_mezcla: "En mezcla",
+        master: "Master", listo: "Listo", publicado: "Publicado",
+      };
+      const items: ActivityItem[] = [];
+      for (const s of songsRes.data ?? []) {
+        items.push({ id: `song-${s.id}`, type: "song", action: "created", title: s.title, subtitle: `${s.artist_name} · ${s.year}`, ts: s.created_at, href: `/discografia?song=${s.id}` });
       }
-      if (activitySettled.status === "fulfilled" && activitySettled.value.data) {
-        setRecentActivity(activitySettled.value.data);
+      for (const d of draftsRes.data ?? []) {
+        const isNew = d.created_at === d.updated_at;
+        items.push({ id: `draft-${d.id}`, type: "draft", action: isNew ? "created" : "updated", title: d.title, subtitle: `${STATUS_LABEL[d.status] ?? d.status}${d.producer ? ` · ${d.producer}` : ""}`, ts: d.updated_at, href: `/maquetas?draft=${d.id}` });
       }
-    });
+      for (const c of collabsRes.data ?? []) {
+        const isNew = c.created_at === c.updated_at;
+        items.push({ id: `collab-${c.id}`, type: "collab", action: isNew ? "created" : "updated", title: c.song_title, subtitle: `con ${c.artist_name} · ${STATUS_LABEL[c.status] ?? c.status}`, ts: c.updated_at, href: `/collabs?collab=${c.id}` });
+      }
+      for (const p of projectsRes.data ?? []) {
+        const isNew = p.created_at === p.updated_at;
+        items.push({ id: `project-${p.id}`, type: "project", action: isNew ? "created" : "updated", title: p.name, subtitle: `${p.type.toUpperCase()} · ${PROJECT_STATUS_LABEL[p.status] ?? p.status}`, ts: p.updated_at, href: `/proyectos?project=${p.id}` });
+      }
+      items.sort((a, b) => b.ts.localeCompare(a.ts));
+      setRecentActivity(items.slice(0, 8));
+    }).catch(() => { /* activity is non-critical */ });
   }, []);
 
   // ── Cmd+S / Ctrl+S → save profile ────────────────────────────────────────
@@ -148,21 +223,30 @@ export default function PerfilPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const { data, error } = await updateProfile({
-        full_name: fullName,
-        avatar_url: avatarUrl || null,
-        artist_slug: artistSlug.trim() || null,
-        bio: bio.trim() || null,
-        studio_name: studioName.trim() || null,
-      });
-      if (error) {
-        toast.error(error);
-      } else {
-        setProfile(data);
-        toast.success("Perfil actualizado correctamente");
-      }
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("No autenticado");
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .update({
+          full_name: fullName,
+          avatar_url: avatarUrl || null,
+          artist_slug: artistSlug.trim() || null,
+          bio: bio.trim() || null,
+          studio_name: studioName.trim() || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", user.id)
+        .select("*")
+        .single();
+
+      if (error) throw error;
+      setProfile(data as Profile);
+      toast.success("Perfil actualizado correctamente");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Error al guardar el perfil");
+      const msg = err instanceof Error ? err.message : "Error al guardar el perfil";
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
