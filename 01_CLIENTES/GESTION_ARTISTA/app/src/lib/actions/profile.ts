@@ -42,48 +42,10 @@ export async function getProfile(): Promise<{
 export async function updateProfile(
   formData: ProfileFormData
 ): Promise<{ data: Profile | null; error: string | null }> {
-  try {
-    // Use cookie-based client only to authenticate the user
-    const supabase = await createServerSupabaseClient();
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-    if (authError || !authData?.user) return { data: null, error: "No autenticado" };
-    const userId = authData.user.id;
-
-    const parsed = ProfileSchema.safeParse(formData);
-    if (!parsed.success) {
-      return { data: null, error: parsed.error.errors[0].message };
-    }
-
-    // Use admin client for the actual DB operation to avoid RLS or serialization issues
-    const admin = createAdminSupabaseClient();
-
-    const updatePayload: Record<string, unknown> = {
-      full_name: parsed.data.full_name,
-      updated_at: new Date().toISOString(),
-      avatar_url: parsed.data.avatar_url !== undefined ? (parsed.data.avatar_url ?? null) : undefined,
-      artist_slug: parsed.data.artist_slug !== undefined ? (parsed.data.artist_slug ?? null) : undefined,
-      bio: parsed.data.bio !== undefined ? (parsed.data.bio ?? null) : undefined,
-      studio_name: parsed.data.studio_name !== undefined ? (parsed.data.studio_name ?? null) : undefined,
-    };
-    // Remove undefined keys so Supabase ignores them
-    Object.keys(updatePayload).forEach((k) => updatePayload[k] === undefined && delete updatePayload[k]);
-
-    const { data, error } = await admin
-      .from("profiles")
-      .update(updatePayload)
-      .eq("id", userId)
-      .select("id, email, full_name, avatar_url, role, artist_slug, bio, studio_name, preferences, created_at, updated_at, is_deleted")
-      .single();
-
-    if (error) return { data: null, error: error.message };
-    return { data: data as Profile, error: null };
-  } catch (err) {
-    console.error("[updateProfile] unexpected error:", err);
-    return {
-      data: null,
-      error: err instanceof Error ? err.message : "Error inesperado al guardar el perfil",
-    };
-  }
+  // ── MINIMAL TEST: skip all Supabase calls ──────────────────────────────
+  // If this still 500s, the bug is in Next.js framework, not our code.
+  void formData; // suppress unused warning
+  return { data: null, error: "TEST: action reached OK" };
 }
 
 /**
