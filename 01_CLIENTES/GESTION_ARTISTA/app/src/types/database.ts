@@ -49,9 +49,12 @@ export interface Profile {
   role: UserRole;
   artist_slug: string | null;
   bio: string | null;
+  studio_name: string | null;
   google_access_token: string | null;
   google_refresh_token: string | null;
   google_token_expiry: string | null;
+  /** User-specific UI preferences — dashboard config, filters, etc. */
+  preferences: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
   is_deleted: boolean;

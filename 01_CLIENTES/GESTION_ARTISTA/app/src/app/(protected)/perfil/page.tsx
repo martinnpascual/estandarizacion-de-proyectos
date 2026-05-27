@@ -28,10 +28,12 @@ import {
   Loader2,
   Upload,
   X,
+  Building2,
 } from "lucide-react";
-import { getProfile, updateProfile, disconnectGoogle } from "@/lib/actions/profile";
+import { updateProfile, disconnectGoogle } from "@/lib/actions/profile";
 import { getDashboardStats, getRecentActivity } from "@/lib/actions/dashboard";
 import { createClient } from "@/lib/supabase/client";
+import { useUser } from "@/hooks/useUser";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useTheme } from "@/components/theme/ThemeProvider";
@@ -70,8 +72,12 @@ export default function PerfilPage() {
   const { confirm, ConfirmDialog } = useConfirm();
   const toast = useToast();
   const { theme, toggle: toggleTheme } = useTheme();
+
+  // useUser() is the source of truth — it works reliably client-side
+  const { profile: userProfile, loading: userLoading } = useUser();
+
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [formInitialized, setFormInitialized] = useState(false);
   const [saving, setSaving] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -81,6 +87,7 @@ export default function PerfilPage() {
   const [avatarUrl, setAvatarUrl] = useState("");
   const [artistSlug, setArtistSlug] = useState("");
   const [bio, setBio] = useState("");
+  const [studioName, setStudioName] = useState("");
 
   // Avatar upload
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -93,6 +100,34 @@ export default function PerfilPage() {
   const [showConfirmPwd, setShowConfirmPwd] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+
+  // ── Populate form once profile arrives from useUser() ────────────────────
+  useEffect(() => {
+    if (userProfile && !formInitialized) {
+      setProfile(userProfile);
+      setFullName(userProfile.full_name ?? "");
+      setAvatarUrl(userProfile.avatar_url ?? "");
+      setArtistSlug(userProfile.artist_slug ?? "");
+      setBio(userProfile.bio ?? "");
+      setStudioName(userProfile.studio_name ?? "");
+      setFormInitialized(true);
+    }
+  }, [userProfile, formInitialized]);
+
+  // ── Load stats + activity via server actions ──────────────────────────────
+  useEffect(() => {
+    Promise.allSettled([
+      getDashboardStats(),
+      getRecentActivity(8),
+    ]).then(([statsSettled, activitySettled]) => {
+      if (statsSettled.status === "fulfilled" && statsSettled.value.data) {
+        setStats(statsSettled.value.data);
+      }
+      if (activitySettled.status === "fulfilled" && activitySettled.value.data) {
+        setRecentActivity(activitySettled.value.data);
+      }
+    });
+  }, []);
 
   // ── Cmd+S / Ctrl+S → save profile ────────────────────────────────────────
   useEffect(() => {
@@ -107,33 +142,7 @@ export default function PerfilPage() {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [saving, fullName, avatarUrl, artistSlug, bio]);
-
-  useEffect(() => {
-    Promise.allSettled([
-      getProfile(),
-      getDashboardStats(),
-      getRecentActivity(8),
-    ]).then(([profileSettled, statsSettled, activitySettled]) => {
-      if (profileSettled.status === "fulfilled" && profileSettled.value.data) {
-        const p = profileSettled.value.data;
-        setProfile(p);
-        setFullName(p.full_name ?? "");
-        setAvatarUrl(p.avatar_url ?? "");
-        setArtistSlug(p.artist_slug ?? "");
-        setBio(p.bio ?? "");
-      }
-      if (statsSettled.status === "fulfilled" && statsSettled.value.data) {
-        setStats(statsSettled.value.data);
-      }
-      if (activitySettled.status === "fulfilled" && activitySettled.value.data) {
-        setRecentActivity(activitySettled.value.data);
-      }
-      setLoading(false);
-    }).catch(() => {
-      setLoading(false);
-    });
-  }, []);
+  }, [saving, fullName, avatarUrl, artistSlug, bio, studioName]);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -143,6 +152,7 @@ export default function PerfilPage() {
       avatar_url: avatarUrl || null,
       artist_slug: artistSlug.trim() || null,
       bio: bio.trim() || null,
+      studio_name: studioName.trim() || null,
     });
     setSaving(false);
     if (error) {
@@ -236,7 +246,7 @@ export default function PerfilPage() {
 
   const googleLinked = !!profile?.google_refresh_token;
 
-  if (loading) {
+  if (userLoading) {
     return (
       <div className="space-y-6 max-w-2xl">
         <div className="h-8 skeleton rounded-xl w-48" />
@@ -449,6 +459,25 @@ export default function PerfilPage() {
             className="w-full bg-background border border-border/60 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
           />
           <p className="text-[11px] text-muted-foreground">{bio.length}/300 caracteres</p>
+        </div>
+
+        {/* Studio name */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+            <Building2 className="h-3 w-3" />
+            Nombre del estudio (página de login)
+          </label>
+          <input
+            type="text"
+            value={studioName}
+            onChange={(e) => setStudioName(e.target.value)}
+            maxLength={60}
+            placeholder="Ej: BERTIAKA STUDIO"
+            className="w-full bg-background border border-border/60 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+          />
+          <p className="text-[11px] text-muted-foreground">
+            Se muestra en la pantalla de inicio de sesión. Dejalo vacío para usar "Studio".
+          </p>
         </div>
 
         {/* EPK Slug */}

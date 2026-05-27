@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useCommandMenu } from "@/components/search/CommandMenu";
+import { createClient } from "@/lib/supabase/client";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import { useTheme } from "@/components/theme/ThemeProvider";
 import { useUser } from "@/hooks/useUser";
@@ -101,19 +102,38 @@ export default function Sidebar() {
 
   const displayName = profile?.full_name
     ? profile.full_name.split(" ")[0].toUpperCase()
-    : "BERTIAKA";
+    : "ARTISTA";
 
   useEffect(() => {
+    const supabase = createClient();
+
     function refresh() {
       getNotifications().then(({ data }) => {
         setNotifCount(data.length);
         setHasOverdue(data.some(n => n.urgency === "overdue"));
       });
     }
+
+    // Initial load
     refresh();
-    // Refresh every 5 minutes to keep the badge current
-    const interval = setInterval(refresh, 5 * 60 * 1000);
-    return () => clearInterval(interval);
+
+    // Realtime: re-fetch badge when calendar_events, collaborations, drafts or goals change
+    const channel = supabase
+      .channel("sidebar-notif-watch")
+      .on("postgres_changes", { event: "*", schema: "public", table: "calendar_events" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "collaborations" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "drafts" }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "goals" }, refresh)
+      .subscribe();
+
+    // Fallback: refresh on window focus (catches changes from other tabs)
+    const onFocus = () => refresh();
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      supabase.removeChannel(channel);
+      window.removeEventListener("focus", onFocus);
+    };
   }, []);
 
   // Escape closes mobile sidebar / shortcuts modal; ? opens shortcuts
@@ -177,14 +197,15 @@ export default function Sidebar() {
               <div className="relative w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center overflow-hidden shadow-lg shadow-primary/20">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/artist.jpg"
+                  src={profile?.avatar_url ?? "/artist.jpg"}
                   alt={displayName}
                   className="w-9 h-9 object-cover"
                   style={{ objectPosition: "50% 12%" }}
                   onError={(e) => {
                     const img = e.target as HTMLImageElement;
-                    if (profile?.avatar_url && img.src !== profile.avatar_url) {
-                      img.src = profile.avatar_url;
+                    // If avatar_url fails, try /artist.jpg; if that fails too, hide
+                    if (img.src !== "/artist.jpg" && !img.src.endsWith("/artist.jpg")) {
+                      img.src = "/artist.jpg";
                     } else {
                       img.style.display = "none";
                     }
@@ -216,7 +237,13 @@ export default function Sidebar() {
         <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent mx-3" />
 
         {/* ── Navegación ─────────────────────────────────────────────────── */}
-        <nav className="flex-1 p-2.5 overflow-y-auto space-y-4">
+        <nav className="flex-1 p-2.5 overflow-y-auto space-y-4 relative">
+          {/* Ghost watermark — logo anclado al fondo del nav */}
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-[130px] h-[130px] pointer-events-none select-none opacity-[0.05] z-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="" className="w-full h-full object-contain" />
+          </div>
+
           {navigationGroups.map((group) => (
             <div key={group.label}>
               {/* Group label */}
