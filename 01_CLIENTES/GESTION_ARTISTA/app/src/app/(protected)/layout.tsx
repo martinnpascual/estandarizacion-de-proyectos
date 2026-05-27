@@ -36,6 +36,7 @@ import AudioPlayer, {
 import { CommandMenuProvider } from "@/components/search/CommandMenu";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import NavProgressBar from "@/components/ui/NavProgressBar";
+import OnboardingModal from "@/components/layout/OnboardingModal";
 
 /** Componente interno que puede leer el contexto del player para ajustar el padding */
 function LayoutContent({ children }: { children: React.ReactNode }) {
@@ -112,6 +113,7 @@ export default function ProtectedLayout({
   const router = useRouter();
   const pathname = usePathname();
   const [isChecking, setIsChecking] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   // MED-04: Verificar auth client-side como respaldo del middleware
   useEffect(() => {
@@ -121,6 +123,10 @@ export default function ProtectedLayout({
         router.replace("/auth/login");
       } else {
         setIsChecking(false);
+        // Show onboarding for new users (localStorage flag)
+        if (!localStorage.getItem("onboarding_done_v1")) {
+          setShowOnboarding(true);
+        }
       }
     });
   }, [router]);
@@ -146,11 +152,34 @@ export default function ProtectedLayout({
       <CommandMenuProvider>
         <AudioPlayerProvider>
           <div className="flex min-h-screen">
+            {/* ── Waveform bars decorativas — bottom-left (igual que login) ── */}
+            <div className="fixed bottom-8 left-72 flex items-end gap-1 pointer-events-none select-none z-0" style={{ opacity: 0.04 }}>
+              {[18, 32, 24, 40, 28, 36, 20, 44, 30, 22, 38, 26].map((h, i) => (
+                <div
+                  key={i}
+                  className="w-[3px] rounded-full bg-primary animate-pulse"
+                  style={{ height: h, animationDelay: `${i * 0.15}s`, animationDuration: "1.8s" }}
+                />
+              ))}
+            </div>
+            {/* ── Waveform bars — top-right ── */}
+            <div className="fixed top-6 right-6 flex items-end gap-1 pointer-events-none select-none z-0 rotate-180" style={{ opacity: 0.04 }}>
+              {[22, 36, 18, 44, 30, 26, 40, 20, 34, 28, 42, 16].map((h, i) => (
+                <div
+                  key={i}
+                  className="w-[3px] rounded-full bg-violet-400 animate-pulse"
+                  style={{ height: h, animationDelay: `${i * 0.12}s`, animationDuration: "2.2s" }}
+                />
+              ))}
+            </div>
             <NavProgressBar />
             <Sidebar />
             <LayoutContent>{children}</LayoutContent>
             <AudioPlayer />
           </div>
+          {showOnboarding && (
+            <OnboardingModal onClose={() => setShowOnboarding(false)} />
+          )}
         </AudioPlayerProvider>
       </CommandMenuProvider>
     </ToastProvider>

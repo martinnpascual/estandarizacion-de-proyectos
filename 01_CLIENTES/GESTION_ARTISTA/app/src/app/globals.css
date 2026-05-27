@@ -89,9 +89,22 @@
     @apply bg-background text-foreground;
     /* --section-hsl se actualiza dinámicamente desde el layout según la sección activa */
     background-image:
-      radial-gradient(ellipse 90% 55% at 15% -5%,  hsl(var(--section-hsl, 262 80% 62%) / 0.22) 0%, transparent 60%),
-      radial-gradient(ellipse 55% 40% at 88% 105%, hsl(var(--section-hsl, 262 80% 62%) / 0.12) 0%, transparent 60%),
-      radial-gradient(ellipse 70% 50% at 50% 115%, hsl(220 80% 60% / 0.08) 0%, transparent 65%);
+      /* Grid lines — mismos que login page */
+      linear-gradient(hsl(var(--primary) / 0.022) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--primary) / 0.022) 1px, transparent 1px),
+      /* Glow primario top-left */
+      radial-gradient(ellipse 70% 50% at -10% -10%, hsl(var(--primary) / 0.14) 0%, transparent 60%),
+      /* Glow accent top-right */
+      radial-gradient(ellipse 50% 40% at 110% -5%, hsl(262 70% 55% / 0.09) 0%, transparent 60%),
+      /* Bottom bloom */
+      radial-gradient(ellipse 70% 35% at 50% 110%, hsl(var(--primary) / 0.08) 0%, transparent 65%),
+      /* Section color blends (dinámicos) */
+      radial-gradient(ellipse 90% 55% at 15% -5%,  hsl(var(--section-hsl, 262 80% 62%) / 0.20) 0%, transparent 60%),
+      radial-gradient(ellipse 55% 40% at 88% 105%, hsl(var(--section-hsl, 262 80% 62%) / 0.10) 0%, transparent 60%),
+      radial-gradient(ellipse 70% 50% at 50% 115%, hsl(220 80% 60% / 0.07) 0%, transparent 65%);
+    background-size:
+      60px 60px, 60px 60px,
+      auto, auto, auto, auto, auto, auto;
     background-attachment: fixed;
   }
 
