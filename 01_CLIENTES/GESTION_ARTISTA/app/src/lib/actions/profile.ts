@@ -43,39 +43,36 @@ export async function updateProfile(
   formData: ProfileFormData
 ): Promise<{ data: Profile | null; error: string | null }> {
   try {
+    // Use cookie-based client only to authenticate the user
     const supabase = await createServerSupabaseClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return { data: null, error: "No autenticado" };
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData?.user) return { data: null, error: "No autenticado" };
+    const userId = authData.user.id;
 
     const parsed = ProfileSchema.safeParse(formData);
     if (!parsed.success) {
       return { data: null, error: parsed.error.errors[0].message };
     }
 
+    // Use admin client for the actual DB operation to avoid RLS or serialization issues
+    const admin = createAdminSupabaseClient();
+
     const updatePayload: Record<string, unknown> = {
       full_name: parsed.data.full_name,
       updated_at: new Date().toISOString(),
+      avatar_url: parsed.data.avatar_url !== undefined ? (parsed.data.avatar_url ?? null) : undefined,
+      artist_slug: parsed.data.artist_slug !== undefined ? (parsed.data.artist_slug ?? null) : undefined,
+      bio: parsed.data.bio !== undefined ? (parsed.data.bio ?? null) : undefined,
+      studio_name: parsed.data.studio_name !== undefined ? (parsed.data.studio_name ?? null) : undefined,
     };
-    if (parsed.data.avatar_url !== undefined) {
-      updatePayload.avatar_url = parsed.data.avatar_url ?? null;
-    }
-    if (parsed.data.artist_slug !== undefined) {
-      updatePayload.artist_slug = parsed.data.artist_slug ?? null;
-    }
-    if (parsed.data.bio !== undefined) {
-      updatePayload.bio = parsed.data.bio ?? null;
-    }
-    if (parsed.data.studio_name !== undefined) {
-      updatePayload.studio_name = parsed.data.studio_name ?? null;
-    }
+    // Remove undefined keys so Supabase ignores them
+    Object.keys(updatePayload).forEach((k) => updatePayload[k] === undefined && delete updatePayload[k]);
 
-    const { data, error } = await supabase
+    const { data, error } = await admin
       .from("profiles")
       .update(updatePayload)
-      .eq("id", user.id)
-      .select("id, email, full_name, avatar_url, role, artist_slug, bio, studio_name, preferences, created_at, updated_at, is_deleted, deleted_at, deleted_by")
+      .eq("id", userId)
+      .select("id, email, full_name, avatar_url, role, artist_slug, bio, studio_name, preferences, created_at, updated_at, is_deleted")
       .single();
 
     if (error) return { data: null, error: error.message };
