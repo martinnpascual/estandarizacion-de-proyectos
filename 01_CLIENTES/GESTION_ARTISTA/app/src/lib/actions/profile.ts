@@ -42,43 +42,51 @@ export async function getProfile(): Promise<{
 export async function updateProfile(
   formData: ProfileFormData
 ): Promise<{ data: Profile | null; error: string | null }> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { data: null, error: "No autenticado" };
+  try {
+    const supabase = await createServerSupabaseClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { data: null, error: "No autenticado" };
 
-  const parsed = ProfileSchema.safeParse(formData);
-  if (!parsed.success) {
-    return { data: null, error: parsed.error.errors[0].message };
-  }
+    const parsed = ProfileSchema.safeParse(formData);
+    if (!parsed.success) {
+      return { data: null, error: parsed.error.errors[0].message };
+    }
 
-  const updatePayload: Partial<Profile> = {
-    full_name: parsed.data.full_name,
-    updated_at: new Date().toISOString(),
-  };
-  if (parsed.data.avatar_url !== undefined) {
-    updatePayload.avatar_url = parsed.data.avatar_url ?? null;
-  }
-  if (parsed.data.artist_slug !== undefined) {
-    updatePayload.artist_slug = parsed.data.artist_slug ?? null;
-  }
-  if (parsed.data.bio !== undefined) {
-    updatePayload.bio = parsed.data.bio ?? null;
-  }
-  if (parsed.data.studio_name !== undefined) {
-    updatePayload.studio_name = parsed.data.studio_name ?? null;
-  }
+    const updatePayload: Record<string, unknown> = {
+      full_name: parsed.data.full_name,
+      updated_at: new Date().toISOString(),
+    };
+    if (parsed.data.avatar_url !== undefined) {
+      updatePayload.avatar_url = parsed.data.avatar_url ?? null;
+    }
+    if (parsed.data.artist_slug !== undefined) {
+      updatePayload.artist_slug = parsed.data.artist_slug ?? null;
+    }
+    if (parsed.data.bio !== undefined) {
+      updatePayload.bio = parsed.data.bio ?? null;
+    }
+    if (parsed.data.studio_name !== undefined) {
+      updatePayload.studio_name = parsed.data.studio_name ?? null;
+    }
 
-  const { data, error } = await supabase
-    .from("profiles")
-    .update(updatePayload)
-    .eq("id", user.id)
-    .select()
-    .single();
+    const { data, error } = await supabase
+      .from("profiles")
+      .update(updatePayload)
+      .eq("id", user.id)
+      .select("id, email, full_name, avatar_url, role, artist_slug, bio, studio_name, preferences, created_at, updated_at, is_deleted, deleted_at, deleted_by")
+      .single();
 
-  if (error) return { data: null, error: error.message };
-  return { data: data as Profile, error: null };
+    if (error) return { data: null, error: error.message };
+    return { data: data as Profile, error: null };
+  } catch (err) {
+    console.error("[updateProfile] unexpected error:", err);
+    return {
+      data: null,
+      error: err instanceof Error ? err.message : "Error inesperado al guardar el perfil",
+    };
+  }
 }
 
 /**
