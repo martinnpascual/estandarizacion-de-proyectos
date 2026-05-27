@@ -159,38 +159,34 @@ function LoginContent({ studioName }: { studioName: string }) {
 
         {/* ── Logo + Studio Name ── */}
         <div className="text-center flex flex-col items-center">
-          {/* Logo 300px — sin fondo negro, solo silueta violeta */}
-          <div className="relative w-[300px] h-[300px] -mb-4">
-            {/* Glow radial — gradiente que se desvanece, igual que el mockup */}
+          {/* Logo 300px — sin fondo negro */}
+          <div className="relative w-[340px] h-[340px] -mb-6 flex items-center justify-center">
+            {/* Glow atmosférico detrás — más grande que el logo, no toca el blend */}
             <div
               className="absolute pointer-events-none"
               style={{
-                inset: "-20px", borderRadius: "50%",
-                background: "radial-gradient(circle, rgba(139,92,246,0.22) 0%, transparent 70%)",
-                filter: "blur(20px)",
+                inset: 0, borderRadius: "50%",
+                background: "radial-gradient(circle, rgba(139,92,246,0.28) 0%, rgba(109,40,217,0.12) 45%, transparent 72%)",
+                filter: "blur(28px)",
               }}
             />
+            {/* Contenedor circular — clip duro que oculta la esquinas negras del PNG */}
             <div
-              className="absolute pointer-events-none"
-              style={{
-                inset: "-10px", borderRadius: "50%",
-                background: "radial-gradient(circle, rgba(109,40,217,0.15) 0%, transparent 60%)",
-                filter: "blur(14px)",
-              }}
-            />
-            {/* Logo */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/logo.png"
-              alt={studioName}
-              className="relative w-full h-full object-contain"
-              style={{
-                mixBlendMode: "screen",
-                filter: "drop-shadow(0 0 18px rgba(139,92,246,0.55)) drop-shadow(0 0 40px rgba(139,92,246,0.25))",
-                WebkitMaskImage: "radial-gradient(ellipse 80% 80% at 50% 50%, black 45%, transparent 72%)",
-                maskImage: "radial-gradient(ellipse 80% 80% at 50% 50%, black 45%, transparent 72%)",
-              }}
-            />
+              className="relative overflow-hidden"
+              style={{ width: 220, height: 220, borderRadius: "50%" }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/logo.png"
+                alt={studioName}
+                className="w-full h-full object-cover"
+                style={{
+                  mixBlendMode: "screen",
+                  filter: "drop-shadow(0 0 14px rgba(139,92,246,0.7)) drop-shadow(0 0 30px rgba(139,92,246,0.4))",
+                  transform: "scale(1.05)",
+                }}
+              />
+            </div>
           </div>
           {/* Studio name — dinámico desde perfil */}
           <h1 className="text-4xl font-black tracking-tight gradient-text drop-shadow-[0_0_20px_hsl(var(--primary)/0.5)] leading-tight">
