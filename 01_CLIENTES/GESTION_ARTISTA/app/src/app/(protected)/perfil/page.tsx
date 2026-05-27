@@ -147,19 +147,24 @@ export default function PerfilPage() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    const { data, error } = await updateProfile({
-      full_name: fullName,
-      avatar_url: avatarUrl || null,
-      artist_slug: artistSlug.trim() || null,
-      bio: bio.trim() || null,
-      studio_name: studioName.trim() || null,
-    });
-    setSaving(false);
-    if (error) {
-      toast.error(error);
-    } else {
-      setProfile(data);
-      toast.success("Perfil actualizado correctamente");
+    try {
+      const { data, error } = await updateProfile({
+        full_name: fullName,
+        avatar_url: avatarUrl || null,
+        artist_slug: artistSlug.trim() || null,
+        bio: bio.trim() || null,
+        studio_name: studioName.trim() || null,
+      });
+      if (error) {
+        toast.error(error);
+      } else {
+        setProfile(data);
+        toast.success("Perfil actualizado correctamente");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al guardar el perfil");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -232,15 +237,20 @@ export default function PerfilPage() {
       return;
     }
     setSavingPassword(true);
-    const supabase = createClient();
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
-    setSavingPassword(false);
-    if (error) {
-      setPasswordError(error.message);
-    } else {
-      toast.success("Contraseña actualizada correctamente");
-      setNewPassword("");
-      setConfirmPassword("");
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) {
+        setPasswordError(error.message);
+      } else {
+        toast.success("Contraseña actualizada correctamente");
+        setNewPassword("");
+        setConfirmPassword("");
+      }
+    } catch (err) {
+      setPasswordError(err instanceof Error ? err.message : "Error al actualizar la contraseña");
+    } finally {
+      setSavingPassword(false);
     }
   }
 
