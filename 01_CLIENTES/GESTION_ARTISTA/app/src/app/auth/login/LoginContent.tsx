@@ -161,9 +161,23 @@ function LoginContent({ studioName }: { studioName: string }) {
         <div className="text-center flex flex-col items-center">
           {/* Logo 300px — sin fondo negro, solo silueta violeta */}
           <div className="relative w-[300px] h-[300px] -mb-4">
-            {/* Glow radial detrás */}
-            <div className="absolute inset-0 rounded-full bg-primary/18 blur-3xl scale-[1.4]" />
-            <div className="absolute inset-0 rounded-full bg-violet-500/10 blur-2xl scale-[1.2]" />
+            {/* Glow radial — gradiente que se desvanece, igual que el mockup */}
+            <div
+              className="absolute pointer-events-none"
+              style={{
+                inset: "-20px", borderRadius: "50%",
+                background: "radial-gradient(circle, rgba(139,92,246,0.22) 0%, transparent 70%)",
+                filter: "blur(20px)",
+              }}
+            />
+            <div
+              className="absolute pointer-events-none"
+              style={{
+                inset: "-10px", borderRadius: "50%",
+                background: "radial-gradient(circle, rgba(109,40,217,0.15) 0%, transparent 60%)",
+                filter: "blur(14px)",
+              }}
+            />
             {/* Logo */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
