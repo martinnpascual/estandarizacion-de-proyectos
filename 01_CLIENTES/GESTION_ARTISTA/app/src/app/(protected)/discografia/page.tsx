@@ -119,6 +119,24 @@ export default function DiscografiaPage() {
   );
   const [copiedSongId, setCopiedSongId] = useState<string | null>(null);
 
+  // ── Favorites (localStorage) ──────────────────────────────────────────────
+  const [favoritedIds, setFavoritedIds] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const raw = localStorage.getItem("discografia-favorites");
+      return raw ? new Set<string>(JSON.parse(raw)) : new Set<string>();
+    } catch { return new Set<string>(); }
+  });
+
+  const toggleFavorite = useCallback((id: string) => {
+    setFavoritedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      localStorage.setItem("discografia-favorites", JSON.stringify(Array.from(next)));
+      return next;
+    });
+  }, []);
+
   function handleCopySongLink(e: React.MouseEvent, songId: string) {
     e.stopPropagation();
     const url = `${window.location.origin}/discografia?song=${songId}`;
@@ -1193,6 +1211,8 @@ export default function DiscografiaPage() {
                               isPlaying={player.currentTrack?.id === song.id && player.isPlaying}
                               isSelected={selectedSong?.id === song.id}
                               isKeyboardSelected={keyboardSongId === song.id}
+                              isFavorited={favoritedIds.has(song.id)}
+                              onToggleFavorite={toggleFavorite}
                               onAction={onAction}
                             />
                           </div>
@@ -1214,6 +1234,8 @@ export default function DiscografiaPage() {
                   isPlaying={player.currentTrack?.id === song.id && player.isPlaying}
                   isSelected={selectedSong?.id === song.id}
                   isKeyboardSelected={keyboardSongId === song.id}
+                  isFavorited={favoritedIds.has(song.id)}
+                  onToggleFavorite={toggleFavorite}
                   onAction={onAction}
                 />
               </div>
@@ -1255,8 +1277,8 @@ export default function DiscografiaPage() {
         <>
           {/* Desktop: sidebar fijo a la derecha */}
           <div
-            className="hidden md:flex flex-col flex-shrink-0 w-80 xl:w-[360px] sticky top-0 self-start border-l border-border/60 overflow-hidden"
-            style={{ height: "calc(100vh - 72px)" }}
+            className="hidden md:flex flex-col flex-shrink-0 w-[360px] xl:w-[420px] sticky top-0 self-start rounded-l-2xl overflow-hidden border-l border-t border-b border-border/20 shadow-[-12px_0_40px_hsl(0_0%_0%/0.25)]"
+            style={{ height: "calc(100vh - 80px)", marginTop: "4px" }}
           >
             <SongDetailPanel
               song={detailSong}
@@ -1339,6 +1361,8 @@ interface SongRowProps {
   isPlaying: boolean;
   isSelected: boolean;
   isKeyboardSelected: boolean;
+  isFavorited: boolean;
+  onToggleFavorite: (id: string) => void;
   onAction: (type: SongActionType, song: Song) => void;
 }
 
@@ -1348,6 +1372,8 @@ const SongRow = memo(function SongRow({
   isPlaying,
   isSelected,
   isKeyboardSelected,
+  isFavorited,
+  onToggleFavorite,
   onAction,
 }: SongRowProps) {
   const hasAudio = !!(song.drive_file_url || song.drive_file_id);
@@ -1566,6 +1592,20 @@ const SongRow = memo(function SongRow({
           <Globe className="h-3.5 w-3.5" />
         </span>
       )}
+
+      {/* Favorite heart */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onToggleFavorite(song.id); }}
+        title={isFavorited ? "Quitar de favoritos" : "Añadir a favoritos"}
+        className={cn(
+          "flex-shrink-0 p-1.5 rounded-xl transition-all active:scale-90",
+          isFavorited
+            ? "text-red-400 opacity-100"
+            : "text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-red-400 hover:bg-red-500/10"
+        )}
+      >
+        <Heart className={cn("h-3.5 w-3.5", isFavorited && "fill-current")} />
+      </button>
 
       {/* Acciones */}
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">

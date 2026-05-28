@@ -160,8 +160,8 @@ export default function SongDetailPanel({ song, onClose, onEdit, onOpenLyrics, m
   const panelContent = (
     <div className="flex flex-col h-full overflow-hidden glass-panel">
 
-      {/* ── Header ──────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 flex-shrink-0 panel-header-ambient">
+      {/* ── Header row 1: título + visibilidad + X ───────────────────── */}
+      <div className="relative flex items-center justify-between px-5 pt-4 pb-3 flex-shrink-0">
         {/* Ambient bleed from cover art */}
         {song.cover_art_url && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -169,22 +169,25 @@ export default function SongDetailPanel({ song, onClose, onEdit, onOpenLyrics, m
             src={song.cover_art_url}
             alt=""
             aria-hidden="true"
-            className="absolute inset-[-20%] w-[140%] h-[140%] object-cover blur-[50px] opacity-[0.10] saturate-150 pointer-events-none"
-          style={{ zIndex: 0 }}
+            className="absolute inset-[-20%] w-[140%] h-[140%] object-cover blur-[60px] opacity-[0.12] saturate-150 pointer-events-none"
+            style={{ zIndex: 0 }}
           />
         )}
-        <div className="flex items-center gap-2">
-          <Disc3 className="h-3.5 w-3.5 text-primary drop-shadow-[0_0_4px_hsl(var(--primary)/0.6)]" />
-          <span className="text-sm font-black">Detalle</span>
+        {/* Left: icon + title + visibility */}
+        <div className="relative z-10 flex items-center gap-2.5 min-w-0">
+          <div className="w-7 h-7 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
+            <Disc3 className="h-3.5 w-3.5 text-primary drop-shadow-[0_0_4px_hsl(var(--primary)/0.6)]" />
+          </div>
+          <span className="text-sm font-black tracking-tight">Detalle</span>
           <button
             onClick={handleTogglePublic}
             disabled={togglingPublic}
             title={isPublic ? "Pública — clic para hacer privada" : "Privada — clic para publicar en EPK"}
             className={cn(
-              "flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-all active:scale-95",
+              "flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium transition-all active:scale-95 border",
               isPublic
-                ? "bg-green-500/15 text-green-400 hover:bg-red-500/15 hover:text-red-400"
-                : "bg-secondary text-muted-foreground hover:bg-green-500/15 hover:text-green-400"
+                ? "bg-green-500/10 text-green-400 border-green-500/25 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/25"
+                : "bg-secondary text-muted-foreground border-border/50 hover:bg-green-500/10 hover:text-green-400 hover:border-green-500/25"
             )}
           >
             {togglingPublic
@@ -193,62 +196,69 @@ export default function SongDetailPanel({ song, onClose, onEdit, onOpenLyrics, m
             {isPublic ? "Pública" : "Privada"}
           </button>
         </div>
-        <div className="flex items-center gap-0.5">
-          <Link
-            href={`/discografia/${song.id}`}
-            title="Abrir página completa"
-            className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground transition-all active:scale-95"
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-          </Link>
-          <button
-            onClick={handleShareLink}
-            title="Copiar enlace directo"
-            className={cn(
-              "p-1.5 rounded-lg transition-all active:scale-95",
-              linkCopied ? "bg-blue-500/15 text-blue-400" : "hover:bg-secondary text-muted-foreground"
-            )}
-          >
-            {linkCopied ? <Check className="h-3.5 w-3.5" /> : <Share2 className="h-3.5 w-3.5" />}
-          </button>
-          <button
-            onClick={handleCopy}
-            title="Copiar info"
-            className={cn(
-              "p-1.5 rounded-lg transition-all active:scale-95",
-              copied ? "bg-green-500/15 text-green-400" : "hover:bg-secondary text-muted-foreground"
-            )}
-          >
-            {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-          </button>
-          <button
-            onClick={() => setShowShortcuts(s => !s)}
-            title="Atajos"
-            className={cn(
-              "p-1.5 rounded-lg transition-all active:scale-95",
-              showShortcuts ? "bg-secondary text-foreground" : "hover:bg-secondary text-muted-foreground"
-            )}
-          >
-            <Keyboard className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={onEdit}
-            className="ml-1 text-xs px-2.5 py-1.5 rounded-lg border border-border/60 hover:bg-secondary/60 transition-all active:scale-95 font-medium"
-          >
-            Editar
-          </button>
-          <button
-            onClick={onClose}
-            className="ml-0.5 p-1.5 rounded-lg hover:bg-secondary text-muted-foreground transition-all active:scale-95"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
+        {/* Right: close button — prominente y separado */}
+        <button
+          onClick={onClose}
+          title="Cerrar (Esc)"
+          className="relative z-10 flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center border border-border/50 bg-secondary/60 text-muted-foreground hover:bg-red-500/12 hover:text-red-400 hover:border-red-500/30 hover:scale-105 transition-all active:scale-95 shadow-sm ml-3"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* ── Header row 2: barra de acciones ─────────────────────────── */}
+      <div className="flex items-center gap-1 px-5 pb-3 border-b border-border/40 flex-shrink-0">
+        <Link
+          href={`/discografia/${song.id}`}
+          title="Abrir página completa"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-all active:scale-95 text-[11px]"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+          <span>Abrir</span>
+        </Link>
+        <button
+          onClick={handleShareLink}
+          title="Copiar enlace directo"
+          className={cn(
+            "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all active:scale-95 text-[11px]",
+            linkCopied ? "bg-blue-500/12 text-blue-400" : "hover:bg-secondary text-muted-foreground hover:text-foreground"
+          )}
+        >
+          {linkCopied ? <Check className="h-3.5 w-3.5" /> : <Share2 className="h-3.5 w-3.5" />}
+          <span>{linkCopied ? "Copiado" : "Compartir"}</span>
+        </button>
+        <button
+          onClick={handleCopy}
+          title="Copiar info"
+          className={cn(
+            "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all active:scale-95 text-[11px]",
+            copied ? "bg-green-500/12 text-green-400" : "hover:bg-secondary text-muted-foreground hover:text-foreground"
+          )}
+        >
+          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+          <span>{copied ? "Copiado" : "Copiar"}</span>
+        </button>
+        <button
+          onClick={() => setShowShortcuts(s => !s)}
+          title="Atajos de teclado"
+          className={cn(
+            "p-1.5 rounded-lg transition-all active:scale-95 ml-auto",
+            showShortcuts ? "bg-secondary text-foreground" : "hover:bg-secondary text-muted-foreground"
+          )}
+        >
+          <Keyboard className="h-3.5 w-3.5" />
+        </button>
+        <button
+          onClick={onEdit}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-all active:scale-95 text-[11px] font-black"
+        >
+          <span>Editar</span>
+        </button>
       </div>
 
       {/* Atajos de teclado */}
       {showShortcuts && (
-        <div className="border-b border-border/50 bg-secondary/20 px-4 py-2.5 flex flex-wrap gap-x-4 gap-y-1">
+        <div className="border-b border-border/40 bg-secondary/20 px-5 py-2.5 flex flex-wrap gap-x-5 gap-y-1.5">
           {[
             ["P", "Reproducir / Pausar"],
             ["E", "Editar"],
@@ -266,7 +276,7 @@ export default function SongDetailPanel({ song, onClose, onEdit, onOpenLyrics, m
       <div className="flex-1 overflow-y-auto">
 
         {/* ── Hero: cover art con fondo ambientado ──────────────────── */}
-        <div className="relative w-full bg-secondary overflow-hidden" style={{ aspectRatio: "1/1" }}>
+        <div className="relative w-full bg-secondary overflow-hidden" style={{ aspectRatio: "16/10" }}>
           {/* Fondo desenfocado (bleed) */}
           {song.cover_art_url && (
             // eslint-disable-next-line @next/next/no-img-element
@@ -274,23 +284,23 @@ export default function SongDetailPanel({ song, onClose, onEdit, onOpenLyrics, m
               src={song.cover_art_url}
               alt=""
               aria-hidden="true"
-              className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl opacity-60 saturate-200"
+              className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl opacity-70 saturate-200"
             />
           )}
           {/* Gradiente inferior — fundido suave a card */}
-          <div className="absolute inset-0 bg-gradient-to-t from-card/85 via-card/15 to-black/10" />
+          <div className="absolute inset-0 bg-gradient-to-t from-card/90 via-card/20 to-black/20" />
 
           {/* Halo ambiental bajo la portada */}
           <div className="cover-art-halo" />
 
           {/* Portada centrada con sombra profunda */}
-          <div className="absolute inset-0 flex items-center justify-center z-10">
+          <div className="absolute inset-0 flex items-center justify-center z-10 py-4">
             {song.cover_art_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={song.cover_art_url}
                 alt={song.title}
-                className="w-[72%] aspect-square object-cover rounded-2xl shadow-[0_24px_64px_hsl(0_0%_0%/0.70)]"
+                className="h-full max-h-[190px] aspect-square object-cover rounded-2xl shadow-[0_20px_56px_hsl(0_0%_0%/0.65)]"
               />
             ) : (
               <div className="w-28 h-28 rounded-2xl bg-secondary/60 border border-border/40 flex items-center justify-center">
@@ -305,10 +315,10 @@ export default function SongDetailPanel({ song, onClose, onEdit, onOpenLyrics, m
               onClick={handlePlay}
               title={isPlaying ? "Pausar" : "Reproducir"}
               className={cn(
-                "absolute bottom-3.5 right-3.5 z-20 w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 active:scale-95 hover:scale-105",
+                "absolute bottom-4 right-4 z-20 w-13 h-13 w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 active:scale-95 hover:scale-110",
                 isPlaying
-                  ? "bg-primary text-primary-foreground animate-glow-pulse"
-                  : "bg-card/85 backdrop-blur-md text-foreground hover:bg-primary hover:text-primary-foreground shadow-[0_4px_20px_hsl(0_0%_0%/0.45)] hover:shadow-[0_0_24px_hsl(var(--primary)/0.5)]"
+                  ? "bg-primary text-primary-foreground animate-glow-pulse shadow-[0_0_24px_hsl(var(--primary)/0.5)]"
+                  : "bg-card/90 backdrop-blur-md text-foreground hover:bg-primary hover:text-primary-foreground shadow-[0_4px_24px_hsl(0_0%_0%/0.5)] hover:shadow-[0_0_28px_hsl(var(--primary)/0.55)]"
               )}
             >
               {isPlaying
@@ -320,7 +330,7 @@ export default function SongDetailPanel({ song, onClose, onEdit, onOpenLyrics, m
 
         {/* ── Waveform (solo si tiene audio) ────────────────────────── */}
         {hasAudio && (
-          <div className="px-4 py-3 border-b border-border/40 bg-secondary/10">
+          <div className="px-5 py-3 border-b border-border/40 bg-secondary/10">
             <WaveformPlayer
               url={song.drive_file_id
                 ? `/api/drive/stream/${song.drive_file_id}`
@@ -331,9 +341,9 @@ export default function SongDetailPanel({ song, onClose, onEdit, onOpenLyrics, m
         )}
 
         {/* ── Título + artista ──────────────────────────────────────── */}
-        <div className="px-5 pt-5 pb-3">
-          <h2 className="text-[22px] font-black leading-tight tracking-tight">{song.title}</h2>
-          <p className="text-sm text-muted-foreground/80 mt-1 font-medium">
+        <div className="px-6 pt-5 pb-3">
+          <h2 className="text-2xl font-black leading-tight tracking-tight">{song.title}</h2>
+          <p className="text-sm text-muted-foreground/80 mt-1.5 font-medium">
             {song.artist_name}
             {song.featuring && song.featuring.length > 0 && (
               <span className="text-muted-foreground/50 font-normal">
@@ -344,7 +354,7 @@ export default function SongDetailPanel({ song, onClose, onEdit, onOpenLyrics, m
         </div>
 
         {/* ── Meta chips ────────────────────────────────────────────── */}
-        <div className="px-5 pb-5 flex flex-wrap gap-1.5">
+        <div className="px-6 pb-5 flex flex-wrap gap-1.5">
           <span className="flex items-center gap-1 text-[11px] bg-secondary/70 text-muted-foreground px-2.5 py-1 rounded-full">
             <Calendar className="h-3 w-3" />
             {song.year}
@@ -381,7 +391,7 @@ export default function SongDetailPanel({ song, onClose, onEdit, onOpenLyrics, m
         </div>
 
         {/* ── Secciones ─────────────────────────────────────────────── */}
-        <div className="px-5 space-y-5 pb-6">
+        <div className="px-6 space-y-5 pb-6">
 
           {/* Tags */}
           {song.tags && song.tags.length > 0 && (
@@ -593,11 +603,13 @@ export default function SongDetailPanel({ song, onClose, onEdit, onOpenLyrics, m
 
   return (
     <>
+      {/* Backdrop */}
       <div
-        className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]"
         onClick={onClose}
       />
-      <div className="fixed right-0 top-0 z-50 h-full w-full max-w-sm border-l border-border/20 shadow-[0_0_80px_hsl(0_0%_0%/0.6)] animate-in slide-in-from-right duration-200">
+      {/* Panel */}
+      <div className="fixed right-0 top-0 z-50 h-full w-full max-w-[460px] rounded-l-2xl overflow-hidden border-l border-t border-b border-border/20 shadow-[-24px_0_80px_hsl(0_0%_0%/0.55),-1px_0_0_hsl(var(--border)/0.12)] animate-in slide-in-from-right duration-250">
         {panelContent}
       </div>
     </>
