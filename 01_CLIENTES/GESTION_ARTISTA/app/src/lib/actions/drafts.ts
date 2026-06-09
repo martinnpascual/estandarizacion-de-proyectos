@@ -14,7 +14,8 @@ export type DraftMutationResult =
   | { data: null; error: string };
 
 export async function getDrafts(
-  statusFilter?: DraftStatus
+  statusFilter?: DraftStatus,
+  includeArchived = false
 ): Promise<DraftsResult> {
   const supabase = await createServerSupabaseClient();
 
@@ -23,6 +24,10 @@ export async function getDrafts(
     .select("*")
     .eq("is_deleted", false)
     .order("created_at", { ascending: false });
+
+  if (!includeArchived) {
+    query = query.eq("is_archived", false);
+  }
 
   if (statusFilter) {
     query = query.eq("status", statusFilter);
@@ -121,6 +126,78 @@ export async function deleteDraft(
       deleted_by: user.id,
     })
     .eq("id", id);
+
+  if (error) return { error: error.message };
+  return { error: null };
+}
+
+// ── Share token ──────────────────────────────────────────────────────
+
+export async function generateShareToken(
+  draftId: string
+): Promise<{ token: string | null; error: string | null }> {
+  const supabase = await createServerSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { token: null, error: "No autenticado" };
+
+  const token = crypto.randomUUID();
+  const { error } = await supabase
+    .from("drafts")
+    .update({ share_token: token })
+    .eq("id", draftId)
+    .eq("created_by", user.id);
+
+  if (error) return { token: null, error: error.message };
+  return { token, error: null };
+}
+
+export async function getDraftByShareToken(
+  token: string
+): Promise<{ data: Draft | null; error: string | null }> {
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("drafts")
+    .select("*")
+    .eq("share_token", token)
+    .eq("is_deleted", false)
+    .maybeSingle();
+
+  if (error) return { data: null, error: error.message };
+  if (!data) return { data: null, error: "Link no encontrado" };
+  return { data: data as Draft, error: null };
+}
+
+// ── Archive ───────────────────────────────────────────────────────────
+
+export async function archiveDraft(
+  id: string
+): Promise<{ error: string | null }> {
+  const supabase = await createServerSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "No autenticado" };
+
+  const { error } = await supabase
+    .from("drafts")
+    .update({ is_archived: true, archived_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("created_by", user.id);
+
+  if (error) return { error: error.message };
+  return { error: null };
+}
+
+export async function unarchiveDraft(
+  id: string
+): Promise<{ error: string | null }> {
+  const supabase = await createServerSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "No autenticado" };
+
+  const { error } = await supabase
+    .from("drafts")
+    .update({ is_archived: false, archived_at: null })
+    .eq("id", id)
+    .eq("created_by", user.id);
 
   if (error) return { error: error.message };
   return { error: null };

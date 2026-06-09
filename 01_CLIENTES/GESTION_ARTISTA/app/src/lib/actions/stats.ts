@@ -3,6 +3,67 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Song } from "@/types/database";
 
+// ── Play events ─────────────────────────────────────────────────────
+
+export async function logPlayEvent(params: {
+  draft_id?: string;
+  song_id?: string;
+}): Promise<void> {
+  try {
+    const supabase = await createServerSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase
+      .from("play_events")
+      .insert({ ...params, created_by: user.id });
+  } catch {
+    // fire-and-forget — never throw
+  }
+}
+
+export interface PlayStats {
+  topDrafts: { draft_id: string; title: string; play_count: number }[];
+}
+
+export async function getPlayStats(): Promise<{
+  data: PlayStats | null;
+  error: string | null;
+}> {
+  try {
+    const supabase = await createServerSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { data: { topDrafts: [] }, error: null };
+
+    const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    const { data, error } = await supabase
+      .from("play_events")
+      .select("draft_id, drafts(title)")
+      .eq("created_by", user.id)
+      .gte("created_at", since)
+      .not("draft_id", "is", null);
+
+    if (error) return { data: null, error: error.message };
+
+    // Aggregate play counts in JS
+    const countMap: Record<string, { title: string; count: number }> = {};
+    for (const row of data ?? []) {
+      if (!row.draft_id) continue;
+      const title = (row.drafts as unknown as { title: string } | null)?.title ?? "Sin título";
+      if (!countMap[row.draft_id]) countMap[row.draft_id] = { title, count: 0 };
+      countMap[row.draft_id].count++;
+    }
+
+    const topDrafts = Object.entries(countMap)
+      .map(([draft_id, { title, count }]) => ({ draft_id, title, play_count: count }))
+      .sort((a, b) => b.play_count - a.play_count)
+      .slice(0, 5);
+
+    return { data: { topDrafts }, error: null };
+  } catch {
+    return { data: { topDrafts: [] }, error: null };
+  }
+}
+
 // ── Maquetas stats ──────────────────────────────────────────────────
 
 export interface MaquetasStats {

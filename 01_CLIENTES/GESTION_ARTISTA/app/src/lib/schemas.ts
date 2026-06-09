@@ -76,6 +76,7 @@ export const ProjectSchema = z.object({
   description: z.string().nullable().default(null),
   target_date: z.string().nullable().default(null),
   cover_art_url: z.string().nullable().default(null),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().default(null),
 });
 export type ProjectFormData = z.infer<typeof ProjectSchema>;
 

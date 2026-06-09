@@ -114,6 +114,10 @@ export interface Draft {
   is_deleted: boolean;
   deleted_at?: string | null;
   deleted_by?: string | null;
+  // Feature: share & archive
+  share_token?: string | null;
+  is_archived?: boolean;
+  archived_at?: string | null;
 }
 
 export interface DraftVersion {
@@ -154,6 +158,7 @@ export interface Project {
   description: string | null;
   target_date: string | null;
   cover_art_url: string | null;
+  color: string | null;
   created_at: string;
   updated_at: string;
   created_by: string;
@@ -174,6 +179,14 @@ export interface ProjectTrack {
   deleted_by?: string | null;
 }
 
+export interface CommentReaction {
+  id: string;
+  comment_id: string;
+  created_by: string;
+  emoji: string;
+  created_at: string;
+}
+
 export interface Comment {
   id: string;
   song_id: string | null;
@@ -189,6 +202,7 @@ export interface Comment {
   deleted_by?: string | null;
   // Joined fields
   author?: Profile;
+  reactions?: CommentReaction[];
 }
 
 export interface CalendarEvent {

@@ -32,6 +32,9 @@ import {
   Clock,
   Heart,
   Sparkles,
+  Share2,
+  Archive,
+  ArchiveRestore,
 } from "lucide-react";
 import DraftVersionsPanel from "@/components/drafts/DraftVersionsPanel";
 import WaveformPlayer from "@/components/audio/WaveformPlayer";
@@ -54,7 +57,11 @@ import {
   searchDrafts,
   deleteDraft,
   updateDraftStatus,
+  generateShareToken,
+  archiveDraft,
+  unarchiveDraft,
 } from "@/lib/actions/drafts";
+import { logPlayEvent } from "@/lib/actions/stats";
 import { useDebounce } from "@/hooks/useDebounce";
 import { translateDraftStatus } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -156,6 +163,7 @@ export default function MaquetasPage() {
   const [commentsOpenId, setCommentsOpenId] = useState<string | null>(null);
   const [waveformOpenId, setWaveformOpenId] = useState<string | null>(null);
   const [aiSuggestOpenId, setAiSuggestOpenId] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
   const [lyricsDraft, setLyricsDraft] = useState<Draft | null>(null);
   const [aiCoverDraft, setAiCoverDraft] = useState<Draft | null>(null);
   const [bulkCoversOpen, setBulkCoversOpen] = useState(false);
@@ -205,7 +213,8 @@ export default function MaquetasPage() {
         result = await searchDrafts(debouncedSearch.trim());
       } else {
         result = await getDrafts(
-          statusFilter !== "todos" ? statusFilter : undefined
+          statusFilter !== "todos" ? statusFilter : undefined,
+          showArchived
         );
       }
 
@@ -221,7 +230,7 @@ export default function MaquetasPage() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, debouncedSearch]);
+  }, [statusFilter, debouncedSearch, showArchived]);
 
   // ?new=1 deep-link; ?status=<status> pre-filters; ?draft=<id> highlights and expands the matching draft row
   useEffect(() => {
@@ -325,8 +334,42 @@ export default function MaquetasPage() {
       player.pause();
       return;
     }
+    // Log play event (fire-and-forget)
+    logPlayEvent({ draft_id: draft.id }).catch(() => {});
     // Play only this single track — use "Reproducir todo" to load the full queue
     player.play(draftToTrack(draft));
+  }
+
+  async function handleShare(draft: Draft) {
+    // Reuse existing token if present
+    let token = draft.share_token;
+    if (!token) {
+      const result = await generateShareToken(draft.id);
+      if (result.error || !result.token) {
+        toast.error("No se pudo generar el link");
+        return;
+      }
+      token = result.token;
+      // Update local state so button reflects the token
+      setDrafts(prev => prev.map(d => d.id === draft.id ? { ...d, share_token: token } : d));
+    }
+    const url = `${window.location.origin}/share/${token}`;
+    await navigator.clipboard.writeText(url);
+    toast.success("Link copiado al portapapeles");
+  }
+
+  async function handleArchive(draft: Draft) {
+    const { error } = await archiveDraft(draft.id);
+    if (error) { toast.error(error); return; }
+    setDrafts(prev => prev.filter(d => d.id !== draft.id));
+    toast.success(`"${draft.title}" archivada`);
+  }
+
+  async function handleUnarchive(draft: Draft) {
+    const { error } = await unarchiveDraft(draft.id);
+    if (error) { toast.error(error); return; }
+    setDrafts(prev => prev.filter(d => d.id !== draft.id));
+    toast.success(`"${draft.title}" restaurada`);
   }
 
   function handlePlayAll() {
@@ -656,7 +699,7 @@ export default function MaquetasPage() {
       </div>
 
 
-      {/* Tabs: Todas / Favoritas */}
+      {/* Tabs: Todas / Favoritas / Archivadas */}
       <div className="flex items-center gap-1 bg-secondary/40 rounded-2xl p-1 w-fit">
         <button
           onClick={() => setActiveTab("todas")}
@@ -694,6 +737,18 @@ export default function MaquetasPage() {
               {favoritedIds.size}
             </span>
           )}
+        </button>
+        <button
+          onClick={() => { setShowArchived(v => !v); setActiveTab("todas"); }}
+          className={cn(
+            "flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-sm font-medium transition-all active:scale-95",
+            showArchived
+              ? "bg-card shadow-sm text-amber-400 font-black border border-amber-500/30"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Archive className={cn("h-3.5 w-3.5", showArchived && "text-amber-400")} />
+          Archivadas
         </button>
       </div>
 
@@ -988,6 +1043,9 @@ export default function MaquetasPage() {
                           isFavorited={favoritedIds.has(draft.id)}
                           onToggleFavorite={() => toggleFavorite(draft.id)}
                           onGenerateCover={() => setAiCoverDraft(draft)}
+                          onShare={() => handleShare(draft)}
+                          onArchive={() => handleArchive(draft)}
+                          onUnarchive={() => handleUnarchive(draft)}
                         />
                         {versionsOpenId === draft.id && (
                           <DraftVersionsPanel draftId={draft.id} draftTitle={draft.title} />
@@ -1045,6 +1103,9 @@ export default function MaquetasPage() {
                       isFavorited={favoritedIds.has(draft.id)}
                       onToggleFavorite={() => toggleFavorite(draft.id)}
                       onGenerateCover={() => setAiCoverDraft(draft)}
+                      onShare={() => handleShare(draft)}
+                      onArchive={() => handleArchive(draft)}
+                      onUnarchive={() => handleUnarchive(draft)}
                     />
                     {versionsOpenId === draft.id && (
                       <DraftVersionsPanel draftId={draft.id} draftTitle={draft.title} />
@@ -1219,6 +1280,9 @@ interface DraftRowProps {
   isFavorited: boolean;
   onToggleFavorite: () => void;
   onGenerateCover: () => void;
+  onShare: () => void;
+  onArchive: () => void;
+  onUnarchive: () => void;
 }
 
 function DraftRow({
@@ -1243,6 +1307,9 @@ function DraftRow({
   isFavorited,
   onToggleFavorite,
   onGenerateCover,
+  onShare,
+  onArchive,
+  onUnarchive,
   waveformOpen,
   onToggleWaveform,
   aiSuggestOpen,
@@ -1632,6 +1699,37 @@ function DraftRow({
         >
           <FileText className="h-3.5 w-3.5" />
         </button>
+        {/* Share link */}
+        <button
+          onClick={onShare}
+          title={draft.share_token ? "Copiar link compartible" : "Generar link compartible"}
+          className={cn(
+            "p-1.5 rounded-xl transition-all active:scale-95",
+            draft.share_token
+              ? "text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+              : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+          )}
+        >
+          <Share2 className="h-3.5 w-3.5" />
+        </button>
+        {/* Archive / Restore */}
+        {draft.is_archived ? (
+          <button
+            onClick={onUnarchive}
+            title="Restaurar de archivo"
+            className="p-1.5 rounded-xl hover:bg-amber-500/10 transition-all active:scale-95 text-amber-400/70 hover:text-amber-400"
+          >
+            <ArchiveRestore className="h-3.5 w-3.5" />
+          </button>
+        ) : (
+          <button
+            onClick={onArchive}
+            title="Archivar maqueta"
+            className="p-1.5 rounded-xl hover:bg-secondary transition-all active:scale-95 text-muted-foreground hover:text-foreground"
+          >
+            <Archive className="h-3.5 w-3.5" />
+          </button>
+        )}
         <button
           onClick={onEdit}
           className="p-1.5 rounded-xl hover:bg-secondary transition-all active:scale-95 text-muted-foreground hover:text-foreground"

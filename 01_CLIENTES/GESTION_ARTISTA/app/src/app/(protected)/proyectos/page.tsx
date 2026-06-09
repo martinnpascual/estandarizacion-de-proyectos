@@ -135,7 +135,13 @@ const EMPTY_FORM: ProjectFormData = {
   description: null,
   target_date: null,
   cover_art_url: null,
+  color: null,
 };
+
+const PROJECT_COLOR_PRESETS = [
+  "#7c3aed","#2563eb","#059669","#d97706",
+  "#dc2626","#db2777","#0891b2","#65a30d",
+];
 
 // TrackWithMeta = TrackWithAudio — re-alias so the rest of the file compiles unchanged
 type TrackWithMeta = TrackWithAudio;
@@ -423,6 +429,7 @@ export default function ProyectosPage() {
       description: p.description,
       target_date: p.target_date,
       cover_art_url: p.cover_art_url,
+      color: p.color ?? null,
     });
     setFormErrors({});
     setShowForm(true);
@@ -1111,6 +1118,12 @@ export default function ProyectosPage() {
 
                 <div className="flex-1 min-w-0" onClick={() => toggleExpanded(project)} role="button">
                   <div className="flex items-center gap-2">
+                    {project.color && (
+                      <span
+                        className="flex-shrink-0 w-2.5 h-2.5 rounded-full"
+                        style={{ background: project.color }}
+                      />
+                    )}
                     <p className="text-sm font-black truncate">{project.name}</p>
                     <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 flex-shrink-0">
                       {PROJECT_TYPE_LABEL[project.type] ?? project.type}
@@ -1416,6 +1429,42 @@ export default function ProyectosPage() {
               <FormField label="Fecha objetivo" error={undefined}>
                 <input type="date" value={form.target_date ?? ""} onChange={(e) => setField("target_date", e.target.value || null)} className={`${iClass(false)} [color-scheme:dark]`} />
               </FormField>
+              {/* Color del proyecto */}
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Color del proyecto</label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setField("color", null)}
+                    title="Sin color"
+                    className={cn(
+                      "w-7 h-7 rounded-full border-2 transition-all active:scale-90",
+                      !form.color ? "border-primary scale-110" : "border-border/40 hover:border-border"
+                    )}
+                    style={{ background: "linear-gradient(135deg, #555 0%, #222 100%)" }}
+                  />
+                  {PROJECT_COLOR_PRESETS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setField("color", c)}
+                      title={c}
+                      className={cn(
+                        "w-7 h-7 rounded-full border-2 transition-all active:scale-90",
+                        form.color === c ? "border-white scale-110" : "border-transparent hover:border-white/40"
+                      )}
+                      style={{ background: c }}
+                    />
+                  ))}
+                  <input
+                    type="color"
+                    value={form.color ?? "#7c3aed"}
+                    onChange={(e) => setField("color", e.target.value)}
+                    title="Color personalizado"
+                    className="w-7 h-7 rounded-full cursor-pointer border border-border/40 bg-transparent overflow-hidden"
+                  />
+                </div>
+              </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => { setShowForm(false); setEditingProject(undefined); }} className="flex-1 py-2.5 rounded-xl border border-border/60 text-sm font-black hover:bg-secondary/60 transition-all active:scale-95">Cancelar</button>
                 <button type="submit" disabled={submitting} className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-black hover:bg-primary/80 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">

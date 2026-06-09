@@ -30,7 +30,7 @@ export async function getComments(params: {
 
   let query = supabase
     .from("comments")
-    .select("*, author:profiles(id, full_name, avatar_url, role)")
+    .select("*, author:profiles(id, full_name, avatar_url, role), reactions:comment_reactions(id, emoji, created_by)")
     .eq("is_deleted", false)
     .order("timestamp_seconds", { ascending: true });
 
@@ -105,6 +105,39 @@ export async function updateComment(
 
   if (error) return { error: error.message };
   return { error: null };
+}
+
+export async function toggleReaction(
+  commentId: string,
+  emoji: string
+): Promise<{ added: boolean; error: string | null }> {
+  const supabase = await createServerSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { added: false, error: "No autenticado" };
+
+  // Check if reaction already exists
+  const { data: existing } = await supabase
+    .from("comment_reactions")
+    .select("id")
+    .eq("comment_id", commentId)
+    .eq("created_by", user.id)
+    .eq("emoji", emoji)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase
+      .from("comment_reactions")
+      .delete()
+      .eq("id", existing.id);
+    if (error) return { added: false, error: error.message };
+    return { added: false, error: null };
+  } else {
+    const { error } = await supabase
+      .from("comment_reactions")
+      .insert({ comment_id: commentId, created_by: user.id, emoji });
+    if (error) return { added: true, error: error.message };
+    return { added: true, error: null };
+  }
 }
 
 export async function deleteComment(

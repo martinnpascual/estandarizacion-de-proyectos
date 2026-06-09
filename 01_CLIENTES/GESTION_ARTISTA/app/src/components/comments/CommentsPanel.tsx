@@ -18,10 +18,11 @@ import {
   resolveComment,
   deleteComment,
   updateComment,
+  toggleReaction,
 } from "@/lib/actions/comments";
 import { formatTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
-import type { Comment } from "@/types/database";
+import type { Comment, CommentReaction } from "@/types/database";
 
 function relativeTime(isoDate: string): string {
   const diff = Date.now() - new Date(isoDate).getTime();
@@ -236,6 +237,7 @@ export default function CommentsPanel({
               <CommentItem
                 key={comment.id}
                 comment={comment}
+                currentUserId={currentUserId}
                 isOwn={comment.created_by === currentUserId}
                 isActive={activeCommentId === comment.id}
                 isEditing={editingId === comment.id}
@@ -249,6 +251,17 @@ export default function CommentsPanel({
                 onSaveEdit={() => handleSaveEdit(comment)}
                 onEditBodyChange={(v) => setEditBody(v.slice(0, MAX_CHARS))}
                 commentRef={(el) => { commentRefs.current[comment.id] = el; }}
+                onReactionToggled={(commentId, emoji, added, newReactionId) => {
+                  setComments(prev => prev.map(c => {
+                    if (c.id !== commentId) return c;
+                    const reactions = c.reactions ?? [];
+                    if (added && currentUserId) {
+                      return { ...c, reactions: [...reactions, { id: newReactionId ?? "", comment_id: commentId, created_by: currentUserId, emoji, created_at: new Date().toISOString() }] };
+                    } else {
+                      return { ...c, reactions: reactions.filter(r => !(r.created_by === currentUserId && r.emoji === emoji)) };
+                    }
+                  }));
+                }}
               />
             ))}
           </div>
@@ -326,8 +339,11 @@ export default function CommentsPanel({
   );
 }
 
+const REACTION_EMOJIS = ["👍", "🔥", "✅", "❤️", "🎯"] as const;
+
 interface CommentItemProps {
   comment: Comment;
+  currentUserId?: string;
   isOwn: boolean;
   isActive: boolean;
   isEditing: boolean;
@@ -341,13 +357,28 @@ interface CommentItemProps {
   onSaveEdit: () => void;
   onEditBodyChange: (v: string) => void;
   commentRef: (el: HTMLDivElement | null) => void;
+  onReactionToggled: (commentId: string, emoji: string, added: boolean, newId?: string) => void;
 }
 
 function CommentItem({
-  comment, isOwn, isActive, isEditing, editBody, savingEdit,
+  comment, currentUserId, isOwn, isActive, isEditing, editBody, savingEdit,
   onSeek, onResolve, onDelete, onStartEdit, onCancelEdit, onSaveEdit,
-  onEditBodyChange, commentRef,
+  onEditBodyChange, commentRef, onReactionToggled,
 }: CommentItemProps) {
+  const [pendingEmoji, setPendingEmoji] = useState<string | null>(null);
+
+  async function handleReaction(emoji: string) {
+    if (pendingEmoji) return;
+    setPendingEmoji(emoji);
+    const { added, error } = await toggleReaction(comment.id, emoji);
+    if (!error) onReactionToggled(comment.id, emoji, added);
+    setPendingEmoji(null);
+  }
+
+  // Group reactions by emoji
+  const reactionMap = (comment.reactions ?? []).reduce<Record<string, CommentReaction[]>>(
+    (acc, r) => { (acc[r.emoji] ??= []).push(r); return acc; }, {}
+  );
   return (
     <div
       ref={commentRef}
@@ -417,7 +448,37 @@ function CommentItem({
               </div>
             </div>
           ) : (
-            <p className="text-sm mt-0.5 whitespace-pre-wrap break-words">{comment.body}</p>
+            <>
+              <p className="text-sm mt-0.5 whitespace-pre-wrap break-words">{comment.body}</p>
+              {/* Emoji reactions */}
+              <div className="flex items-center flex-wrap gap-1 mt-1.5">
+                {REACTION_EMOJIS.map((emoji) => {
+                  const reacters = reactionMap[emoji] ?? [];
+                  const isMine = reacters.some(r => r.created_by === currentUserId);
+                  return (
+                    <button
+                      key={emoji}
+                      onClick={() => handleReaction(emoji)}
+                      disabled={pendingEmoji === emoji}
+                      title={isMine ? `Quitar ${emoji}` : `Reaccionar con ${emoji}`}
+                      className={cn(
+                        "flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-xs transition-all active:scale-90 border",
+                        reacters.length > 0
+                          ? isMine
+                            ? "bg-primary/15 border-primary/30 text-primary"
+                            : "bg-secondary/80 border-border/40 text-foreground/70 hover:bg-secondary"
+                          : "bg-transparent border-transparent text-muted-foreground/30 hover:bg-secondary/60 hover:border-border/30 hover:text-foreground/60"
+                      )}
+                    >
+                      <span>{emoji}</span>
+                      {reacters.length > 0 && (
+                        <span className="tabular-nums font-semibold text-[10px]">{reacters.length}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
 
