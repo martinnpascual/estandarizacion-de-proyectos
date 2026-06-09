@@ -40,7 +40,6 @@ export async function getSocialLinks(): Promise<{
         .from("social_stats")
         .select("*")
         .eq("social_link_id", link.id)
-        .is("deleted_at", null)
         .order("recorded_at", { ascending: false })
         .limit(2);
 
@@ -123,7 +122,6 @@ export async function getSocialStatHistory(
     .from("social_stats")
     .select("*")
     .eq("social_link_id", socialLinkId)
-    .is("deleted_at", null)
     .order("recorded_at", { ascending: true })
     .limit(limit);
 

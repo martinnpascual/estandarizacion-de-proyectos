@@ -73,7 +73,7 @@ async function fetchYouTubeStats(url: string): Promise<PlatformSyncResult> {
   try {
     const res = await fetch(
       `https://www.googleapis.com/youtube/v3/channels?${params}`,
-      { next: { revalidate: 0 } }
+      { cache: "no-store" as RequestCache }
     );
     if (!res.ok) {
       const body = await res.text();
@@ -99,10 +99,10 @@ async function fetchYouTubeStats(url: string): Promise<PlatformSyncResult> {
 
 // ─── Spotify ─────────────────────────────────────────────────────────────────
 
-async function getSpotifyAccessToken(): Promise<string | null> {
+async function getSpotifyAccessToken(): Promise<{ token: string | null; error?: string }> {
   const clientId = process.env.SPOTIFY_CLIENT_ID;
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
-  if (!clientId || !clientSecret) return null;
+  if (!clientId || !clientSecret) return { token: null, error: "SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET no configuradas" };
 
   try {
     const res = await fetch("https://accounts.spotify.com/api/token", {
@@ -112,13 +112,16 @@ async function getSpotifyAccessToken(): Promise<string | null> {
         Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
       },
       body: "grant_type=client_credentials",
-      next: { revalidate: 0 },
+      cache: "no-store",
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      return { token: null, error: `Spotify token HTTP ${res.status}: ${body.slice(0, 100)}` };
+    }
     const data = await res.json();
-    return (data.access_token as string) ?? null;
-  } catch {
-    return null;
+    return { token: (data.access_token as string) ?? null };
+  } catch (err) {
+    return { token: null, error: err instanceof Error ? err.message : "Error de red al conectar con Spotify" };
   }
 }
 
@@ -145,29 +148,60 @@ async function fetchSpotifyStats(url: string): Promise<PlatformSyncResult> {
     return { ...base, error: "SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET no configuradas" };
   }
 
-  const token = await getSpotifyAccessToken();
-  if (!token) return { ...base, error: "No se pudo obtener token de Spotify" };
+  const { token, error: tokenError } = await getSpotifyAccessToken();
+  if (!token) return { ...base, error: tokenError ?? "No se pudo obtener token de Spotify" };
 
   let followers: number | null = null;
   let monthly_plays: number | null = null;
+  let artistName: string | null = null;
 
-  // 1. Get followers via official API
+  // 1. Get followers via official API (full artist object)
   try {
     const res = await fetch(`https://api.spotify.com/v1/artists/${artistId}`, {
       headers: { Authorization: `Bearer ${token}` },
-      next: { revalidate: 0 },
+      cache: "no-store",
     });
     if (res.ok) {
       const data = await res.json();
       followers = data.followers?.total ?? null;
+      artistName = data.name ?? null;
     }
   } catch { /* continue */ }
 
-  // 2. Try to scrape monthly listeners from public Spotify page
+  // 2. Fallback: if followers is null, search by artist name to get full object
+  //    (Spotify sometimes returns simplified objects for micro-artists via /v1/artists/{id})
+  if (followers === null && artistName) {
+    try {
+      const searchParams = new URLSearchParams({ q: artistName, type: "artist", limit: "5" });
+      const searchRes = await fetch(
+        `https://api.spotify.com/v1/search?${searchParams}`,
+        { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }
+      );
+      if (searchRes.ok) {
+        const searchData = await searchRes.json();
+        // Find exact match by artist ID
+        const match = (searchData.artists?.items ?? []).find(
+          (a: { id: string; followers?: { total: number } }) => a.id === artistId
+        );
+        if (match?.followers?.total != null) {
+          followers = match.followers.total;
+        } else if (searchData.artists?.items?.length > 0) {
+          // Fallback: first result if name matches (case-insensitive)
+          const firstMatch = searchData.artists.items.find(
+            (a: { id: string; name: string; followers?: { total: number } }) =>
+              a.name.toLowerCase() === artistName!.toLowerCase() && a.followers?.total != null
+          );
+          if (firstMatch?.followers?.total != null) followers = firstMatch.followers.total;
+        }
+      }
+    } catch { /* continue */ }
+  }
+
+  // 3. Try to scrape monthly listeners from public Spotify page
   try {
     const pageRes = await fetch(`https://open.spotify.com/artist/${artistId}`, {
       headers: { ...BROWSER_HEADERS, Accept: "text/html,application/xhtml+xml" },
-      next: { revalidate: 0 },
+      cache: "no-store",
     });
     if (pageRes.ok) {
       const html = await pageRes.text();
@@ -176,7 +210,10 @@ async function fetchSpotifyStats(url: string): Promise<PlatformSyncResult> {
   } catch { /* monthly_plays stays null */ }
 
   if (followers === null && monthly_plays === null) {
-    return { ...base, error: "No se obtuvieron datos de Spotify" };
+    return {
+      ...base,
+      error: "Spotify: datos no disponibles vía API para este perfil — actualizá manualmente",
+    };
   }
 
   return { ...base, followers, monthly_plays };
@@ -209,7 +246,7 @@ async function fetchInstagramStats(url: string): Promise<PlatformSyncResult> {
           Referer: "https://www.instagram.com/",
           Origin: "https://www.instagram.com",
         },
-        next: { revalidate: 0 },
+        cache: "no-store",
       }
     );
 
@@ -255,7 +292,7 @@ async function fetchTikTokStats(url: string): Promise<PlatformSyncResult> {
         "sec-fetch-user": "?1",
         "upgrade-insecure-requests": "1",
       },
-      next: { revalidate: 0 },
+      cache: "no-store",
       redirect: "follow",
     });
 
@@ -346,7 +383,7 @@ export async function fetchYouTubeGoalStat(url: string): Promise<YouTubeGoalResu
     try {
       const res = await fetch(
         `https://www.googleapis.com/youtube/v3/videos?${params}`,
-        { next: { revalidate: 0 } }
+        { cache: "no-store" as RequestCache }
       );
       if (!res.ok) {
         const body = await res.text();

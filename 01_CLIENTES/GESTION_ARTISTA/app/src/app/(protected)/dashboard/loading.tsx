@@ -1,27 +1,16 @@
-import { DashboardStatsSkeleton, ChartSkeleton, ListSkeleton } from "@/components/ui/Skeletons";
+﻿import { DashboardStatsSkeleton, ChartSkeleton } from "@/components/ui/Skeletons";
 
 export default function DashboardLoading() {
   return (
-    <div className="space-y-5 animate-fade-in">
-      {/* Hero banner skeleton */}
-      <div className="card-premium rounded-2xl p-6 h-[120px] skeleton-shimmer" />
-
-      {/* Stats row */}
-      <DashboardStatsSkeleton />
-
-      {/* Charts + activity row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2">
-          <ChartSkeleton height="h-64" />
-        </div>
-        <ListSkeleton rows={4} />
+    <div className="space-y-6 animate-fade-in p-4 md:p-6 lg:p-8">
+      <div className="space-y-2">
+        <div className="skeleton h-8 w-56 rounded-xl" />
+        <div className="skeleton h-4 w-40 rounded" />
       </div>
-
-      {/* Bottom widgets row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        <ListSkeleton rows={3} />
-        <ListSkeleton rows={3} />
-        <ListSkeleton rows={3} />
+      <DashboardStatsSkeleton />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <ChartSkeleton height="h-64" />
+        <ChartSkeleton height="h-64" />
       </div>
     </div>
   );

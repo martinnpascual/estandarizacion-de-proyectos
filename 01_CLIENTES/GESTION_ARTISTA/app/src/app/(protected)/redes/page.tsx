@@ -54,6 +54,7 @@ import type { SocialPlatform, SocialStat } from "@/types/database";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { cn } from "@/lib/utils";
+import { StaggerList, StaggerItem, GestureCard } from "@/components/ui/MotionWrapper";
 
 const PLATFORM_META: Record<
   SocialPlatform,
@@ -84,15 +85,15 @@ const PLATFORM_META: Record<
     label: "Instagram", color: "bg-pink-500",   chartColor: "#ec4899",
     placeholder: "https://instagram.com/...",
     followersLabel: "Seguidores", playsLabel: "Posts",
-    autoSync: true,
-    syncNote: "Sync vía endpoint público (best-effort)",
+    autoSync: false,
+    syncNote: "Entrada manual — Instagram no permite sync automático",
   },
   tiktok:    {
     label: "TikTok",    color: "bg-slate-400",  chartColor: "#94a3b8",
     placeholder: "https://tiktok.com/@...",
     followersLabel: "Seguidores", playsLabel: "Likes totales",
-    autoSync: true,
-    syncNote: "Sync vía scraping público (best-effort)",
+    autoSync: false,
+    syncNote: "Entrada manual — TikTok no permite sync automático",
   },
 };
 
@@ -685,14 +686,14 @@ export default function RedesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="card-premium relative overflow-hidden rounded-2xl">
-        <div className="absolute inset-0 bg-gradient-to-br from-pink-500/10 via-transparent to-transparent pointer-events-none" />
-        <div className="absolute -top-10 -right-10 w-40 h-40 bg-pink-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-purple-400/6 rounded-full blur-2xl pointer-events-none" />
+      <div className="card-premium relative overflow-hidden rounded-2xl page-header-hero">
+        <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, hsl(var(--section-hsl, 262 80% 62%) / 0.08) 0%, transparent 60%)" }} />
+        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full blur-3xl pointer-events-none" style={{ background: "hsl(var(--section-hsl, 262 80% 62%) / 0.06)" }} />
+        <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full blur-2xl pointer-events-none" style={{ background: "hsl(var(--section-hsl, 262 80% 62%) / 0.04)" }} />
         <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-5">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500/30 to-pink-600/10 border border-pink-500/20 flex items-center justify-center flex-shrink-0">
-              <Share2 className="h-5 w-5 text-pink-400" />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg, hsl(var(--section-hsl, 262 80% 62%) / 0.30), hsl(var(--section-hsl, 262 80% 62%) / 0.08))", border: "1px solid hsl(var(--section-hsl, 262 80% 62%) / 0.22)" }}>
+              <Share2 className="h-5 w-5 drop-shadow-[0_0_6px_currentColor]" style={{ color: "hsl(var(--section-hsl, 262 80% 62%))" }} />
             </div>
             <div>
               <h1 className="text-xl font-black tracking-tight gradient-text">Redes Sociales</h1>
@@ -899,15 +900,17 @@ export default function RedesPage() {
           })()}
 
           {links.length > 0 && (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <StaggerList className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {sortedLinks.map((link) => {
                 const meta = PLATFORM_META[link.platform];
                 const stat = link.latest_stat;
                 const chartOpen = expandedChart === link.id;
                 return (
-                  <div key={link.id}
+                  <StaggerItem key={link.id}>
+                  <GestureCard
+                    intensity={4}
                     className={cn(
-                      "card-premium platform-stat-card platform-card-ambient rounded-2xl p-5 group",
+                      "card-premium platform-stat-card platform-card-ambient rounded-2xl p-5 group h-full",
                       isStale(stat?.recorded_at) && stat != null ? "!border-orange-500/30" : ""
                     )}
                     style={{
@@ -1079,10 +1082,11 @@ export default function RedesPage() {
                         </button>
                       )}
                     </div>
-                  </div>
+                  </GestureCard>
+                  </StaggerItem>
                 );
               })}
-            </div>
+            </StaggerList>
           )}
 
           {/* Total reach summary */}

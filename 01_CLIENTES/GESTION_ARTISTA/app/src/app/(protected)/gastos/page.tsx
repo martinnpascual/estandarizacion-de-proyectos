@@ -519,14 +519,14 @@ export default function GastosPage() {
       <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
 
         {/* ── Header ─────────────────────────────────────────────────────────── */}
-        <div className="card-premium relative overflow-hidden rounded-2xl">
-          <div className="absolute inset-0 bg-gradient-to-br from-red-500/8 via-transparent to-transparent pointer-events-none" />
-          <div className="absolute -top-10 -right-10 w-40 h-40 bg-red-500/8 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-orange-400/6 rounded-full blur-2xl pointer-events-none" />
+        <div className="card-premium relative overflow-hidden rounded-2xl page-header-hero">
+          <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, hsl(var(--section-hsl, 262 80% 62%) / 0.08) 0%, transparent 60%)" }} />
+          <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full blur-3xl pointer-events-none" style={{ background: "hsl(var(--section-hsl, 262 80% 62%) / 0.06)" }} />
+          <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full blur-2xl pointer-events-none" style={{ background: "hsl(var(--section-hsl, 262 80% 62%) / 0.04)" }} />
           <div className="relative flex items-center justify-between gap-4 flex-wrap px-6 py-5">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500/30 to-orange-500/10 border border-red-500/20 flex items-center justify-center flex-shrink-0">
-                <Receipt className="h-5 w-5 text-red-400" />
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg, hsl(var(--section-hsl, 262 80% 62%) / 0.30), hsl(var(--section-hsl, 262 80% 62%) / 0.08))", border: "1px solid hsl(var(--section-hsl, 262 80% 62%) / 0.22)" }}>
+                <Receipt className="h-5 w-5 drop-shadow-[0_0_6px_currentColor]" style={{ color: "hsl(var(--section-hsl, 262 80% 62%))" }} />
               </div>
               <div>
                 <h1 className="text-xl font-black tracking-tight leading-tight gradient-text">Gastos</h1>
@@ -756,8 +756,17 @@ export default function GastosPage() {
                       </AreaChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="h-52 flex flex-col items-center justify-center text-muted-foreground text-sm gap-2">
-                      <TrendingDown className="h-8 w-8 opacity-20" />
+                    <div className="h-52 flex flex-col items-center justify-center text-muted-foreground text-sm gap-3">
+                      <div
+                        className="relative w-14 h-14 rounded-2xl flex items-center justify-center empty-state-icon"
+                        style={{
+                          background: "linear-gradient(135deg, hsl(var(--section-hsl, 348 72% 58%) / 0.20), hsl(var(--section-hsl, 348 72% 58%) / 0.07))",
+                          border: "1px solid hsl(var(--section-hsl, 348 72% 58%) / 0.22)",
+                          boxShadow: "0 8px 32px hsl(0 0% 0% / 0.15)"
+                        }}
+                      >
+                        <TrendingDown className="h-7 w-7" style={{ color: "hsl(var(--section-hsl, 348 72% 58%))" }} />
+                      </div>
                       Sin gastos registrados en {selectedYear}
                     </div>
                   )}
@@ -945,8 +954,17 @@ export default function GastosPage() {
                       </div>
                     </>
                   ) : (
-                    <div className="h-48 flex flex-col items-center justify-center text-muted-foreground text-xs gap-2">
-                      <span className="text-3xl opacity-20">🗂</span>
+                    <div className="h-48 flex flex-col items-center justify-center text-muted-foreground text-xs gap-3">
+                      <div
+                        className="relative w-12 h-12 rounded-xl flex items-center justify-center empty-state-icon"
+                        style={{
+                          background: "linear-gradient(135deg, hsl(var(--section-hsl, 348 72% 58%) / 0.18), hsl(var(--section-hsl, 348 72% 58%) / 0.06))",
+                          border: "1px solid hsl(var(--section-hsl, 348 72% 58%) / 0.20)",
+                          boxShadow: "0 6px 20px hsl(0 0% 0% / 0.12)"
+                        }}
+                      >
+                        <span className="text-lg">🗂</span>
+                      </div>
                       <span>Sin datos para {selectedYear}</span>
                     </div>
                   )}

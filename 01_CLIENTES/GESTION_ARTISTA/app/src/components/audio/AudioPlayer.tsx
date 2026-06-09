@@ -72,7 +72,8 @@ function SpectrumAnalyzer({
   const smoothed   = useRef<Float32Array>(new Float32Array(BAR_COUNT));
   const peakHold   = useRef<Float32Array>(new Float32Array(BAR_COUNT));
   const binRanges  = useRef<Array<[number, number]> | null>(null);
-  const idlePhase  = useRef(0);
+  const idlePhase    = useRef(0);
+  const shimmerPhase = useRef(0);
   const prevDpr    = useRef(0);
   const prevW      = useRef(0);
   const prevH      = useRef(0);
@@ -98,10 +99,6 @@ function SpectrumAnalyzer({
     const ctx = canvas.getContext("2d", { alpha: true });
     if (!ctx) return;
 
-    // Parse CSS primary color once
-    const cssHsl  = getComputedStyle(document.documentElement).getPropertyValue("--primary").trim() || "262 80% 62%";
-    const [pH, pS, pL] = cssHsl.split(" ").map(parseFloat);
-
     const draw = () => {
       rafRef.current = requestAnimationFrame(draw);
 
@@ -117,6 +114,14 @@ function SpectrumAnalyzer({
       }
 
       ctx.clearRect(0, 0, W, H);
+
+      // ── Section-reactive color — reads --section-hsl every frame ──────
+      const sectionHsl = getComputedStyle(document.documentElement)
+        .getPropertyValue("--section-hsl").trim() || "262 80% 62%";
+      const parts = sectionHsl.split(" ").map(parseFloat);
+      const pH = isNaN(parts[0]) ? 262 : parts[0];
+      const pS = isNaN(parts[1]) ? 80  : parts[1];
+      const pL = isNaN(parts[2]) ? 62  : parts[2];
 
       // ── Read frequency data or breathe ─────────────────────────────
       const analyser = analyserRef.current;
@@ -134,211 +139,214 @@ function SpectrumAnalyzer({
           smoothed.current[i] += alpha * (raw - smoothed.current[i]);
         }
       } else {
-        // Organic multi-layer breathing when paused
-        idlePhase.current += 0.018;
+        // Organic breathing when paused — multi-layer, visible motion
+        idlePhase.current += 0.022;
         const t = idlePhase.current;
         for (let i = 0; i < BAR_COUNT; i++) {
           const x    = i / BAR_COUNT;
-          const wave = 0.50 * Math.sin(t + x * 5.8)
-                     + 0.28 * Math.sin(t * 1.4 + x * 11.6)
-                     + 0.14 * Math.sin(t * 0.8 + x * 2.9)
-                     + 0.08 * Math.sin(t * 2.1 + x * 17.4);
-          const target = MIN_AMP + 0.16 * (1 + wave) * 0.5;
-          smoothed.current[i] += 0.048 * (target - smoothed.current[i]);
+          const wave = 0.55 * Math.sin(t + x * 4.2)
+                     + 0.28 * Math.sin(t * 1.7 + x * 9.0)
+                     + 0.18 * Math.sin(t * 0.5 + x * 2.2)
+                     + 0.10 * Math.sin(t * 2.8 + x * 16.0)
+                     + 0.06 * Math.sin(t * 0.3 + x * 0.8);
+          const target = MIN_AMP + 0.22 * (1 + wave) * 0.5;
+          smoothed.current[i] += 0.055 * (target - smoothed.current[i]);
         }
       }
 
-      // ── Update peak-hold ticks ──────────────────────────────────────
-      for (let i = 0; i < BAR_COUNT; i++) {
-        if (smoothed.current[i] >= peakHold.current[i]) {
-          peakHold.current[i] = smoothed.current[i];
-        } else {
-          peakHold.current[i] = Math.max(MIN_AMP, peakHold.current[i] - PEAK_DECAY);
-        }
-      }
-
-      // ── Layout ──────────────────────────────────────────────────────
-      const totalGap = BAR_GAP * (BAR_COUNT - 1);
-      const barW     = Math.max(1, (W - totalGap) / BAR_COUNT);
-      const midY     = H / 2;
-      const halfH    = midY - 2;
-
-      const pct       = duration > 0 ? currentTime / duration : 0;
+      // ── Build bezier control points from smoothed data ──────────────
+      const WAVE_PTS = 80;
+      const floor    = H - 2;
+      const maxH     = H - 7;
+      const pct      = duration > 0 ? currentTime / duration : 0;
       const playheadX = pct * W;
 
-      // ── Center axis baseline ─────────────────────────────────────────
+      // Shimmer — continuous ripple that travels across the wave
+      shimmerPhase.current += isPlaying ? 0.055 : 0.032;
+      const sp = shimmerPhase.current;
+
+      const pts: Array<{ x: number; y: number }> = [];
+      for (let i = 0; i < WAVE_PTS; i++) {
+        const sIdx  = Math.round((i / (WAVE_PTS - 1)) * (BAR_COUNT - 1));
+        const base  = smoothed.current[sIdx];
+        const norm  = i / (WAVE_PTS - 1);   // 0..1 across the wave
+
+        // Two shimmer layers: one fast ripple + one slow swell
+        const ripple = isPlaying
+          ? base * 0.10 * Math.sin(sp * 2.2 + norm * 14.0)          // tied to signal amplitude
+          : 0.018      * Math.sin(sp * 1.4 + norm * 7.5);            // pure ripple when idle
+        const swell  = isPlaying
+          ? base * 0.06 * Math.sin(sp * 0.8 + norm * 4.0)
+          : 0.012      * Math.sin(sp * 0.5 + norm * 2.8);
+
+        pts.push({
+          x: (norm) * W,
+          y: floor - Math.max(2, (base + ripple + swell) * maxH),
+        });
+      }
+
+      // ── Helper: build closed bezier area path ───────────────────────
+      function buildPath(points: Array<{ x: number; y: number }>, closed: boolean) {
+        if (points.length < 2 || !ctx) return;
+        ctx.beginPath();
+        if (closed) { ctx.moveTo(points[0].x, floor); ctx.lineTo(points[0].x, points[0].y); }
+        else          ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 0; i < points.length - 1; i++) {
+          const cpx = (points[i].x + points[i + 1].x) / 2;
+          ctx.bezierCurveTo(cpx, points[i].y, cpx, points[i + 1].y, points[i + 1].x, points[i + 1].y);
+        }
+        if (closed) { ctx.lineTo(points[points.length - 1].x, floor); ctx.closePath(); }
+      }
+
+      // ── Split points at playhead — interpolate exact intersection ──
+      // Find the y value on the curve at exactly playheadX
+      let interY = floor;
+      for (let i = 0; i < pts.length - 1; i++) {
+        if (pts[i].x <= playheadX && pts[i + 1].x >= playheadX) {
+          const t = (playheadX - pts[i].x) / (pts[i + 1].x - pts[i].x);
+          interY = pts[i].y + t * (pts[i + 1].y - pts[i].y);
+          break;
+        }
+      }
+      const interPt = { x: playheadX, y: interY };
+
+      // Played segment (left of playhead) + intersection point
+      const playedPts = pct > 0.004
+        ? [...pts.filter(p => p.x < playheadX), interPt]
+        : [];
+
+      // Unplayed segment (right of playhead) + intersection point
+      const unplayedPts = pct < 0.996
+        ? [interPt, ...pts.filter(p => p.x > playheadX)]
+        : pts;
+
+      // ── Unplayed: barely visible area, no stroke ─────────────────────
+      if (unplayedPts.length >= 2) {
+        buildPath(unplayedPts, true);
+        const gUnplayed = ctx.createLinearGradient(0, 0, 0, floor);
+        gUnplayed.addColorStop(0,   `hsla(${pH},${pS}%,${Math.min(pL + 8, 95)}%,${isPlaying ? 0.11 : 0.07})`);
+        gUnplayed.addColorStop(0.6, `hsla(${pH},${pS}%,${pL}%,0.04)`);
+        gUnplayed.addColorStop(1,   "rgba(0,0,0,0)");
+        ctx.fillStyle = gUnplayed;
+        ctx.fill();
+      }
+
+      // ── Played: vivid fill + bright glowing stroke ───────────────────
+      if (playedPts.length >= 2) {
+        // Area fill
+        buildPath(playedPts, true);
+        const gPlayed = ctx.createLinearGradient(0, 0, 0, floor);
+        gPlayed.addColorStop(0,    `hsla(${pH},${pS}%,${Math.min(pL + 18, 97)}%,0.88)`);
+        gPlayed.addColorStop(0.32, `hsla(${pH},${pS}%,${pL}%,0.60)`);
+        gPlayed.addColorStop(0.72, `hsla(${pH},${pS}%,${Math.max(pL - 8, 20)}%,0.25)`);
+        gPlayed.addColorStop(1,    "rgba(0,0,0,0)");
+        ctx.fillStyle = gPlayed;
+        ctx.fill();
+
+        // Top-edge glow stroke (only played portion)
+        buildPath(playedPts, false);
+        ctx.strokeStyle = `hsla(${pH},${pS}%,${Math.min(pL + 30, 98)}%,0.95)`;
+        ctx.lineWidth   = 1.8;
+        ctx.shadowColor = `hsla(${pH},${pS}%,${pL}%,0.60)`;
+        ctx.shadowBlur  = 11;
+        ctx.stroke();
+        ctx.shadowBlur  = 0;
+      }
+
+      // ── Idle full wave (when nothing played yet) ─────────────────────
+      if (pct <= 0.004 && pts.length >= 2) {
+        buildPath(pts, true);
+        const gIdle = ctx.createLinearGradient(0, 0, 0, floor);
+        gIdle.addColorStop(0,   `hsla(${pH},${pS}%,${Math.min(pL + 8, 92)}%,${isPlaying ? 0.12 : 0.08})`);
+        gIdle.addColorStop(0.6, `hsla(${pH},${pS}%,${pL}%,0.04)`);
+        gIdle.addColorStop(1,   "rgba(0,0,0,0)");
+        ctx.fillStyle = gIdle;
+        ctx.fill();
+        buildPath(pts, false);
+        ctx.strokeStyle = `hsla(${pH},${pS}%,${Math.min(pL + 18, 95)}%,0.28)`;
+        ctx.lineWidth   = 1.2;
+        ctx.stroke();
+      }
+
+      // ── Floor baseline glow ─────────────────────────────────────────
+      const floorGrd = ctx.createLinearGradient(0, 0, W, 0);
+      floorGrd.addColorStop(0,                         `hsla(${pH},${pS}%,${pL}%,0.00)`);
+      floorGrd.addColorStop(Math.max(0, pct - 0.06),   `hsla(${pH},${pS}%,${pL}%,0.00)`);
+      floorGrd.addColorStop(pct,                       `hsla(${pH},${pS}%,${Math.min(pL + 22, 96)}%,0.60)`);
+      floorGrd.addColorStop(Math.min(pct + 0.01, 1),   `hsla(${pH},${pS}%,${pL}%,0.16)`);
+      floorGrd.addColorStop(1,                         `hsla(${pH},${pS}%,${pL}%,0.07)`);
       ctx.beginPath();
-      ctx.moveTo(0, midY);
-      ctx.lineTo(W, midY);
-      ctx.strokeStyle = `rgba(255,255,255,0.045)`;
-      ctx.lineWidth   = 0.5;
+      ctx.moveTo(0, floor); ctx.lineTo(W, floor);
+      ctx.strokeStyle = floorGrd;
+      ctx.lineWidth   = 0.8;
+      ctx.shadowBlur  = 0;
       ctx.stroke();
 
-      // ── Played-region ambient tint ───────────────────────────────────
-      if (pct > 0.002) {
-        const tintGrd = ctx.createLinearGradient(0, 0, playheadX, 0);
-        tintGrd.addColorStop(0, `hsla(${pH}, ${pS}%, ${pL}%, 0.04)`);
-        tintGrd.addColorStop(1, `hsla(${pH}, ${pS}%, ${pL}%, 0.11)`);
-        ctx.fillStyle = tintGrd;
-        ctx.fillRect(0, 0, playheadX, H);
-      }
-
-      // ── Horizontal frequency color gradients (warm bass → cool highs) ──
-      // Playing state: full vivid spectrum
-      const gradFreqPlay = ctx.createLinearGradient(0, 0, W, 0);
-      gradFreqPlay.addColorStop(0,    `hsla(${pH - 24}, ${Math.min(pS + 22, 100)}%, ${pL + 4}%, 0.97)`);
-      gradFreqPlay.addColorStop(0.12, `hsla(${pH - 10}, ${pS + 8}%,                 ${pL + 5}%, 0.95)`);
-      gradFreqPlay.addColorStop(0.35, `hsla(${pH},       ${pS}%,                    ${pL + 9}%, 0.93)`);
-      gradFreqPlay.addColorStop(0.60, `hsla(${pH + 8},  ${pS - 4}%,                ${pL + 14}%, 0.94)`);
-      gradFreqPlay.addColorStop(1.0,  `hsla(${pH + 42}, ${Math.max(pS - 25, 56)}%, ${pL + 26}%, 0.91)`);
-
-      // Paused state: muted version
-      const gradFreqPause = ctx.createLinearGradient(0, 0, W, 0);
-      gradFreqPause.addColorStop(0,   `hsla(${pH - 16}, ${pS}%, ${pL + 2}%, 0.50)`);
-      gradFreqPause.addColorStop(0.5, `hsla(${pH},      ${pS}%, ${pL}%,     0.44)`);
-      gradFreqPause.addColorStop(1.0, `hsla(${pH + 28}, ${pS}%, ${pL + 12}%, 0.46)`);
-
-      // ── Draw bars (symmetric: grow up + down from midY) ─────────────
-      for (let i = 0; i < BAR_COUNT; i++) {
-        const x      = i * (barW + BAR_GAP);
-        const cx     = x + barW / 2;
-        const val    = smoothed.current[i];
-        const arm    = Math.max(1, val * halfH);
-        const radius = Math.min(barW / 2, 1.5);
-
-        const barFrac  = cx / W;
-        const isFilled = barFrac <= pct;
-
-        if (isFilled && isPlaying) {
-          ctx.fillStyle = gradFreqPlay;
-        } else if (isFilled) {
-          ctx.fillStyle = gradFreqPause;
-        } else {
-          ctx.fillStyle = `rgba(255,255,255,${isPlaying ? 0.16 : 0.10})`;
+      // ── Comment markers ─────────────────────────────────────────────
+      for (const ts of commentMarkers) {
+        if (duration <= 0) break;
+        const mx = (ts / duration) * W;
+        // Find wave y at marker position
+        let markerY = floor - 8;
+        for (let i = 0; i < pts.length - 1; i++) {
+          if (pts[i].x <= mx && pts[i + 1].x >= mx) {
+            const t = (mx - pts[i].x) / (pts[i + 1].x - pts[i].x);
+            markerY = pts[i].y + t * (pts[i + 1].y - pts[i].y) - 5;
+            break;
+          }
         }
-
-        // Top arm
         ctx.beginPath();
-        ctx.roundRect(x, midY - arm, barW, arm, [radius, radius, 0, 0]);
+        ctx.arc(mx, markerY, 3, 0, Math.PI * 2);
+        ctx.fillStyle   = "rgba(234,179,8,0.95)";
+        ctx.shadowColor = "rgba(234,179,8,0.80)";
+        ctx.shadowBlur  = 7;
         ctx.fill();
-        // Bottom arm (mirror)
-        ctx.beginPath();
-        ctx.roundRect(x, midY, barW, arm, [0, 0, radius, radius]);
-        ctx.fill();
-
-        // ── Bright tip overlay for loud bars (near-white highlights) ─
-        if (isFilled && isPlaying && val > 0.62) {
-          const t    = (val - 0.62) / 0.38;
-          const tipH = Math.max(1.5, arm * 0.20);
-          ctx.fillStyle = `rgba(255,255,255,${t * 0.32})`;
-          ctx.beginPath();
-          ctx.roundRect(x, midY - arm, barW, tipH, [radius, radius, 0, 0]);
-          ctx.fill();
-          ctx.beginPath();
-          ctx.roundRect(x, midY + arm - tipH, barW, tipH, [0, 0, radius, radius]);
-          ctx.fill();
-        }
+        ctx.shadowBlur  = 0;
       }
 
-      // ── Peak-hold ticks — professional spectrum analyzer signature ──
-      if (isPlaying) {
-        for (let i = 0; i < BAR_COUNT; i++) {
-          const ph = peakHold.current[i];
-          if (ph <= MIN_AMP + 0.01) continue;
-          const x        = i * (barW + BAR_GAP);
-          const cx       = x + barW / 2;
-          const pArm     = Math.max(1, ph * halfH);
-          const barFrac  = cx / W;
-          const isFilled = barFrac <= pct;
-          const alpha    = isFilled ? 0.88 : 0.28;
-
-          // Frequency-matched tick color
-          const freqFrac = i / (BAR_COUNT - 1);
-          const tickHue  = freqFrac < 0.18
-            ? pH - 24 * (1 - freqFrac / 0.18)
-            : freqFrac > 0.65
-              ? pH + 42 * ((freqFrac - 0.65) / 0.35)
-              : pH;
-          const tickL = Math.min(pL + 32, 92);
-          ctx.fillStyle = `hsla(${tickHue}, ${pS}%, ${tickL}%, ${alpha})`;
-
-          // Top tick
-          ctx.fillRect(x, midY - pArm - 1.5, barW, 1.5);
-          // Bottom tick (mirror)
-          ctx.fillRect(x, midY + pArm,         barW, 1.5);
-        }
-      }
-
-      // ── Depth vignette: fade extreme top & bottom into background ───
-      const topVig = ctx.createLinearGradient(0, 0, 0, midY * 0.40);
-      topVig.addColorStop(0,   'rgba(6,6,10,0.52)');
-      topVig.addColorStop(1,   'rgba(6,6,10,0)');
-      ctx.fillStyle = topVig;
-      ctx.fillRect(0, 0, W, midY * 0.40);
-
-      const botVig = ctx.createLinearGradient(0, H - midY * 0.40, 0, H);
-      botVig.addColorStop(0,   'rgba(6,6,10,0)');
-      botVig.addColorStop(1,   'rgba(6,6,10,0.52)');
-      ctx.fillStyle = botVig;
-      ctx.fillRect(0, H - midY * 0.40, W, midY * 0.40);
-
-      // ── Playhead ─────────────────────────────────────────────────────
+      // ── Playhead ────────────────────────────────────────────────────
       if (duration > 0 && pct > 0.001) {
-        // Wide soft glow halo
-        const grd = ctx.createLinearGradient(playheadX - 14, 0, playheadX + 14, 0);
-        grd.addColorStop(0,    `hsla(${pH},${pS}%,${pL+10}%,0)`);
-        grd.addColorStop(0.38, `hsla(${pH},${pS}%,${pL+22}%,0.28)`);
-        grd.addColorStop(0.62, `hsla(${pH},${pS}%,${pL+22}%,0.28)`);
-        grd.addColorStop(1,    `hsla(${pH},${pS}%,${pL+10}%,0)`);
-        ctx.fillStyle = grd;
-        ctx.fillRect(playheadX - 14, 0, 28, H);
+        // Soft halo
+        const haloGrd = ctx.createLinearGradient(playheadX - 12, 0, playheadX + 12, 0);
+        haloGrd.addColorStop(0,   `hsla(${pH},${pS}%,${pL}%,0)`);
+        haloGrd.addColorStop(0.4, `hsla(${pH},${pS}%,${pL + 12}%,0.16)`);
+        haloGrd.addColorStop(0.6, `hsla(${pH},${pS}%,${pL + 12}%,0.16)`);
+        haloGrd.addColorStop(1,   `hsla(${pH},${pS}%,${pL}%,0)`);
+        ctx.fillStyle = haloGrd;
+        ctx.fillRect(playheadX - 12, 0, 24, H);
 
-        // Crisp 1.5 px line
+        // Line
         ctx.save();
         ctx.beginPath();
         ctx.moveTo(playheadX, 0);
         ctx.lineTo(playheadX, H);
-        ctx.strokeStyle = `hsla(${pH},${pS}%,${Math.min(pL + 36, 97)}%,0.97)`;
-        ctx.lineWidth   = 1.5;
-        ctx.shadowColor = `hsl(${pH} ${pS}% ${Math.min(pL + 22, 92)}%)`;
-        ctx.shadowBlur  = 11;
+        ctx.strokeStyle = `hsla(${pH},${pS}%,${Math.min(pL + 34, 98)}%,0.88)`;
+        ctx.lineWidth   = 1.2;
+        ctx.shadowColor = `hsla(${pH},${pS}%,${pL + 8}%,0.75)`;
+        ctx.shadowBlur  = 12;
         ctx.stroke();
         ctx.restore();
 
-        // Outer knob ring
+        // Dot sitting on the wave
+        let waveY = floor / 2;
+        for (let i = 0; i < pts.length - 1; i++) {
+          if (pts[i].x <= playheadX && pts[i + 1].x >= playheadX) {
+            const t = (playheadX - pts[i].x) / (pts[i + 1].x - pts[i].x);
+            waveY = pts[i].y + t * (pts[i + 1].y - pts[i].y);
+            break;
+          }
+        }
         ctx.beginPath();
-        ctx.arc(playheadX, midY, 6.5, 0, Math.PI * 2);
-        ctx.strokeStyle = `hsla(${pH},${pS}%,${Math.min(pL + 28, 90)}%,0.45)`;
-        ctx.lineWidth   = 1;
-        ctx.stroke();
-
-        // Main knob
-        ctx.beginPath();
-        ctx.arc(playheadX, midY, 5, 0, Math.PI * 2);
-        ctx.fillStyle   = `hsl(${pH} ${pS}% ${Math.min(pL + 36, 97)}%)`;
-        ctx.shadowColor = `hsl(${pH} ${pS}% ${pL}%)`;
+        ctx.arc(playheadX, waveY, 4, 0, Math.PI * 2);
+        ctx.fillStyle   = `hsla(${pH},${pS}%,${Math.min(pL + 36, 98)}%,0.96)`;
+        ctx.shadowColor = `hsla(${pH},${pS}%,${pL}%,0.90)`;
         ctx.shadowBlur  = 18;
         ctx.fill();
         ctx.shadowBlur  = 0;
-
-        // White center dot
         ctx.beginPath();
-        ctx.arc(playheadX, midY, 1.8, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(255,255,255,0.97)";
+        ctx.arc(playheadX, waveY, 1.6, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255,255,255,0.98)";
         ctx.fill();
-      }
-
-      // ── Comment markers ──────────────────────────────────────────────
-      for (const ts of commentMarkers) {
-        if (duration <= 0) break;
-        const mx = (ts / duration) * W;
-        ctx.beginPath();
-        ctx.arc(mx, midY, 3.5, 0, Math.PI * 2);
-        ctx.fillStyle   = "rgba(234,179,8,0.95)";
-        ctx.shadowColor = "rgba(234,179,8,0.75)";
-        ctx.shadowBlur  = 8;
-        ctx.fill();
-        ctx.shadowBlur  = 0;
       }
     };
 
@@ -347,28 +355,30 @@ function SpectrumAnalyzer({
   }, [analyserRef, isPlaying, currentTime, duration, commentMarkers]);
 
   return (
-    <div className="relative w-full" style={{ height: 64 }}>
-      {/* Timestamp hover tooltip */}
+    <div className="w-full relative">
+      {/* Hover timestamp tooltip */}
       {hoverTime !== null && hoverPct !== null && (
         <div
           className="absolute bottom-full mb-1.5 -translate-x-1/2 pointer-events-none z-10"
           style={{ left: `${hoverPct * 100}%` }}
         >
-          <div className="px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold text-white/90 shadow-lg whitespace-nowrap"
-            style={{ background: "rgba(10,10,18,0.92)", border: "1px solid rgba(255,255,255,0.12)", backdropFilter: "blur(8px)" }}>
+          <div
+            className="px-2 py-0.5 rounded-md text-[10px] font-mono font-black text-white/90 whitespace-nowrap player-lcd"
+            style={{ background: "rgba(6,6,14,0.96)", border: "1px solid rgba(255,255,255,0.12)", backdropFilter: "blur(12px)" }}
+          >
             {formatTime(hoverTime)}
           </div>
-          <div className="w-1.5 h-1.5 mx-auto -mt-[5px] rotate-45"
-            style={{ background: "rgba(10,10,18,0.92)", border: "0 solid transparent", borderRight: "1px solid rgba(255,255,255,0.12)", borderBottom: "1px solid rgba(255,255,255,0.12)" }} />
         </div>
       )}
+
+      {/* Canvas */}
       <canvas
         ref={canvasRef}
-        className="w-full h-full cursor-pointer select-none"
+        className="w-full cursor-pointer select-none block"
+        style={{ height: 44 }}
         onClick={(e) => seekFromX(e.clientX, e.currentTarget.getBoundingClientRect())}
         onMouseMove={handleMouseMove}
         onMouseLeave={() => setHoverPct(null)}
-        style={{ display: "block" }}
       />
     </div>
   );
@@ -391,7 +401,9 @@ function QueueDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
       )}
         style={{ background: "rgba(10,10,15,0.97)", backdropFilter: "blur(28px)" }}
       >
-        <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
+        <div className="absolute top-0 left-0 right-0 h-[1px]" style={{
+          background: "linear-gradient(90deg, transparent, hsl(var(--section-hsl, 262 80% 62%) / 0.65), transparent)"
+        }} />
 
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/8 flex-shrink-0">
           <div className="flex items-center gap-2">
@@ -418,7 +430,9 @@ function QueueDrawer({ open, onClose }: { open: boolean; onClose: () => void }) 
         <div className="overflow-y-auto flex-1">
           {queue.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-white/20 gap-3">
-              <Music className="h-8 w-8 opacity-30" />
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center empty-state-icon" style={{ background: "hsl(var(--section-hsl, 262 80% 62%) / 0.15)", border: "1px solid hsl(var(--section-hsl, 262 80% 62%) / 0.20)" }}>
+                <Music className="h-6 w-6" style={{ color: "hsl(var(--section-hsl, 262 80% 62%) / 0.70)" }} />
+              </div>
               <p className="text-sm">La cola está vacía</p>
             </div>
           ) : (
@@ -646,24 +660,25 @@ export default function AudioPlayer() {
             background: "rgba(6,6,10,0.98)",
             backdropFilter: "blur(52px) saturate(2.2)",
           }} />
-          {/* Ambient multi-color bloom */}
-          <div className="absolute inset-0 pointer-events-none" style={{
-            background: "linear-gradient(135deg, hsl(var(--primary)/0.22) 0%, transparent 48%, hsl(var(--primary)/0.12) 100%)",
+          {/* Hex dot grid — tech material texture */}
+          <div className="player-hex-grid" />
+          {/* Ambient multi-color bloom — section-hsl reactive */}
+          <div className="absolute inset-0 pointer-events-none transition-all duration-700" style={{
+            background: `linear-gradient(135deg, hsl(var(--section-hsl, 262 80% 62%) / ${isPlaying ? "0.22" : "0.12"}) 0%, transparent 48%, hsl(var(--section-hsl, 262 80% 62%) / 0.10) 100%)`,
           }} />
-          {/* Side accent glows — left warm, right cool */}
-          <div className="absolute inset-0 pointer-events-none" style={{
-            background: "radial-gradient(ellipse 40% 100% at 0% 50%, hsl(var(--primary)/0.14) 0%, transparent 100%)",
+          {/* Side accent glows — left section-hsl, right cool complement */}
+          <div className="absolute inset-0 pointer-events-none transition-all duration-700" style={{
+            background: `radial-gradient(ellipse 40% 100% at 0% 50%, hsl(var(--section-hsl, 262 80% 62%) / ${isPlaying ? "0.16" : "0.08"}) 0%, transparent 100%)`,
           }} />
           <div className="absolute inset-0 pointer-events-none" style={{
-            background: "radial-gradient(ellipse 30% 100% at 100% 50%, hsl(200 80% 60%/0.08) 0%, transparent 100%)",
+            background: "radial-gradient(ellipse 30% 100% at 100% 50%, hsl(200 80% 60%/0.06) 0%, transparent 100%)",
           }} />
-          {/* Central upward glow — depth from bottom */}
-          <div className="absolute left-1/2 top-0 -translate-x-1/2 pointer-events-none" style={{
+          {/* Central upward glow — section-hsl */}
+          <div className="absolute left-1/2 top-0 -translate-x-1/2 pointer-events-none transition-all duration-700" style={{
             width: "65%", height: "130%",
-            background: `radial-gradient(ellipse at 50% 100%, hsl(var(--primary)/${isPlaying ? "0.20" : "0.11"}) 0%, transparent 70%)`,
-            transition: "background 0.6s ease",
+            background: `radial-gradient(ellipse at 50% 100%, hsl(var(--section-hsl, 262 80% 62%) / ${isPlaying ? "0.20" : "0.09"}) 0%, transparent 70%)`,
           }} />
-          {/* Cover art color bleed — stronger */}
+          {/* Cover art color bleed */}
           {coverUrl && (
             <div className="absolute inset-0 pointer-events-none blur-3xl scale-110" style={{
               backgroundImage: `url(${coverUrl})`,
@@ -673,21 +688,36 @@ export default function AudioPlayer() {
               transition: "opacity 0.7s ease",
             }} />
           )}
-          {/* Subtle grain texture for premium material feel */}
-          <div className="absolute inset-0 pointer-events-none opacity-[0.028]" style={{
+          {/* Grain texture */}
+          <div className="absolute inset-0 pointer-events-none opacity-[0.022]" style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
             backgroundSize: "200px 200px",
           }} />
         </div>
 
-        {/* ── Top accent line ──────────────────────────────────────────── */}
-        <div className="absolute top-0 left-0 right-0 h-[2px] pointer-events-none" style={{
-          background: "linear-gradient(90deg, transparent 0%, hsl(200 80% 72%/0.55) 8%, hsl(var(--primary)/0.75) 25%, hsl(var(--primary)) 50%, hsl(var(--primary)/0.75) 75%, hsl(262 90% 82%/0.55) 92%, transparent 100%)",
-          boxShadow: "0 0 24px hsl(var(--primary)/0.65), 0 0 48px hsl(var(--primary)/0.28)",
-        }} />
+        {/* ── Top accent line — section-hsl reactive + animated ────────── */}
+        <div className="absolute top-0 left-0 right-0 pointer-events-none" style={{ height: "2px" }}>
+          {/* Base glow */}
+          <div className="absolute inset-0" style={{
+            background: "linear-gradient(90deg, transparent 0%, hsl(var(--section-hsl, 262 80% 62%) / 0.55) 15%, hsl(var(--section-hsl, 262 80% 62%)) 50%, hsl(var(--section-hsl, 262 80% 62%) / 0.55) 85%, transparent 100%)",
+            boxShadow: "0 0 22px hsl(var(--section-hsl, 262 80% 62%) / 0.7), 0 0 48px hsl(var(--section-hsl, 262 80% 62%) / 0.25)",
+            transition: "all 0.6s ease",
+          }} />
+          {/* Animated shimmer sweep */}
+          {isPlaying && (
+            <div className="absolute inset-0 overflow-hidden rounded-full">
+              <div style={{
+                position: "absolute", inset: 0,
+                background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0) 35%, rgba(255,255,255,0.55) 50%, rgba(255,255,255,0) 65%, transparent 100%)",
+                backgroundSize: "200% 100%",
+                animation: "accent-flow 3s linear infinite",
+              }} />
+            </div>
+          )}
+        </div>
 
         {/* ── Spectrum + time labels ────────────────────────────────────── */}
-        <div className="relative z-10 px-3 pt-1.5">
+        <div className="relative z-10 px-3 pt-1">
           <SpectrumAnalyzer
             analyserRef={analyserRef}
             isPlaying={isPlaying}
@@ -696,12 +726,21 @@ export default function AudioPlayer() {
             commentMarkers={commentMarkers}
             onSeek={player.seek}
           />
-          <div className="flex justify-between mt-0.5 px-0.5">
-            <span className="text-[9px] tabular-nums font-mono text-white/30 select-none">{formatTime(currentTime)}</span>
+          <div className="flex justify-between mt-0.5 px-0.5 items-center">
+            <span
+              className="player-lcd select-none transition-colors"
+              style={{
+                fontSize: "9px",
+                color: isPlaying ? "hsl(var(--section-hsl, 262 80% 62%) / 0.70)" : "rgba(255,255,255,0.28)",
+              }}
+            >
+              {formatTime(currentTime)}
+            </span>
             <button
               onClick={() => setShowRemaining(v => !v)}
               title={showRemaining ? "Mostrar duración total" : "Mostrar tiempo restante"}
-              className="text-[9px] tabular-nums font-mono text-white/18 hover:text-white/45 transition-colors select-none cursor-pointer"
+              className="player-lcd transition-colors select-none cursor-pointer hover:text-white/55"
+              style={{ fontSize: "9px", color: "rgba(255,255,255,0.18)" }}
             >
               {duration > 0
                 ? showRemaining
@@ -745,7 +784,7 @@ export default function AudioPlayer() {
                     <div key={k} className="w-[2px] rounded-full eq-bar"
                       style={{
                         height: h * 2.8,
-                        background: "linear-gradient(to top, hsl(var(--primary)), hsl(262 80% 78%))",
+                        background: "linear-gradient(to top, hsl(var(--section-hsl, 262 80% 62%)), hsl(var(--section-hsl, 262 80% 80%)))",
                         animationDelay: `${k * 0.12}s`,
                       }} />
                   ))}
@@ -759,47 +798,47 @@ export default function AudioPlayer() {
           </div>
         ) : (
           /* ── Full expanded bar ────────────────────────────────────────── */
-          <div className="relative z-10 flex items-center gap-2 px-4 py-2.5 max-w-screen-xl mx-auto">
+          <div className="relative z-10 flex items-center gap-2 px-4 py-1.5 max-w-screen-xl mx-auto">
 
             {/* ── LEFT: Cover + info ────────────────────────────────── */}
-            <div className="flex items-center gap-3 w-[292px] min-w-0 flex-shrink-0">
+            <div className="flex items-center gap-2.5 w-[260px] min-w-0 flex-shrink-0">
               {/* Cover art */}
               <div className={cn("relative flex-shrink-0", isPlaying && "player-cover-float")}>
-                {/* Ambient pulse halo */}
+                {/* Ambient pulse halo — section-hsl reactive */}
                 {isPlaying && (
-                  <div className="absolute -inset-[5px] rounded-[24px] pointer-events-none animate-pulse" style={{
-                    boxShadow: "0 0 0 2px hsl(var(--primary)/0.70), 0 0 48px hsl(var(--primary)/0.65), 0 0 96px hsl(var(--primary)/0.28)",
+                  <div className="absolute -inset-[4px] rounded-[20px] pointer-events-none animate-pulse" style={{
+                    boxShadow: "0 0 0 1.5px hsl(var(--section-hsl, 262 80% 62%) / 0.65), 0 0 32px hsl(var(--section-hsl, 262 80% 62%) / 0.55), 0 0 64px hsl(var(--section-hsl, 262 80% 62%) / 0.22)",
                     animationDuration: "2.2s",
                   }} />
                 )}
                 {isPlaying && (
                   <>
-                    {/* Inner ring — vivid primary CW fast */}
-                    <div className="absolute -inset-[6px] rounded-full pointer-events-none player-ring-spin" style={{
-                      background: "conic-gradient(from 0deg, hsl(var(--primary)) 0%, hsl(var(--primary)/0.75) 20%, transparent 38%, hsl(var(--primary)/0.55) 62%, transparent 80%, hsl(var(--primary)) 100%)",
-                      WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 3px), black calc(100% - 3px))",
-                      mask: "radial-gradient(farthest-side, transparent calc(100% - 3px), black calc(100% - 3px))",
+                    {/* Inner ring — section-hsl vivid CW fast */}
+                    <div className="absolute -inset-[5px] rounded-full pointer-events-none player-ring-spin" style={{
+                      background: "conic-gradient(from 0deg, hsl(var(--section-hsl, 262 80% 62%)) 0%, hsl(var(--section-hsl, 262 80% 62%) / 0.75) 20%, transparent 38%, hsl(var(--section-hsl, 262 80% 62%) / 0.55) 62%, transparent 80%, hsl(var(--section-hsl, 262 80% 62%)) 100%)",
+                      WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 2.5px), black calc(100% - 2.5px))",
+                      mask: "radial-gradient(farthest-side, transparent calc(100% - 2.5px), black calc(100% - 2.5px))",
                     }} />
-                    {/* Middle ring — lavender CCW */}
-                    <div className="absolute -inset-[13px] rounded-full pointer-events-none player-ring-spin-ccw" style={{
-                      background: "conic-gradient(from 120deg, transparent 0%, hsl(262 90% 82%/0.85) 16%, transparent 40%, hsl(var(--primary)/0.50) 70%, transparent 100%)",
-                      WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 2px), black calc(100% - 2px))",
-                      mask: "radial-gradient(farthest-side, transparent calc(100% - 2px), black calc(100% - 2px))",
-                    }} />
-                    {/* Outer ring — cool cyan/teal, very slow CW */}
-                    <div className="absolute -inset-[20px] rounded-full pointer-events-none player-ring-spin-slow" style={{
-                      background: "conic-gradient(from 240deg, transparent 0%, hsl(200 80% 72%/0.42) 14%, transparent 34%, hsl(var(--primary)/0.24) 60%, transparent 100%)",
+                    {/* Middle ring — lighter tint CCW */}
+                    <div className="absolute -inset-[10px] rounded-full pointer-events-none player-ring-spin-ccw" style={{
+                      background: "conic-gradient(from 120deg, transparent 0%, hsl(var(--section-hsl, 262 80% 82%) / 0.75) 16%, transparent 40%, hsl(var(--section-hsl, 262 80% 62%) / 0.40) 70%, transparent 100%)",
                       WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 1.5px), black calc(100% - 1.5px))",
                       mask: "radial-gradient(farthest-side, transparent calc(100% - 1.5px), black calc(100% - 1.5px))",
+                    }} />
+                    {/* Outer ring — desaturated slow CW */}
+                    <div className="absolute -inset-[16px] rounded-full pointer-events-none player-ring-spin-slow" style={{
+                      background: "conic-gradient(from 240deg, transparent 0%, hsl(var(--section-hsl, 262 80% 72%) / 0.30) 14%, transparent 34%, hsl(var(--section-hsl, 262 80% 62%) / 0.16) 60%, transparent 100%)",
+                      WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 1px), black calc(100% - 1px))",
+                      mask: "radial-gradient(farthest-side, transparent calc(100% - 1px), black calc(100% - 1px))",
                     }} />
                   </>
                 )}
                 <div className={cn(
-                  "relative w-20 h-20 rounded-2xl overflow-hidden flex items-center justify-center transition-all duration-500",
+                  "relative w-[60px] h-[60px] rounded-xl overflow-hidden flex items-center justify-center transition-all duration-500",
                   "border player-cover-vinyl player-cover-shine",
                   isPlaying
-                    ? "border-primary/55 shadow-[0_0_0_1px_hsl(var(--primary)/0.22),0_10px_44px_hsl(var(--primary)/0.58),0_20px_64px_rgba(0,0,0,0.65)]"
-                    : "border-white/12 shadow-[0_4px_22px_rgba(0,0,0,0.58)]"
+                    ? "border-[hsl(var(--section-hsl,262_80%_62%)/0.55)] shadow-[0_0_0_1px_hsl(var(--section-hsl,262_80%_62%)/0.22),0_8px_32px_hsl(var(--section-hsl,262_80%_62%)/0.50),0_14px_44px_rgba(0,0,0,0.60)]"
+                    : "border-white/12 shadow-[0_4px_16px_rgba(0,0,0,0.50)]"
                 )}>
                   {coverUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -814,7 +853,7 @@ export default function AudioPlayer() {
                       {/* Spinning vinyl groove texture */}
                       <div className={cn("absolute inset-0", isPlaying && "player-grooves-spin")} style={{
                         background: `
-                          radial-gradient(circle at center, hsl(var(--primary)/0.28) 0%, transparent 68%),
+                          radial-gradient(circle at center, hsl(var(--section-hsl, 262 80% 62%) / 0.28) 0%, transparent 68%),
                           repeating-radial-gradient(circle at center, transparent 0px, transparent 4px, rgba(0,0,0,0.20) 4px, rgba(0,0,0,0.20) 5px)
                         `,
                       }} />
@@ -823,16 +862,16 @@ export default function AudioPlayer() {
                         border: "1px solid rgba(255,255,255,0.06)",
                         boxShadow: "inset 0 0 12px rgba(0,0,0,0.5)",
                       }} />
-                      {/* Static center label */}
-                      <div className="relative z-[2] w-11 h-11 rounded-full flex items-center justify-center" style={{
-                        background: "radial-gradient(circle at 32% 28%, hsl(var(--primary)/0.95) 0%, hsl(262 72% 28%) 52%, hsl(262 55% 11%) 100%)",
-                        border: "1.5px solid hsl(var(--primary)/0.55)",
+                      {/* Static center label — section-hsl reactive */}
+                      <div className="relative z-[2] w-8 h-8 rounded-full flex items-center justify-center" style={{
+                        background: "radial-gradient(circle at 32% 28%, hsl(var(--section-hsl, 262 80% 62%) / 0.95) 0%, hsl(var(--section-hsl, 262 72% 28%) / 0.80) 52%, rgba(6,4,18,1) 100%)",
+                        border: "1.5px solid hsl(var(--section-hsl, 262 80% 62%) / 0.55)",
                         boxShadow: isPlaying
-                          ? "0 0 0 1px hsl(var(--primary)/0.20), 0 0 28px hsl(var(--primary)/0.70), inset 0 1px 0 rgba(255,255,255,0.22)"
+                          ? "0 0 0 1px hsl(var(--section-hsl, 262 80% 62%) / 0.20), 0 0 28px hsl(var(--section-hsl, 262 80% 62%) / 0.70), inset 0 1px 0 rgba(255,255,255,0.22)"
                           : "0 0 12px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.07)",
                       }}>
                         {/* Center hole */}
-                        <div className="absolute w-3 h-3 rounded-full" style={{
+                        <div className="absolute w-2 h-2 rounded-full" style={{
                           background: "rgba(0,0,0,0.82)",
                           border: "1px solid rgba(255,255,255,0.16)",
                         }} />
@@ -842,7 +881,7 @@ export default function AudioPlayer() {
                               <div key={idx} className="eq-bar rounded-full" style={{
                                 width: "2px",
                                 height: `${[55,100,40,75,50][idx - 1]}%`,
-                                background: "linear-gradient(to top, hsl(var(--primary)/0.9), rgba(255,255,255,0.95))",
+                                background: "linear-gradient(to top, hsl(var(--section-hsl, 262 80% 62%) / 0.9), rgba(255,255,255,0.95))",
                               }} />
                             ))}
                           </div>
@@ -858,22 +897,39 @@ export default function AudioPlayer() {
               {/* Title + artist */}
               <div className="min-w-0 flex-1">
                 {isPlaying ? (
-                  <div className="flex items-center mb-1.5">
+                  <div className="flex items-center gap-1.5 mb-1">
                     <div className="flex items-center gap-1.5 px-2 py-[3px] rounded-full" style={{
-                      background: "linear-gradient(135deg, hsl(var(--primary)/0.28) 0%, hsl(var(--primary)/0.14) 100%)",
-                      border: "1px solid hsl(var(--primary)/0.35)",
-                      boxShadow: "0 0 10px hsl(var(--primary)/0.22), inset 0 1px 0 rgba(255,255,255,0.08)",
+                      background: "linear-gradient(135deg, hsl(var(--section-hsl, 262 80% 62%) / 0.28) 0%, hsl(var(--section-hsl, 262 80% 62%) / 0.12) 100%)",
+                      border: "1px solid hsl(var(--section-hsl, 262 80% 62%) / 0.38)",
+                      boxShadow: "0 0 10px hsl(var(--section-hsl, 262 80% 62%) / 0.22), inset 0 1px 0 rgba(255,255,255,0.08)",
                     }}>
-                      <div className="player-now-dot" />
-                      <span className="text-[9px] font-black uppercase tracking-widest text-primary drop-shadow-[0_0_5px_hsl(var(--primary)/0.7)]">
+                      <div className="player-now-dot" style={{
+                        background: "hsl(var(--section-hsl, 262 80% 62%))",
+                        boxShadow: "0 0 8px hsl(var(--section-hsl, 262 80% 62%) / 0.9)",
+                      }} />
+                      <span className="text-[9px] font-black uppercase tracking-widest" style={{
+                        color: "hsl(var(--section-hsl, 262 80% 62%))",
+                        filter: "drop-shadow(0 0 4px hsl(var(--section-hsl, 262 80% 62%) / 0.65))",
+                      }}>
                         Reproduciendo
                       </span>
                     </div>
+                    {/* LIVE indicator */}
+                    <div className="flex items-center gap-1 px-1.5 py-[3px] rounded-full" style={{
+                      background: "rgba(239,68,68,0.12)",
+                      border: "1px solid rgba(239,68,68,0.28)",
+                    }}>
+                      <div className="player-live-dot" />
+                      <span className="text-[7px] font-black uppercase tracking-widest text-red-400">Live</span>
+                    </div>
                   </div>
                 ) : (
-                  <div className="mb-1.5">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-white/25 px-2 py-[3px] rounded-full border border-white/8">
-                      En pausa
+                  <div className="mb-1">
+                    <span className="player-lcd text-[9px] font-black uppercase tracking-widest text-white/22 px-2 py-[3px] rounded-full" style={{
+                      border: "1px solid rgba(255,255,255,0.07)",
+                      background: "rgba(255,255,255,0.03)",
+                    }}>
+                      ⏸ En pausa
                     </span>
                   </div>
                 )}
@@ -882,7 +938,7 @@ export default function AudioPlayer() {
                   <p
                     ref={titleRef}
                     className={cn(
-                      "text-[15px] font-black leading-tight transition-colors",
+                      "text-[13px] font-black leading-tight transition-colors",
                       titleOverflows ? "player-marquee-inner" : "truncate",
                       isPlaying ? "text-white" : "text-white/65"
                     )}
@@ -892,11 +948,11 @@ export default function AudioPlayer() {
                     {titleOverflows && <span className="mx-6 opacity-0 select-none">·</span>}
                   </p>
                 </div>
-                <p className="text-[11px] text-white/35 truncate leading-tight mt-0.5 font-medium">
+                <p className="text-[10px] text-white/35 truncate leading-tight mt-0.5 font-medium">
                   {currentTrack.artist}
                 </p>
                 {/* BPM + Key badges + Like button */}
-                <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                   {currentTrack.bpm && (
                     <span className="meta-chip meta-chip-bpm">
                       {currentTrack.bpm} BPM
@@ -938,7 +994,7 @@ export default function AudioPlayer() {
             </div>
 
             {/* ── Separator ─────────────────────────────────────────── */}
-            <div className="hidden lg:block w-px h-10 bg-white/12 flex-shrink-0 mx-1" />
+            <div className="hidden lg:block w-px h-8 bg-white/12 flex-shrink-0 mx-1" />
 
             {/* ── CENTER: Controls ──────────────────────────────────── */}
             <div className="flex-1 flex flex-col items-center gap-1 min-w-0">
@@ -960,19 +1016,19 @@ export default function AudioPlayer() {
 
                 {/* ── Play / Pause ─────────────────────────────────── */}
                 <div className="relative mx-2">
-                  {/* Ambient pulse ring behind button */}
+                  {/* Ambient pulse ring behind button — section-hsl */}
                   {isPlaying && (
                     <div className="absolute inset-0 rounded-full pointer-events-none animate-ping"
-                      style={{ background: "hsl(var(--primary)/0.20)", animationDuration: "2.4s" }} />
+                      style={{ background: "hsl(var(--section-hsl, 262 80% 62%) / 0.22)", animationDuration: "2.4s" }} />
                   )}
                   <button
                     onClick={() => { resumeAudioContext(); player.togglePlay(); }}
                     title={isPlaying ? "Pausar (Espacio)" : "Reproducir (Espacio)"}
-                    className="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0 player-play-btn relative z-10"
+                    className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 player-play-btn relative z-10"
                   >
                     {isPlaying
-                      ? <Pause className="h-[22px] w-[22px] text-white" />
-                      : <Play className="h-[22px] w-[22px] text-white ml-0.5" />}
+                      ? <Pause className="h-[18px] w-[18px] text-white" />
+                      : <Play className="h-[18px] w-[18px] text-white ml-0.5" />}
                   </button>
                 </div>
 
@@ -1001,10 +1057,10 @@ export default function AudioPlayer() {
             </div>
 
             {/* ── Separator ─────────────────────────────────────────── */}
-            <div className="hidden lg:block w-px h-10 bg-white/12 flex-shrink-0 mx-1" />
+            <div className="hidden lg:block w-px h-8 bg-white/12 flex-shrink-0 mx-1" />
 
             {/* ── RIGHT: Speed, volume, queue, collapse ─────────────── */}
-            <div className="hidden sm:flex items-center gap-1.5 w-[250px] justify-end flex-shrink-0">
+            <div className="hidden sm:flex items-center gap-1.5 w-[230px] justify-end flex-shrink-0">
 
               {/* Sleep timer */}
               <div className="relative">
@@ -1186,7 +1242,9 @@ export default function AudioPlayer() {
           <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm" onClick={() => setShowShortcuts(false)} />
           <div className="fixed z-[61] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md rounded-2xl border border-white/12 shadow-2xl overflow-hidden"
             style={{ background: "rgba(10,10,18,0.98)", backdropFilter: "blur(32px)" }}>
-            <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
+            <div className="absolute top-0 left-0 right-0 h-[1px]" style={{
+          background: "linear-gradient(90deg, transparent, hsl(var(--section-hsl, 262 80% 62%) / 0.65), transparent)"
+        }} />
             <div className="flex items-center justify-between px-5 py-4 border-b border-white/8">
               <div>
                 <p className="text-sm font-black text-white/90">Atajos de teclado</p>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   ListMusic,
   Plus,
@@ -20,6 +21,11 @@ import {
   Upload,
   Zap,
   Headphones,
+  Printer,
+  Monitor,
+  ChevronLeft,
+  ChevronRight,
+  Music2,
 } from "lucide-react";
 import {
   getSetlists,
@@ -40,6 +46,7 @@ import {
   type SetlistBeat,
 } from "@/lib/actions/setlist-beats";
 import { useAudioPlayerContext } from "@/components/audio/AudioPlayer";
+import { StaggerList, StaggerItem } from "@/components/ui/MotionWrapper";
 import { getSongsByYear } from "@/lib/actions/songs";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
@@ -93,6 +100,7 @@ export default function SetlistsPage() {
   const toast = useToast();
   const { confirm, ConfirmDialog } = useConfirm();
   const player = useAudioPlayerContext();
+  const searchParams = useSearchParams();
 
   // Setlists state
   const [setlists, setSetlists] = useState<Setlist[]>([]);
@@ -130,6 +138,10 @@ export default function SetlistsPage() {
   const dragItem = useRef<number | null>(null);
   const dragOverItem = useRef<number | null>(null);
 
+  // Presentation Mode
+  const [presentationMode, setPresentationMode] = useState(false);
+  const [presentationIndex, setPresentationIndex] = useState(0);
+
   // ─── Load setlists ──────────────────────────────────────────────────────────
 
   const loadSetlists = useCallback(async () => {
@@ -155,6 +167,15 @@ export default function SetlistsPage() {
   // ─── Trigger load on mount ──────────────────────────────────────────────────
   useEffect(() => { loadSetlists(); }, [loadSetlists]);
 
+  // ?new=1 deep-link desde ContextualFAB
+  useEffect(() => {
+    if (searchParams.get("new") === "1") {
+      setEditingSetlist(undefined);
+      setShowFormModal(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Persist selected setlist ID so it's restored on next visit
   useEffect(() => {
     if (selectedSetlist) {
@@ -179,6 +200,12 @@ export default function SetlistsPage() {
         e.preventDefault();
         handleExportCSV();
       }
+      if ((e.key === "p" || e.key === "P") && !showFormModal && !showSongPicker && selectedSetlist && setlistSongs.length > 0) {
+        e.preventDefault();
+        setPresentationIndex(0);
+        setPresentationMode(true);
+      }
+      if (e.key === "Escape" && presentationMode) { setPresentationMode(false); return; }
       if (e.key === "Escape" && showFormModal) { setShowFormModal(false); }
     }
     document.addEventListener("keydown", onKey);
@@ -461,6 +488,71 @@ export default function SetlistsPage() {
     toast.success("Setlist exportada");
   }
 
+  // ─── Print export ───────────────────────────────────────────────────────────
+
+  function handlePrint() {
+    if (!selectedSetlist) return;
+    const dateStr = selectedSetlist.event_date ? formatEventDate(selectedSetlist.event_date) : "";
+    const totalDur = formatTime(calcTotalDuration(setlistSongs));
+    const rows = setlistSongs.map((s, i) => {
+      const title  = getTrackTitle(s);
+      const artist = s.song?.artist_name ?? "";
+      const dur    = s.song?.duration_seconds ? formatTime(s.song.duration_seconds) : "—";
+      const bpm    = s.song?.bpm ?? (s.draft as { bpm?: number } | null | undefined)?.bpm ?? "—";
+      const key    = s.song?.key_signature ?? (s.draft as { key_signature?: string } | null | undefined)?.key_signature ?? "—";
+      return `<tr>
+        <td class="num">${i + 1}</td>
+        <td class="title"><strong>${title}</strong>${artist ? `<br/><small>${artist}</small>` : ""}</td>
+        <td>${bpm}</td>
+        <td>${key}</td>
+        <td>${dur}</td>
+      </tr>`;
+    }).join("");
+
+    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"/>
+      <title>${selectedSetlist.name}</title>
+      <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#0f0f1a;padding:32px 40px;background:#fff}
+        header{margin-bottom:24px;border-bottom:2px solid #0f0f1a;padding-bottom:16px}
+        h1{font-size:24px;font-weight:900;letter-spacing:-0.5px}
+        .meta{display:flex;gap:20px;margin-top:6px;font-size:12px;color:#555}
+        table{width:100%;border-collapse:collapse;margin-top:16px;font-size:13px}
+        th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:#777;border-bottom:1px solid #e2e2e2;padding:6px 8px}
+        td{padding:9px 8px;border-bottom:1px solid #f0f0f0;vertical-align:top}
+        td.num{color:#aaa;font-variant-numeric:tabular-nums;width:32px}
+        td.title strong{font-weight:700}
+        td.title small{font-size:11px;color:#888;display:block;margin-top:1px}
+        tr:hover td{background:#fafafa}
+        .footer{margin-top:20px;font-size:11px;color:#aaa;display:flex;justify-content:space-between}
+        @media print{body{padding:20px 28px}}
+      </style></head><body>
+      <header>
+        <h1>${selectedSetlist.name}</h1>
+        <div class="meta">
+          ${dateStr ? `<span>📅 ${dateStr}</span>` : ""}
+          ${selectedSetlist.venue ? `<span>📍 ${selectedSetlist.venue}</span>` : ""}
+          <span>🎵 ${setlistSongs.length} canciones · ${totalDur}</span>
+        </div>
+      </header>
+      <table>
+        <thead><tr><th>#</th><th>Título</th><th>BPM</th><th>Tono</th><th>Duración</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="footer">
+        <span>Generado por Gestión Artista</span>
+        <span>${new Date().toLocaleDateString("es-AR")}</span>
+      </div>
+      </body></html>`;
+
+    const win = window.open("", "_blank");
+    if (!win) { toast.error("Permite ventanas emergentes para imprimir"); return; }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); }, 350);
+  }
+
   // ─── Filtered songs for picker ──────────────────────────────────────────────
 
   const alreadyAddedIds = new Set(setlistSongs.map((s) => s.song_id).filter(Boolean));
@@ -474,15 +566,16 @@ export default function SetlistsPage() {
   // ─── Render ─────────────────────────────────────────────────────────────────
 
   return (
+    <>
     <div className="flex flex-col gap-6 h-full">
       {/* Header */}
-      <div className="card-premium relative overflow-hidden rounded-2xl">
-        <div className="absolute inset-0 bg-gradient-to-br from-violet-500/8 via-transparent to-transparent" />
-        <div className="absolute -top-16 -right-16 w-48 h-48 bg-violet-500/6 rounded-full blur-3xl" />
+      <div className="card-premium relative overflow-hidden rounded-2xl page-header-hero">
+        <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, hsl(var(--section-hsl, 262 80% 62%) / 0.08) 0%, transparent 60%)" }} />
+        <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full blur-3xl pointer-events-none" style={{ background: "hsl(var(--section-hsl, 262 80% 62%) / 0.06)" }} />
         <div className="relative px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500/30 to-violet-600/10 border border-violet-500/20 flex items-center justify-center flex-shrink-0">
-              <ListMusic className="h-5 w-5 text-violet-400 drop-shadow-[0_0_6px_currentColor]" />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg, hsl(var(--section-hsl, 262 80% 62%) / 0.30), hsl(var(--section-hsl, 262 80% 62%) / 0.08))", border: "1px solid hsl(var(--section-hsl, 262 80% 62%) / 0.22)" }}>
+              <ListMusic className="h-5 w-5 drop-shadow-[0_0_6px_currentColor]" style={{ color: "hsl(var(--section-hsl, 262 80% 62%))" }} />
             </div>
             <div>
               <h1 className="text-xl font-black tracking-tight gradient-text">Setlists</h1>
@@ -496,14 +589,32 @@ export default function SetlistsPage() {
           </div>
           <div className="flex items-center gap-2">
             {selectedSetlist && setlistSongs.length > 0 && (
-              <button
-                onClick={handleExportCSV}
-                title="Exportar setlist a CSV (E)"
-                className="flex items-center gap-1.5 px-3 py-2 border border-border/60 rounded-xl hover:bg-secondary/60 transition-all active:scale-95 text-sm text-muted-foreground hover:text-foreground"
-              >
-                <Download className="h-4 w-4" />
-                <span className="hidden sm:inline">Exportar</span>
-              </button>
+              <>
+                <button
+                  onClick={() => { setPresentationIndex(0); setPresentationMode(true); }}
+                  title="Modo presentación (P)"
+                  className="flex items-center gap-1.5 px-3 py-2 border border-border/60 rounded-xl hover:bg-secondary/60 transition-all active:scale-95 text-sm text-muted-foreground hover:text-foreground"
+                >
+                  <Monitor className="h-4 w-4" />
+                  <span className="hidden sm:inline">Presentar</span>
+                </button>
+                <button
+                  onClick={handlePrint}
+                  title="Imprimir / PDF"
+                  className="flex items-center gap-1.5 px-3 py-2 border border-border/60 rounded-xl hover:bg-secondary/60 transition-all active:scale-95 text-sm text-muted-foreground hover:text-foreground"
+                >
+                  <Printer className="h-4 w-4" />
+                  <span className="hidden sm:inline">PDF</span>
+                </button>
+                <button
+                  onClick={handleExportCSV}
+                  title="Exportar setlist a CSV (E)"
+                  className="flex items-center gap-1.5 px-3 py-2 border border-border/60 rounded-xl hover:bg-secondary/60 transition-all active:scale-95 text-sm text-muted-foreground hover:text-foreground"
+                >
+                  <Download className="h-4 w-4" />
+                  <span className="hidden sm:inline">CSV</span>
+                </button>
+              </>
             )}
             <button
               onClick={() => {
@@ -572,7 +683,7 @@ export default function SetlistsPage() {
             <div className="card-premium flex flex-col items-center justify-center py-20 text-center rounded-2xl px-6">
               <div className="relative mb-5">
                 <div className="absolute inset-0 bg-violet-500/20 rounded-2xl blur-xl scale-125" />
-                <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500/20 to-violet-700/10 border border-violet-500/20 flex items-center justify-center">
+                <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500/20 to-violet-700/10 border border-violet-500/20 flex items-center justify-center empty-state-icon shadow-[0_8px_32px_hsl(0_0%_0%/0.15)]">
                   <ListMusic className="h-8 w-8 text-violet-400/60" />
                 </div>
               </div>
@@ -592,9 +703,9 @@ export default function SetlistsPage() {
               </button>
             </div>
           ) : (
-            setlists.map((setlist) => (
-              <SetlistCard
-                key={setlist.id}
+            <StaggerList className="space-y-2">
+            {setlists.map((setlist) => (
+              <StaggerItem key={setlist.id}><SetlistCard
                 setlist={setlist}
                 isSelected={selectedSetlist?.id === setlist.id}
                 isDeleting={deletingId === setlist.id}
@@ -609,7 +720,9 @@ export default function SetlistsPage() {
                 }}
                 onDelete={() => handleDeleteSetlist(setlist)}
               />
-            ))
+            </StaggerItem>
+            ))}
+            </StaggerList>
           )}
         </div>
 
@@ -752,7 +865,9 @@ export default function SetlistsPage() {
                     </div>
                   ) : setlistSongs.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 text-center px-6">
-                      <Music className="h-10 w-10 text-muted-foreground/20 mb-3" />
+                      <div className="relative w-14 h-14 rounded-2xl flex items-center justify-center empty-state-icon mb-3" style={{ background: "linear-gradient(135deg, hsl(var(--section-hsl, 286 72% 62%) / 0.20), hsl(var(--section-hsl, 286 72% 62%) / 0.07))", border: "1px solid hsl(var(--section-hsl, 286 72% 62%) / 0.22)", boxShadow: "0 8px 32px hsl(0 0% 0% / 0.15)" }}>
+                        <Music className="h-7 w-7" style={{ color: "hsl(var(--section-hsl, 286 72% 62%))" }} />
+                      </div>
                       <p className="text-sm text-muted-foreground/50">
                         Esta setlist no tiene canciones todavía
                       </p>
@@ -840,7 +955,9 @@ export default function SetlistsPage() {
                     </div>
                   ) : beats.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 text-center px-6">
-                      <Headphones className="h-10 w-10 text-muted-foreground/20 mb-3" />
+                      <div className="relative w-14 h-14 rounded-2xl flex items-center justify-center empty-state-icon mb-3" style={{ background: "linear-gradient(135deg, hsl(var(--section-hsl, 286 72% 62%) / 0.20), hsl(var(--section-hsl, 286 72% 62%) / 0.07))", border: "1px solid hsl(var(--section-hsl, 286 72% 62%) / 0.22)", boxShadow: "0 8px 32px hsl(0 0% 0% / 0.15)" }}>
+                        <Headphones className="h-7 w-7" style={{ color: "hsl(var(--section-hsl, 286 72% 62%))" }} />
+                      </div>
                       <p className="text-sm text-muted-foreground/50">
                         No hay beats para este setlist
                       </p>
@@ -977,6 +1094,18 @@ export default function SetlistsPage() {
         />
       )}
     </div>
+
+    {/* ── Modo Presentación ───────────────────────────────────────────────── */}
+    {presentationMode && selectedSetlist && setlistSongs.length > 0 && (
+      <PresentationMode
+        setlist={selectedSetlist}
+        songs={setlistSongs}
+        index={presentationIndex}
+        onIndexChange={setPresentationIndex}
+        onClose={() => setPresentationMode(false)}
+      />
+    )}
+    </>
   );
 }
 
@@ -1308,7 +1437,9 @@ function SongPickerModal({
             </div>
           ) : songs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center px-6">
-              <Music className="h-8 w-8 text-muted-foreground/20 mb-2" />
+              <div className="relative w-12 h-12 rounded-xl flex items-center justify-center empty-state-icon mb-2" style={{ background: "linear-gradient(135deg, hsl(var(--section-hsl, 286 72% 62%) / 0.20), hsl(var(--section-hsl, 286 72% 62%) / 0.07))", border: "1px solid hsl(var(--section-hsl, 286 72% 62%) / 0.22)", boxShadow: "0 6px 20px hsl(0 0% 0% / 0.12)" }}>
+                <Music className="h-6 w-6" style={{ color: "hsl(var(--section-hsl, 286 72% 62%))" }} />
+              </div>
               <p className="text-sm text-muted-foreground/50">
                 {searchValue
                   ? `Sin resultados para "${searchValue}"`
@@ -1372,6 +1503,112 @@ function SongPickerModal({
           )}
         </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Presentation Mode overlay ────────────────────────────────────────────────
+
+function PresentationMode({
+  setlist, songs, index, onIndexChange, onClose,
+}: {
+  setlist: Setlist;
+  songs: SetlistSongWithDetails[];
+  index: number;
+  onIndexChange: (i: number) => void;
+  onClose: () => void;
+}) {
+  const song   = songs[index];
+  const title  = song?.song?.title ?? (song?.draft as {title?:string}|null|undefined)?.title ?? "Sin título";
+  const artist = song?.song?.artist_name ?? "";
+  const bpm    = song?.song?.bpm ?? (song?.draft as {bpm?:number}|null|undefined)?.bpm;
+  const key    = song?.song?.key_signature ?? (song?.draft as {key_signature?:string}|null|undefined)?.key_signature;
+  const cover  = song?.song?.cover_art_url ?? null;
+  const notes  = song?.notes ?? "";
+  const dur    = song?.song?.duration_seconds ? formatTime(song.song.duration_seconds) : null;
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") onIndexChange(Math.min(index + 1, songs.length - 1));
+      if (e.key === "ArrowLeft"  || e.key === "ArrowUp")   onIndexChange(Math.max(index - 1, 0));
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [index, onIndexChange, onClose, songs.length]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex flex-col items-center justify-center select-none"
+      style={{ background: "rgba(4,4,10,0.98)", backdropFilter: "blur(40px)" }}
+    >
+      <div className="absolute inset-0 pointer-events-none" style={{
+        background: "radial-gradient(ellipse 80% 60% at 50% 40%, hsl(var(--section-hsl, 286 72% 62%) / 0.18) 0%, transparent 70%)",
+      }} />
+      <button onClick={onClose}
+        className="absolute top-5 right-5 p-2 rounded-xl text-white/30 hover:text-white/80 hover:bg-white/8 transition-all z-10"
+        title="Cerrar (Esc)">
+        <X className="h-5 w-5" />
+      </button>
+      <div className="absolute top-0 left-0 right-0 h-0.5" style={{ background: "hsl(var(--section-hsl, 286 72% 62%) / 0.20)" }}>
+        <div className="h-full transition-all duration-300"
+          style={{ width: `${((index + 1) / songs.length) * 100}%`, background: "hsl(var(--section-hsl, 286 72% 62%))" }} />
+      </div>
+      <div className="absolute top-5 left-5 right-16 flex items-center gap-3">
+        <span className="text-white/25 text-sm font-medium truncate">{setlist.name}</span>
+        <span className="text-white/20 text-sm tabular-nums flex-shrink-0">{index + 1} / {songs.length}</span>
+      </div>
+      {cover && (
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={cover} alt="" className="absolute inset-0 w-full h-full object-cover opacity-[0.07] blur-3xl scale-110" />
+        </div>
+      )}
+      <div className="relative z-10 flex flex-col items-center text-center px-8 max-w-3xl w-full gap-6">
+        {cover ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={cover} alt="" className="w-28 h-28 md:w-36 md:h-36 rounded-2xl object-cover shadow-2xl border border-white/10" />
+        ) : (
+          <div className="w-28 h-28 md:w-36 md:h-36 rounded-2xl flex items-center justify-center" style={{
+            background: "linear-gradient(135deg, hsl(var(--section-hsl, 286 72% 62%) / 0.25), hsl(var(--section-hsl, 286 72% 62%) / 0.08))",
+            border: "1px solid hsl(var(--section-hsl, 286 72% 62%) / 0.22)",
+          }}>
+            <Music2 className="h-12 w-12" style={{ color: "hsl(var(--section-hsl, 286 72% 62%) / 0.6)" }} />
+          </div>
+        )}
+        <div className="space-y-2">
+          {artist && <p className="text-white/38 text-sm font-medium tracking-wider uppercase">{artist}</p>}
+          <h2 className="text-5xl md:text-7xl font-black text-white leading-none tracking-tight">{title}</h2>
+        </div>
+        <div className="flex items-center justify-center gap-3 flex-wrap">
+          {bpm && (
+            <span className="px-4 py-1.5 rounded-full text-sm font-black font-mono border"
+              style={{ color: "hsl(var(--section-hsl, 286 72% 62%))", borderColor: "hsl(var(--section-hsl, 286 72% 62%) / 0.28)", background: "hsl(var(--section-hsl, 286 72% 62%) / 0.10)" }}>
+              {bpm} BPM
+            </span>
+          )}
+          {key && <span className="px-4 py-1.5 rounded-full text-sm font-black border border-white/14 text-white/70">{key}</span>}
+          {dur && <span className="px-4 py-1.5 rounded-full text-sm font-mono border border-white/10 text-white/40">{dur}</span>}
+        </div>
+        {notes && <p className="text-white/40 text-base leading-relaxed max-w-lg">{notes}</p>}
+      </div>
+      <div className="absolute bottom-8 flex items-center gap-5">
+        <button onClick={() => onIndexChange(Math.max(index - 1, 0))} disabled={index === 0}
+          className="p-3 rounded-2xl border border-white/12 text-white/45 hover:text-white/90 hover:bg-white/8 disabled:opacity-20 transition-all active:scale-95">
+          <ChevronLeft className="h-6 w-6" />
+        </button>
+        <div className="flex gap-1.5">
+          {songs.map((_, i) => (
+            <button key={i} onClick={() => onIndexChange(i)} className="transition-all rounded-full"
+              style={{ width: i === index ? 20 : 6, height: 6, borderRadius: 3,
+                background: i === index ? "hsl(var(--section-hsl, 286 72% 62%))" : "rgba(255,255,255,0.16)" }} />
+          ))}
+        </div>
+        <button onClick={() => onIndexChange(Math.min(index + 1, songs.length - 1))} disabled={index === songs.length - 1}
+          className="p-3 rounded-2xl border border-white/12 text-white/45 hover:text-white/90 hover:bg-white/8 disabled:opacity-20 transition-all active:scale-95">
+          <ChevronRight className="h-6 w-6" />
+        </button>
       </div>
     </div>
   );

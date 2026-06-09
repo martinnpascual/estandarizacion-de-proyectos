@@ -140,10 +140,10 @@ export default function PapeleraPage() {
       {ConfirmDialog}
       <div className="min-h-screen p-6 max-w-4xl mx-auto">
         {/* Header */}
-        <div className="card-premium relative overflow-hidden rounded-2xl mb-6">
-          <div className="absolute inset-0 bg-gradient-to-br from-red-500/8 via-transparent to-transparent pointer-events-none" />
-          <div className="absolute -top-10 -right-10 w-40 h-40 bg-red-500/6 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-orange-400/5 rounded-full blur-2xl pointer-events-none" />
+        <div className="card-premium relative overflow-hidden rounded-2xl mb-6 page-header-hero">
+          <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, hsl(var(--section-hsl, 262 80% 62%) / 0.08) 0%, transparent 60%)" }} />
+          <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full blur-3xl pointer-events-none" style={{ background: "hsl(var(--section-hsl, 262 80% 62%) / 0.06)" }} />
+          <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full blur-2xl pointer-events-none" style={{ background: "hsl(var(--section-hsl, 262 80% 62%) / 0.04)" }} />
           <div className="relative flex items-center justify-between px-6 py-5">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500/30 to-red-600/10 border border-red-500/20 flex items-center justify-center flex-shrink-0">
@@ -212,12 +212,16 @@ export default function PapeleraPage() {
           </div>
         ) : filteredItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-secondary/50 flex items-center justify-center">
-              <Trash2 className="h-8 w-8 text-muted-foreground/40" />
+            <div className="relative">
+              {/* Ambient halo */}
+              <div className="absolute inset-0 rounded-2xl blur-2xl opacity-20 bg-muted-foreground scale-150 pointer-events-none" />
+              <div className="relative w-16 h-16 rounded-2xl bg-secondary/60 border border-border/50 flex items-center justify-center empty-state-icon shadow-[0_8px_32px_hsl(0_0%_0%/0.15)]">
+                <Trash2 className="h-8 w-8 text-muted-foreground/50" />
+              </div>
             </div>
             <div className="text-center">
-              <p className="text-base font-medium text-muted-foreground">Papelera vacía</p>
-              <p className="text-sm text-muted-foreground/60 mt-1">No hay elementos eliminados</p>
+              <p className="text-base font-black text-muted-foreground">Papelera vacía</p>
+              <p className="text-sm text-muted-foreground/50 mt-1">No hay elementos eliminados</p>
             </div>
           </div>
         ) : (

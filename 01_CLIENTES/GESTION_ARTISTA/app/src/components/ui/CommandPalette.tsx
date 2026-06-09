@@ -753,7 +753,7 @@ export default function CommandPalette() {
           <div className="flex items-center justify-between px-4 py-2.5
                            border-t border-white/8">
             <span className="text-[10px] text-white/25 font-medium tracking-wide">
-              BERTIAKA Studio
+              Studio
             </span>
             <div className="flex items-center gap-3 text-[10px] text-white/25">
               <span className="flex items-center gap-1">

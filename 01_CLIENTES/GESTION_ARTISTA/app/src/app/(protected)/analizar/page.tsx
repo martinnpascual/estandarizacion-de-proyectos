@@ -311,13 +311,13 @@ export default function AnalizarPage() {
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       {/* Header */}
-      <div className="card-premium relative overflow-hidden rounded-2xl">
-        <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/8 via-transparent to-transparent pointer-events-none" />
-        <div className="absolute -top-10 -right-10 w-40 h-40 bg-yellow-500/6 rounded-full blur-3xl pointer-events-none" />
+      <div className="card-premium relative overflow-hidden rounded-2xl page-header-hero">
+        <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, hsl(var(--section-hsl, 262 80% 62%) / 0.08) 0%, transparent 60%)" }} />
+        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full blur-3xl pointer-events-none" style={{ background: "hsl(var(--section-hsl, 262 80% 62%) / 0.06)" }} />
         <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-5">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-500/30 to-yellow-600/10 border border-yellow-500/20 flex items-center justify-center flex-shrink-0">
-              <Zap className="h-5 w-5 text-yellow-400" />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg, hsl(var(--section-hsl, 262 80% 62%) / 0.30), hsl(var(--section-hsl, 262 80% 62%) / 0.08))", border: "1px solid hsl(var(--section-hsl, 262 80% 62%) / 0.22)" }}>
+              <Zap className="h-5 w-5 drop-shadow-[0_0_6px_currentColor]" style={{ color: "hsl(var(--section-hsl, 262 80% 62%))" }} />
             </div>
             <div>
               <h1 className="text-xl font-black tracking-tight gradient-text">Análisis de BPM y tonalidad</h1>

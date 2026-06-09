@@ -262,13 +262,13 @@ function NotificacionesContent() {
   return (
     <div className="space-y-6 max-w-2xl">
       {/* Header */}
-      <div className="card-premium relative overflow-hidden rounded-2xl">
-        <div className="absolute inset-0 bg-gradient-to-br from-violet-500/8 via-transparent to-transparent pointer-events-none" />
-        <div className="absolute -top-10 -right-10 w-40 h-40 bg-violet-500/6 rounded-full blur-3xl pointer-events-none" />
+      <div className="card-premium relative overflow-hidden rounded-2xl page-header-hero">
+        <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, hsl(var(--section-hsl, 262 80% 62%) / 0.10) 0%, transparent 60%)" }} />
+        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full blur-3xl pointer-events-none" style={{ background: "hsl(var(--section-hsl, 262 80% 62%) / 0.08)" }} />
         <div className="relative flex items-center justify-between px-6 py-5">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500/30 to-violet-600/10 border border-violet-500/20 flex items-center justify-center flex-shrink-0">
-              <Bell className="h-5 w-5 text-violet-400 drop-shadow-[0_0_6px_currentColor]" />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg, hsl(var(--section-hsl, 262 80% 62%) / 0.30), hsl(var(--section-hsl, 262 80% 62%) / 0.08))", border: "1px solid hsl(var(--section-hsl, 262 80% 62%) / 0.22)" }}>
+              <Bell className="h-5 w-5 drop-shadow-[0_0_6px_currentColor]" style={{ color: "hsl(var(--section-hsl, 262 80% 62%))" }} />
             </div>
             <div>
               <h1 className="text-xl font-black tracking-tight leading-tight gradient-text">Notificaciones</h1>
@@ -422,28 +422,33 @@ function NotificacionesContent() {
       {loading ? (
         <Skeleton />
       ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center py-20 text-muted-foreground">
-          <CheckCircle2 className="h-12 w-12 mb-4 opacity-20" />
-          <p className="text-sm font-medium">
-            {searchQuery.trim()
-              ? `Sin resultados para "${searchQuery}"`
-              : urgencyFilter !== "all"
-              ? "Sin resultados para este filtro"
-              : "Todo al día"}
-          </p>
-          <p className="text-xs mt-1">
-            {searchQuery.trim()
-              ? "Probá con otro término"
-              : urgencyFilter !== "all"
-              ? "Prueba quitando el filtro de urgencia"
-              : filter === "todos"
-              ? "No hay notificaciones pendientes en los próximos 30 días"
-              : `No hay ${FILTER_TABS.find(t => t.id === filter)?.label.toLowerCase() ?? "items"} pendientes`}
-          </p>
+        <div className="flex flex-col items-center py-20 text-muted-foreground gap-3">
+          <div className="relative">
+            <div className="absolute inset-0 rounded-full blur-2xl opacity-15 bg-green-400 scale-150 pointer-events-none" />
+            <CheckCircle2 className="relative h-14 w-14 opacity-25 empty-state-icon text-green-400" />
+          </div>
+          <div className="text-center space-y-1">
+            <p className="text-sm font-black text-foreground/60">
+              {searchQuery.trim()
+                ? `Sin resultados para "${searchQuery}"`
+                : urgencyFilter !== "all"
+                ? "Sin resultados para este filtro"
+                : "Todo al día"}
+            </p>
+            <p className="text-xs text-muted-foreground/60">
+              {searchQuery.trim()
+                ? "Probá con otro término"
+                : urgencyFilter !== "all"
+                ? "Prueba quitando el filtro de urgencia"
+                : filter === "todos"
+                ? "No hay notificaciones pendientes en los próximos 30 días"
+                : `No hay ${FILTER_TABS.find(t => t.id === filter)?.label.toLowerCase() ?? "items"} pendientes`}
+            </p>
+          </div>
           {(urgencyFilter !== "all" || searchQuery.trim()) && (
             <button
               onClick={() => { setUrgencyFilter("all"); setSearchQuery(""); }}
-              className="mt-3 text-sm text-primary hover:underline transition-all active:scale-95"
+              className="text-sm text-primary hover:underline transition-all active:scale-95"
             >
               Quitar filtros
             </button>

@@ -40,6 +40,7 @@ import Image from "next/image";
 import SongDetailPanel from "@/components/songs/SongDetailPanel";
 import LyricsPanel from "@/components/lyrics/LyricsPanel";
 import { SongRowSkeleton, SongCardSkeleton } from "@/components/ui/Skeletons";
+import { StaggerList, StaggerItem } from "@/components/ui/MotionWrapper";
 import { useAudioPlayerContext } from "@/components/audio/AudioPlayer";
 import SongForm from "@/components/songs/SongForm";
 import CommentsPanel from "@/components/comments/CommentsPanel";
@@ -501,10 +502,10 @@ export default function DiscografiaPage() {
         detailSong ? "flex-1" : "w-full"
       )}>
       {/* Header */}
-      <div className="card-premium relative overflow-hidden rounded-2xl">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-transparent to-transparent pointer-events-none" />
-        <div className="absolute -top-10 -right-10 w-40 h-40 bg-primary/8 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-8 -left-8 w-28 h-28 bg-violet-400/5 rounded-full blur-2xl pointer-events-none" />
+      <div className="card-premium relative overflow-hidden rounded-2xl page-header-hero">
+        <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, hsl(var(--section-hsl, 262 80% 62%) / 0.08) 0%, transparent 60%)" }} />
+        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full blur-3xl pointer-events-none" style={{ background: "hsl(var(--section-hsl, 262 80% 62%) / 0.06)" }} />
+        <div className="absolute -bottom-8 -left-8 w-28 h-28 rounded-full blur-2xl pointer-events-none" style={{ background: "hsl(var(--section-hsl, 262 80% 62%) / 0.04)" }} />
         <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-5">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/30 to-primary/8 border border-primary/25 flex items-center justify-center flex-shrink-0 shadow-[0_0_20px_hsl(var(--primary)/0.2)]">
@@ -1105,11 +1106,15 @@ export default function DiscografiaPage() {
           </div>
         ) : songs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center px-4">
-            <div className="relative mb-5">
-              <div className="absolute inset-0 bg-primary/15 rounded-2xl blur-xl scale-125" />
-              <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 flex items-center justify-center">
-                <Music className="h-8 w-8 text-primary/50" />
-              </div>
+            <div
+              className="relative w-16 h-16 rounded-2xl flex items-center justify-center empty-state-icon mb-5"
+              style={{
+                background: "linear-gradient(135deg, hsl(var(--section-hsl, 262 80% 62%) / 0.20), hsl(var(--section-hsl, 262 80% 62%) / 0.07))",
+                border: "1px solid hsl(var(--section-hsl, 262 80% 62%) / 0.22)",
+                boxShadow: "0 8px 32px hsl(0 0% 0% / 0.15)"
+              }}
+            >
+              <Music className="h-8 w-8" style={{ color: "hsl(var(--section-hsl, 262 80% 62%))" }} />
             </div>
             <p className="text-sm font-medium text-foreground/70">
               {isSearching ? `Sin resultados para "${searchQuery}"` : `No hay canciones en ${selectedYear}`}
@@ -1166,8 +1171,14 @@ export default function DiscografiaPage() {
               <>
                 <div className="relative mb-5">
                   <div className="absolute inset-0 bg-muted/20 rounded-2xl blur-xl scale-125" />
-                  <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-secondary to-secondary/50 border border-border/60 flex items-center justify-center">
-                    <Filter className="h-8 w-8 text-muted-foreground/40" />
+                  <div
+                    className="relative w-16 h-16 rounded-2xl flex items-center justify-center empty-state-icon shadow-[0_8px_32px_hsl(0_0%_0%/0.15)]"
+                    style={{
+                      background: "linear-gradient(135deg, hsl(var(--section-hsl, 262 80% 62%) / 0.20), hsl(var(--section-hsl, 262 80% 62%) / 0.07))",
+                      border: "1px solid hsl(var(--section-hsl, 262 80% 62%) / 0.22)"
+                    }}
+                  >
+                    <Filter className="h-8 w-8" style={{ color: "hsl(var(--section-hsl, 262 80% 62%))" }} />
                   </div>
                 </div>
                 <p className="text-sm font-medium text-foreground/70">Sin canciones con ese filtro</p>
@@ -1225,9 +1236,9 @@ export default function DiscografiaPage() {
             );
           })()
         ) : (
-          <div className="divide-y divide-border/50">
+          <StaggerList className="divide-y divide-border/50">
             {displayedSongs.map((song, idx) => (
-              <div key={song.id} id={`song-row-${song.id}`} className="row-interactive" onDoubleClick={() => handleEdit(song)}>
+              <StaggerItem key={song.id}><div id={`song-row-${song.id}`} className="row-interactive" onDoubleClick={() => handleEdit(song)}>
                 <SongRow
                   song={song}
                   index={idx + 1}
@@ -1238,9 +1249,9 @@ export default function DiscografiaPage() {
                   onToggleFavorite={toggleFavorite}
                   onAction={onAction}
                 />
-              </div>
+              </div></StaggerItem>
             ))}
-          </div>
+          </StaggerList>
         )}
       </div>
       )}

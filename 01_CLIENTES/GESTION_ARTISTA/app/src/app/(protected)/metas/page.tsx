@@ -608,10 +608,10 @@ export default function MetasPage() {
     <PageTransition className="min-h-screen">
       <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
         {/* Header */}
-        <div className="card-premium relative overflow-hidden rounded-2xl">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-transparent to-transparent pointer-events-none" />
-          <div className="absolute -top-10 -right-10 w-40 h-40 bg-primary/8 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-violet-400/6 rounded-full blur-2xl pointer-events-none" />
+        <div className="card-premium relative overflow-hidden rounded-2xl page-header-hero">
+          <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, hsl(var(--section-hsl, 262 80% 62%) / 0.08) 0%, transparent 60%)" }} />
+          <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full blur-3xl pointer-events-none" style={{ background: "hsl(var(--section-hsl, 262 80% 62%) / 0.06)" }} />
+          <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full blur-2xl pointer-events-none" style={{ background: "hsl(var(--section-hsl, 262 80% 62%) / 0.04)" }} />
           <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-5">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/30 to-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
@@ -769,7 +769,16 @@ export default function MetasPage() {
           </div>
         ) : displayedGoals.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-4">
-            <Target className="h-12 w-12 opacity-30" />
+            <div
+              className="relative w-16 h-16 rounded-2xl flex items-center justify-center empty-state-icon"
+              style={{
+                background: "linear-gradient(135deg, hsl(var(--section-hsl, 330 78% 60%) / 0.20), hsl(var(--section-hsl, 330 78% 60%) / 0.07))",
+                border: "1px solid hsl(var(--section-hsl, 330 78% 60%) / 0.22)",
+                boxShadow: "0 8px 32px hsl(0 0% 0% / 0.15)"
+              }}
+            >
+              <Target className="h-8 w-8" style={{ color: "hsl(var(--section-hsl, 330 78% 60%))" }} />
+            </div>
             <div className="text-center">
               <p className="font-medium">
                 {filter === "activas" ? "No hay metas activas" : filter === "completadas" ? "No hay metas completadas" : "No hay metas todavía"}

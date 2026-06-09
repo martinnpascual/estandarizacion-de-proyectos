@@ -34,8 +34,10 @@ import {
 import { CollabSchema, type CollabFormData } from "@/lib/schemas";
 import { translateCollabStatus } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { StaggerList, StaggerItem } from "@/components/ui/MotionWrapper";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { createClient } from "@/lib/supabase/client";
 import type { Collaboration, CollabStatus } from "@/types/database";
 
 const STATUSES: { value: "todos" | CollabStatus; label: string }[] = [
@@ -281,6 +283,19 @@ export default function CollabsPage() {
   useEffect(() => { localStorage.setItem("collabs-view-mode", viewMode); }, [viewMode]);
   useEffect(() => { localStorage.setItem("collabs-sort", sortBy); }, [sortBy]);
 
+  // ─── Supabase Realtime: refresca cuando otro usuario modifica collabs ──────
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel("collabs-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "collaborations" }, () => {
+        loadCollabs();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function openCreate() {
     setEditingCollab(undefined);
     setForm(EMPTY_FORM);
@@ -437,14 +452,14 @@ export default function CollabsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="card-premium relative overflow-hidden rounded-2xl">
-        <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/8 via-transparent to-transparent pointer-events-none" />
-        <div className="absolute -top-10 -right-10 w-40 h-40 bg-yellow-500/8 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-8 -left-8 w-28 h-28 bg-amber-400/5 rounded-full blur-2xl pointer-events-none" />
+      <div className="card-premium relative overflow-hidden rounded-2xl page-header-hero">
+        <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, hsl(var(--section-hsl, 262 80% 62%) / 0.08) 0%, transparent 60%)" }} />
+        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full blur-3xl pointer-events-none" style={{ background: "hsl(var(--section-hsl, 262 80% 62%) / 0.06)" }} />
+        <div className="absolute -bottom-8 -left-8 w-28 h-28 rounded-full blur-2xl pointer-events-none" style={{ background: "hsl(var(--section-hsl, 262 80% 62%) / 0.04)" }} />
         <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-5">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-500/30 to-yellow-600/10 border border-yellow-500/20 flex items-center justify-center flex-shrink-0">
-              <Users className="h-5 w-5 text-yellow-400" />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg, hsl(var(--section-hsl, 262 80% 62%) / 0.30), hsl(var(--section-hsl, 262 80% 62%) / 0.08))", border: "1px solid hsl(var(--section-hsl, 262 80% 62%) / 0.22)" }}>
+              <Users className="h-5 w-5 drop-shadow-[0_0_6px_currentColor]" style={{ color: "hsl(var(--section-hsl, 262 80% 62%))" }} />
             </div>
             <div>
               <h1 className="text-xl font-black tracking-tight leading-tight gradient-text">Featuring</h1>
@@ -806,7 +821,9 @@ export default function CollabsPage() {
           <div className="flex flex-col items-center justify-center py-16 text-center px-4">
             {artistFilter ? (
               <>
-                <Users className="h-10 w-10 text-yellow-400/40 mb-4" />
+                <div className="relative w-14 h-14 rounded-2xl flex items-center justify-center empty-state-icon mb-3" style={{ background: "linear-gradient(135deg, hsl(var(--section-hsl, 306 70% 60%) / 0.20), hsl(var(--section-hsl, 306 70% 60%) / 0.07))", border: "1px solid hsl(var(--section-hsl, 306 70% 60%) / 0.22)", boxShadow: "0 8px 32px hsl(0 0% 0% / 0.15)" }}>
+                  <Users className="h-7 w-7" style={{ color: "hsl(var(--section-hsl, 306 70% 60%))" }} />
+                </div>
                 <p className="text-muted-foreground text-sm font-medium">Sin collabs con {artistFilter}</p>
                 <button onClick={() => setArtistFilter(null)} className="mt-3 text-sm text-primary hover:underline">
                   Ver todas
@@ -814,7 +831,9 @@ export default function CollabsPage() {
               </>
             ) : noDeadlineFilter ? (
               <>
-                <CalendarDays className="h-10 w-10 text-green-400/40 mb-4" />
+                <div className="relative w-14 h-14 rounded-2xl flex items-center justify-center empty-state-icon mb-3" style={{ background: "linear-gradient(135deg, hsl(142 71% 45% / 0.20), hsl(142 71% 45% / 0.07))", border: "1px solid hsl(142 71% 45% / 0.22)", boxShadow: "0 8px 32px hsl(0 0% 0% / 0.15)" }}>
+                  <CalendarDays className="h-7 w-7 text-green-400" />
+                </div>
                 <p className="text-muted-foreground text-sm font-medium">¡Todas tienen deadline! 📅</p>
                 <p className="text-xs text-muted-foreground mt-1">Todas las collabs activas tienen una fecha asignada</p>
                 <button onClick={() => setNoDeadlineFilter(false)} className="mt-3 text-sm text-primary hover:underline">
@@ -823,7 +842,9 @@ export default function CollabsPage() {
               </>
             ) : (
               <>
-                <AlertTriangle className="h-10 w-10 text-green-400/40 mb-4" />
+                <div className="relative w-14 h-14 rounded-2xl flex items-center justify-center empty-state-icon mb-3" style={{ background: "linear-gradient(135deg, hsl(142 71% 45% / 0.20), hsl(142 71% 45% / 0.07))", border: "1px solid hsl(142 71% 45% / 0.22)", boxShadow: "0 8px 32px hsl(0 0% 0% / 0.15)" }}>
+                  <AlertTriangle className="h-7 w-7 text-green-400" />
+                </div>
                 <p className="text-muted-foreground text-sm font-medium">¡Sin vencidos!</p>
                 <p className="text-xs text-muted-foreground mt-1">No hay collabs con deadline vencido</p>
                 <button onClick={() => { setOverdueOnly(false); setNoDeadlineFilter(false); }} className="mt-3 text-sm text-primary hover:underline">
@@ -833,7 +854,7 @@ export default function CollabsPage() {
             )}
           </div>
         ) : (
-          <div className="divide-y divide-border/50">
+          <StaggerList className="divide-y divide-border/50">
             {filteredCollabs.map((collab) => {
               const deadlineInfo = getDeadlineInfo(collab.deadline);
               const isExpanded = expandedId === collab.id;
@@ -1055,7 +1076,7 @@ export default function CollabsPage() {
             </div>
             );
             })}
-          </div>
+          </StaggerList>
         )}
       </div>
 

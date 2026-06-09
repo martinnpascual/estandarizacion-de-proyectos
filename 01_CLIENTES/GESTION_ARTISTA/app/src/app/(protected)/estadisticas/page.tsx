@@ -279,10 +279,10 @@ function EstadisticasContent() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="card-premium relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary/10 via-purple-500/5 to-blue-500/10 p-6">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none" />
-        <div className="absolute -top-10 -right-10 w-44 h-44 bg-primary/8 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-blue-500/6 rounded-full blur-2xl pointer-events-none" />
+      <div className="card-premium relative overflow-hidden rounded-2xl page-header-hero p-6">
+        <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, hsl(var(--section-hsl, 262 80% 62%) / 0.10) 0%, transparent 60%)" }} />
+        <div className="absolute -top-10 -right-10 w-44 h-44 rounded-full blur-3xl pointer-events-none" style={{ background: "hsl(var(--section-hsl, 262 80% 62%) / 0.08)" }} />
+        <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full blur-2xl pointer-events-none" style={{ background: "hsl(var(--section-hsl, 262 80% 62%) / 0.05)" }} />
         <div className="relative flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center shadow-lg shadow-primary/25 flex-shrink-0">
             <BarChart2 className="h-6 w-6 text-white" />
@@ -371,7 +371,16 @@ function DiscografiaTab({ stats }: { stats: AllStats["discografia"] }) {
   if (!stats || stats.totalSongs === 0) {
     return (
       <div className="text-center py-20 text-muted-foreground">
-        <Disc3 className="h-12 w-12 mx-auto mb-3 opacity-20" />
+        <div
+          className="relative w-16 h-16 rounded-2xl flex items-center justify-center empty-state-icon mx-auto mb-3"
+          style={{
+            background: "linear-gradient(135deg, hsl(var(--section-hsl, 178 70% 45%) / 0.20), hsl(var(--section-hsl, 178 70% 45%) / 0.07))",
+            border: "1px solid hsl(var(--section-hsl, 178 70% 45%) / 0.22)",
+            boxShadow: "0 8px 32px hsl(0 0% 0% / 0.15)"
+          }}
+        >
+          <Disc3 className="h-8 w-8" style={{ color: "hsl(var(--section-hsl, 178 70% 45%))" }} />
+        </div>
         <p className="text-sm">Todavía no hay canciones en la discografía</p>
       </div>
     );
@@ -479,8 +488,8 @@ function DiscografiaTab({ stats }: { stats: AllStats["discografia"] }) {
                 <BarChart data={stats.bpmDistribution} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="bpmBarGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#60a5fa" stopOpacity={1} />
-                      <stop offset="100%" stopColor="#818cf8" stopOpacity={0.6} />
+                      <stop offset="0%" stopColor="hsl(var(--section-hsl, 178 70% 45%))" stopOpacity={0.95} />
+                      <stop offset="100%" stopColor="hsl(var(--section-hsl, 178 70% 45%))" stopOpacity={0.45} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
@@ -579,7 +588,16 @@ function MaquetasTab({ stats }: { stats: AllStats["maquetas"] }) {
   if (!stats || stats.total === 0) {
     return (
       <div className="text-center py-20 text-muted-foreground">
-        <FileAudio className="h-12 w-12 mx-auto mb-3 opacity-20" />
+        <div
+          className="relative w-16 h-16 rounded-2xl flex items-center justify-center empty-state-icon mx-auto mb-3"
+          style={{
+            background: "linear-gradient(135deg, hsl(var(--section-hsl, 178 70% 45%) / 0.20), hsl(var(--section-hsl, 178 70% 45%) / 0.07))",
+            border: "1px solid hsl(var(--section-hsl, 178 70% 45%) / 0.22)",
+            boxShadow: "0 8px 32px hsl(0 0% 0% / 0.15)"
+          }}
+        >
+          <FileAudio className="h-8 w-8" style={{ color: "hsl(var(--section-hsl, 178 70% 45%))" }} />
+        </div>
         <p className="text-sm">Todavía no hay maquetas registradas</p>
       </div>
     );
@@ -689,7 +707,16 @@ function CollabsTab({ stats }: { stats: AllStats["collabs"] }) {
   if (!stats || stats.total === 0) {
     return (
       <div className="text-center py-20 text-muted-foreground">
-        <Users className="h-12 w-12 mx-auto mb-3 opacity-20" />
+        <div
+          className="relative w-16 h-16 rounded-2xl flex items-center justify-center empty-state-icon mx-auto mb-3"
+          style={{
+            background: "linear-gradient(135deg, hsl(var(--section-hsl, 178 70% 45%) / 0.20), hsl(var(--section-hsl, 178 70% 45%) / 0.07))",
+            border: "1px solid hsl(var(--section-hsl, 178 70% 45%) / 0.22)",
+            boxShadow: "0 8px 32px hsl(0 0% 0% / 0.15)"
+          }}
+        >
+          <Users className="h-8 w-8" style={{ color: "hsl(var(--section-hsl, 178 70% 45%))" }} />
+        </div>
         <p className="text-sm">Todavía no hay featurings registrados</p>
       </div>
     );
@@ -852,7 +879,16 @@ function ResumenTab({ stats }: { stats: AllStats }) {
   if (!hasAnyData) {
     return (
       <div className="text-center py-20 text-muted-foreground">
-        <BarChart2 className="h-12 w-12 mx-auto mb-3 opacity-20" />
+        <div
+          className="relative w-16 h-16 rounded-2xl flex items-center justify-center empty-state-icon mx-auto mb-3"
+          style={{
+            background: "linear-gradient(135deg, hsl(var(--section-hsl, 178 70% 45%) / 0.20), hsl(var(--section-hsl, 178 70% 45%) / 0.07))",
+            border: "1px solid hsl(var(--section-hsl, 178 70% 45%) / 0.22)",
+            boxShadow: "0 8px 32px hsl(0 0% 0% / 0.15)"
+          }}
+        >
+          <BarChart2 className="h-8 w-8" style={{ color: "hsl(var(--section-hsl, 178 70% 45%))" }} />
+        </div>
         <p className="text-sm">Todavía no hay datos suficientes para el resumen</p>
       </div>
     );
@@ -1272,7 +1308,16 @@ function ProyectosTab({ stats }: { stats: AllStats["projects"] }) {
   if (!stats || stats.total === 0) {
     return (
       <div className="text-center py-20 text-muted-foreground">
-        <FolderOpen className="h-12 w-12 mx-auto mb-3 opacity-20" />
+        <div
+          className="relative w-16 h-16 rounded-2xl flex items-center justify-center empty-state-icon mx-auto mb-3"
+          style={{
+            background: "linear-gradient(135deg, hsl(var(--section-hsl, 178 70% 45%) / 0.20), hsl(var(--section-hsl, 178 70% 45%) / 0.07))",
+            border: "1px solid hsl(var(--section-hsl, 178 70% 45%) / 0.22)",
+            boxShadow: "0 8px 32px hsl(0 0% 0% / 0.15)"
+          }}
+        >
+          <FolderOpen className="h-8 w-8" style={{ color: "hsl(var(--section-hsl, 178 70% 45%))" }} />
+        </div>
         <p className="text-sm">Todavía no hay proyectos registrados</p>
       </div>
     );
@@ -1411,7 +1456,16 @@ function RedesTab({ links, loading }: { links: SocialLinkWithLatestStat[]; loadi
   if (links.length === 0) {
     return (
       <div className="text-center py-20 text-muted-foreground">
-        <Share2 className="h-12 w-12 mx-auto mb-3 opacity-20" />
+        <div
+          className="relative w-16 h-16 rounded-2xl flex items-center justify-center empty-state-icon mx-auto mb-3"
+          style={{
+            background: "linear-gradient(135deg, hsl(var(--section-hsl, 178 70% 45%) / 0.20), hsl(var(--section-hsl, 178 70% 45%) / 0.07))",
+            border: "1px solid hsl(var(--section-hsl, 178 70% 45%) / 0.22)",
+            boxShadow: "0 8px 32px hsl(0 0% 0% / 0.15)"
+          }}
+        >
+          <Share2 className="h-8 w-8" style={{ color: "hsl(var(--section-hsl, 178 70% 45%))" }} />
+        </div>
         <p className="text-sm">No hay redes sociales configuradas</p>
         <a href="/redes" className="inline-flex items-center gap-1 mt-3 text-xs text-primary hover:underline transition-all active:scale-95">
           Configurar redes <ChevronRight className="h-3 w-3" />
@@ -1620,7 +1674,16 @@ function MetasTab({ stats }: { stats: GoalsStats | null }) {
   if (!stats || stats.total === 0) {
     return (
       <div className="text-center py-20 text-muted-foreground">
-        <Target className="h-12 w-12 mx-auto mb-3 opacity-20" />
+        <div
+          className="relative w-16 h-16 rounded-2xl flex items-center justify-center empty-state-icon mx-auto mb-3"
+          style={{
+            background: "linear-gradient(135deg, hsl(var(--section-hsl, 178 70% 45%) / 0.20), hsl(var(--section-hsl, 178 70% 45%) / 0.07))",
+            border: "1px solid hsl(var(--section-hsl, 178 70% 45%) / 0.22)",
+            boxShadow: "0 8px 32px hsl(0 0% 0% / 0.15)"
+          }}
+        >
+          <Target className="h-8 w-8" style={{ color: "hsl(var(--section-hsl, 178 70% 45%))" }} />
+        </div>
         <p className="text-sm">Todavía no hay metas registradas</p>
         <a href="/metas" className="inline-flex items-center gap-1 mt-3 text-xs text-primary hover:underline transition-all active:scale-95">
           Crear primera meta <ChevronRight className="h-3 w-3" />

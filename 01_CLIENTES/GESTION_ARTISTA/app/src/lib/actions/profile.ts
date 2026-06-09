@@ -42,10 +42,35 @@ export async function getProfile(): Promise<{
 export async function updateProfile(
   formData: ProfileFormData
 ): Promise<{ data: Profile | null; error: string | null }> {
-  // ── MINIMAL TEST: skip all Supabase calls ──────────────────────────────
-  // If this still 500s, the bug is in Next.js framework, not our code.
-  void formData; // suppress unused warning
-  return { data: null, error: "TEST: action reached OK" };
+  const parsed = ProfileSchema.safeParse(formData);
+  if (!parsed.success) {
+    const message = parsed.error.errors.map((e) => e.message).join(", ");
+    return { data: null, error: message };
+  }
+
+  const supabase = await createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { data: null, error: "No autenticado" };
+
+  const admin = createAdminSupabaseClient();
+  const { data, error } = await admin
+    .from("profiles")
+    .update({
+      full_name: parsed.data.full_name,
+      avatar_url: parsed.data.avatar_url ?? null,
+      artist_slug: parsed.data.artist_slug ?? null,
+      bio: parsed.data.bio ?? null,
+      studio_name: parsed.data.studio_name ?? null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", user.id)
+    .select("id, email, full_name, avatar_url, artist_slug, bio, studio_name, role, created_at, updated_at, preferences, is_deleted, google_access_token, google_refresh_token, google_token_expiry")
+    .single();
+
+  if (error) return { data: null, error: error.message };
+  return { data: data as Profile, error: null };
 }
 
 /**

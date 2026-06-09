@@ -36,7 +36,7 @@ export default function PublishDraftModal({
 }: PublishDraftModalProps) {
   const [form, setForm] = useState<PublishForm>({
     title: draft.title,
-    artist_name: artistName ?? "BERTIAKA",
+    artist_name: artistName ?? "",
     year: new Date().getFullYear(),
     featuring: "",
     genre: "",

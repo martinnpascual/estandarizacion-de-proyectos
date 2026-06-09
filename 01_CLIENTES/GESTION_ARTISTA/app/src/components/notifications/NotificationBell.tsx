@@ -154,8 +154,10 @@ export default function NotificationBell() {
                 ))}
               </div>
             ) : count === 0 ? (
-              <div className="flex flex-col items-center py-10 text-muted-foreground">
-                <Bell className="h-8 w-8 opacity-20 mb-2" />
+              <div className="flex flex-col items-center py-10 text-muted-foreground gap-2">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center empty-state-icon" style={{ background: "hsl(var(--section-hsl, 25 90% 58%) / 0.15)", border: "1px solid hsl(var(--section-hsl, 25 90% 58%) / 0.20)" }}>
+                  <Bell className="h-6 w-6" style={{ color: "hsl(var(--section-hsl, 25 90% 58%) / 0.70)" }} />
+                </div>
                 <p className="text-xs">Sin notificaciones pendientes</p>
               </div>
             ) : (

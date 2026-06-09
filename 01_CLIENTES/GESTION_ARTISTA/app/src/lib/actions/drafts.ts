@@ -227,6 +227,44 @@ export async function deleteDraftVersion(
   return { error: null };
 }
 
+// ── Portada con IA ────────────────────────────────────────────────────
+
+export async function getDraftsWithoutCovers(): Promise<{
+  data: Array<{ id: string; title: string }> | null;
+  error: string | null;
+}> {
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("drafts")
+    .select("id, title")
+    .eq("is_deleted", false)
+    .is("cover_art_url", null)
+    .order("created_at", { ascending: false });
+
+  if (error) return { data: null, error: error.message };
+  return { data: data as Array<{ id: string; title: string }>, error: null };
+}
+
+export async function updateDraftCoverArt(
+  id: string,
+  coverArtUrl: string | null
+): Promise<{ data: Draft | null; error: string | null }> {
+  const supabase = await createServerSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { data: null, error: "No autenticado" };
+
+  const { data, error } = await supabase
+    .from("drafts")
+    .update({ cover_art_url: coverArtUrl, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("is_deleted", false)
+    .select()
+    .single();
+
+  if (error) return { data: null, error: error.message };
+  return { data: data as Draft, error: null };
+}
+
 // ── Publicar maqueta ──────────────────────────────────────────────────
 
 // Publica una maqueta moviéndola a la tabla songs

@@ -22,6 +22,7 @@ import {
 } from "@/lib/actions/dashboard";
 import { getUpcomingEvents, getUpcomingReleases } from "@/lib/actions/calendar";
 import { getGoals } from "@/lib/actions/goals";
+import { savePreferences } from "@/lib/actions/profile";
 import { useUser } from "@/hooks/useUser";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent, CalendarEventType, Draft, Collaboration, Project, ProjectStatus, Goal } from "@/types/database";
@@ -241,12 +242,30 @@ export default function DashboardPage() {
 
   useEffect(() => {
     load();
-    // Verificar si Google está conectado consultando el perfil
-    fetch("/api/drive/files?q=__check__")
-      .then((r) => r.json())
-      .then((j) => setGoogleLinked(!j.needs_auth))
-      .catch(() => setGoogleLinked(false));
   }, [load]);
+
+  // Derive Google connection state from profile (no extra API call)
+  useEffect(() => {
+    if (profile !== null) {
+      setGoogleLinked(!!profile.google_access_token);
+    }
+  }, [profile]);
+
+  // Sync dashboard config from DB preferences (overrides localStorage if available)
+  useEffect(() => {
+    if (!profile?.preferences) return;
+    const saved = (profile.preferences as Record<string, unknown>)["dashboard_config_v1"] as DashboardConfig | undefined;
+    if (!saved) return;
+    const knownIds = new Set<string>(DEFAULT_WIDGET_ORDER);
+    const validOrder = (saved.order ?? []).filter((id) => knownIds.has(id)) as WidgetId[];
+    const missing = DEFAULT_WIDGET_ORDER.filter((id) => !validOrder.includes(id));
+    const merged: DashboardConfig = {
+      order: [...validOrder, ...missing],
+      hidden: ((saved.hidden ?? []).filter((id) => knownIds.has(id))) as WidgetId[],
+    };
+    setDashConfig(merged);
+    if (typeof window !== "undefined") localStorage.setItem(CONFIG_KEY, JSON.stringify(merged));
+  }, [profile]);
 
   // Keyboard: R = refresh dashboard
   useEffect(() => {
@@ -263,7 +282,7 @@ export default function DashboardPage() {
   // Use profile's full_name if available, fall back to email prefix
   const firstName = profile?.full_name
     ? profile.full_name.split(" ")[0].toUpperCase()
-    : (user?.email?.split("@")[0] ?? "BERTIAKA").toUpperCase();
+    : (user?.email?.split("@")[0] ?? "ARTISTA").toUpperCase();
 
   const greeting = (() => {
     const h = new Date().getHours();
@@ -359,6 +378,8 @@ export default function DashboardPage() {
   function saveDashConfig(cfg: DashboardConfig) {
     setDashConfig(cfg);
     if (typeof window !== "undefined") localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+    // Also persist to DB so config survives device/browser switches (silent fail)
+    savePreferences("dashboard_config_v1", cfg);
   }
   function toggleWidget(id: WidgetId) {
     const hidden = dashConfig.hidden.includes(id)
@@ -404,7 +425,7 @@ export default function DashboardPage() {
     <div className="space-y-5">
 
       {/* ── HERO BANNER ─────────────────────────────────────────────────────── */}
-      <div className="card-premium relative overflow-hidden rounded-2xl">
+      <div className="card-premium relative overflow-hidden rounded-2xl page-header-hero">
         {/* Ambient gradients — section-hsl reactive */}
         <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, hsl(var(--section-hsl, 248 78% 65%) / 0.14) 0%, transparent 60%)" }} />
         <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full blur-3xl pointer-events-none" style={{ background: "hsl(var(--section-hsl, 248 78% 65%) / 0.10)" }} />
@@ -420,8 +441,8 @@ export default function DashboardPage() {
               <div className="relative w-20 h-20 rounded-2xl overflow-hidden border-2 border-primary/35 shadow-[0_0_32px_hsl(var(--primary)/0.35)]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/artist.jpg"
-                  alt="BERTIAKA"
+                  src={profile?.avatar_url ?? "/artist.jpg"}
+                  alt={firstName}
                   className="w-full h-full object-cover"
                   style={{ objectPosition: "50% 12%" }}
                 />
@@ -617,11 +638,15 @@ export default function DashboardPage() {
                   <div className="grid grid-cols-7 gap-1 mb-4">
                     {weekDays.map((day) => (
                       <div key={day.dateStr} className={cn(
-                        "flex flex-col items-center gap-0.5 py-2 px-0.5 rounded-xl transition-all",
-                        day.isToday ? "week-day-today" : "bg-secondary/50 hover:bg-secondary/80"
+                        "flex flex-col items-center gap-0.5 py-2 px-0.5 rounded-xl transition-all cursor-default",
+                        day.isToday
+                          ? "week-day-today"
+                          : day.count > 0
+                          ? "bg-secondary/70 hover:bg-secondary ring-1 ring-inset ring-border/40"
+                          : "bg-secondary/40 hover:bg-secondary/65"
                       )}>
                         <span className={cn("text-[9px] uppercase tracking-wide font-black",
-                          day.isToday ? "text-primary" : "text-muted-foreground/55")}>
+                          day.isToday ? "text-primary" : day.count > 0 ? "text-foreground/70" : "text-muted-foreground/50")}>
                           {day.label}
                         </span>
                         <span className={cn(
@@ -629,7 +654,7 @@ export default function DashboardPage() {
                           day.isToday
                             ? "text-base font-black text-primary drop-shadow-[0_0_8px_hsl(var(--primary)/0.5)]"
                             : day.count > 0 ? "text-sm font-bold text-foreground"
-                            : "text-sm font-medium text-muted-foreground/35"
+                            : "text-sm font-medium text-muted-foreground/30"
                         )}>
                           {day.dayNum}
                         </span>
@@ -638,7 +663,7 @@ export default function DashboardPage() {
                             <span key={i} className={cn("rounded-full transition-all",
                               day.isToday
                                 ? "w-1.5 h-1.5 bg-primary shadow-[0_0_4px_hsl(var(--primary)/0.8)]"
-                                : "w-1 h-1 bg-muted-foreground/40")} />
+                                : "w-1.5 h-1.5 bg-green-400 shadow-[0_0_4px_hsl(142_70%_55%/0.7)]")} />
                           ))}
                           {day.count === 0 && <span className="w-1 h-1" />}
                         </div>

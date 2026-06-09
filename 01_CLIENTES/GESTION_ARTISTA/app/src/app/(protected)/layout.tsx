@@ -6,21 +6,23 @@ import { useRouter, usePathname } from "next/navigation";
 // Mapa de sección → color HSL (h s% l%) para el degradado ambiente del body
 // Paleta alineada al primario violeta (262°): blues, índigos, magentas, rosas, teales
 const SECTION_HSL: Record<string, string> = {
-  "/discografia":  "262 80% 62%",  // violeta — primario
-  "/maquetas":     "220 80% 62%",  // azul
-  "/dashboard":    "248 78% 65%",  // azul-violeta
-  "/setlists":     "286 72% 62%",  // púrpura suave
-  "/collabs":      "306 70% 60%",  // fucsia
-  "/proyectos":    "192 75% 50%",  // cian
-  "/calendario":   "205 80% 58%",  // cielo
-  "/estadisticas": "178 70% 45%",  // teal
-  "/ingresos":     "155 65% 48%",  // verde esmeralda
-  "/gastos":       "348 72% 58%",  // rosa-rojo
-  "/metas":        "330 78% 60%",  // rosa
-  "/redes":        "252 82% 65%",  // índigo
-  "/equipo":       "312 70% 58%",  // magenta cálido
-  "/analizar":     "278 80% 65%",  // violeta eléctrico
-  "/perfil":       "262 80% 62%",  // mismo que primario
+  "/discografia":      "262 80% 62%",  // violeta — primario
+  "/maquetas":         "220 80% 62%",  // azul
+  "/dashboard":        "248 78% 65%",  // azul-violeta
+  "/setlists":         "286 72% 62%",  // púrpura suave
+  "/collabs":          "306 70% 60%",  // fucsia
+  "/proyectos":        "192 75% 50%",  // cian
+  "/calendario":       "205 80% 58%",  // cielo
+  "/estadisticas":     "178 70% 45%",  // teal
+  "/ingresos":         "155 65% 48%",  // verde esmeralda
+  "/gastos":           "348 72% 58%",  // rosa-rojo
+  "/metas":            "330 78% 60%",  // rosa
+  "/redes":            "252 82% 65%",  // índigo
+  "/equipo":           "312 70% 58%",  // magenta cálido
+  "/analizar":         "278 80% 65%",  // violeta eléctrico
+  "/perfil":           "262 80% 62%",  // mismo que primario
+  "/notificaciones":   "25 90% 58%",   // naranja — alertas
+  "/papelera":         "210 15% 52%",  // gris neutro — trash
 };
 
 function getSectionHsl(pathname: string): string {
@@ -37,8 +39,10 @@ import { CommandMenuProvider } from "@/components/search/CommandMenu";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import NavProgressBar from "@/components/ui/NavProgressBar";
 import OnboardingModal from "@/components/layout/OnboardingModal";
+import ContextualFAB from "@/components/layout/ContextualFAB";
+import DeadlineAlerts from "@/components/layout/DeadlineAlerts";
 
-/** Componente interno que puede leer el contexto del player para ajustar el padding */
+/** Componente interno que puede leer el contexto del player para ajustar el padding y el FAB */
 function LayoutContent({ children }: { children: React.ReactNode }) {
   const { currentTrack } = useAudioPlayerContext();
   return (
@@ -101,6 +105,8 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
         }} />
       </div>
       <div className="relative z-10 p-4 md:p-6 lg:p-8 page-enter">{children}</div>
+      {/* ── FAB contextual ────────────────────────────────────────────── */}
+      <ContextualFAB playerActive={!!currentTrack} />
     </main>
   );
 }
@@ -192,6 +198,8 @@ export default function ProtectedLayout({
             <Sidebar />
             <LayoutContent>{children}</LayoutContent>
             <AudioPlayer />
+            {/* ── Alertas de deadline próximas ──────────────────────── */}
+            <DeadlineAlerts />
           </div>
           {showOnboarding && (
             <OnboardingModal onClose={() => setShowOnboarding(false)} />

@@ -40,7 +40,7 @@ const KEY_SIGNATURES = [
 
 const EMPTY_FORM: SongFormData = {
   title: "",
-  artist_name: "BERTIAKA",
+  artist_name: "",
   featuring: [],
   year: CURRENT_YEAR,
   genre: null,

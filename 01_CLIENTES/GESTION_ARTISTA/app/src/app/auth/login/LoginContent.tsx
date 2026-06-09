@@ -241,7 +241,7 @@ function LoginContent({ studioName }: { studioName: string }) {
               {/* Google login */}
               <button
                 onClick={handleGoogleLogin}
-                className="w-full flex items-center justify-center gap-3 px-4 py-2.5 bg-white/5 border border-border/60 rounded-xl hover:bg-white/10 hover:border-border transition-all active:scale-95 text-sm font-medium"
+                className="w-full flex items-center justify-center gap-3 px-4 py-2.5 bg-white/5 border border-border/60 rounded-xl hover:bg-white/10 hover:border-border hover:-translate-y-0.5 hover:shadow-[0_8px_24px_hsl(0_0%_0%/0.25)] transition-all active:scale-95 text-sm font-medium"
               >
                 <svg className="h-4 w-4 flex-shrink-0" viewBox="0 0 24 24">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
@@ -389,7 +389,7 @@ function SubmitButton({
     <button
       type="submit"
       disabled={loading}
-      className="relative w-full py-2.5 rounded-xl text-sm font-semibold overflow-hidden disabled:opacity-60 transition-all active:scale-95 group"
+      className="relative w-full py-2.5 rounded-xl text-sm font-black overflow-hidden disabled:opacity-60 transition-all active:scale-95 btn-shine group"
     >
       <span className="absolute inset-0 bg-gradient-to-r from-primary to-primary/80 transition-opacity group-hover:opacity-90" />
       <span className="absolute inset-0 bg-gradient-to-r from-primary to-primary/80 blur-md opacity-40 scale-110 group-hover:opacity-60 transition-opacity" />

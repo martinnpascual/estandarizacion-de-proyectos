@@ -31,10 +31,15 @@ import {
   ListPlus,
   Clock,
   Heart,
+  Sparkles,
 } from "lucide-react";
 import DraftVersionsPanel from "@/components/drafts/DraftVersionsPanel";
+import WaveformPlayer from "@/components/audio/WaveformPlayer";
+import AICoverModal from "@/components/drafts/AICoverModal";
+import BulkCoversModal from "@/components/drafts/BulkCoversModal";
 import LyricsPanel from "@/components/lyrics/LyricsPanel";
 import { SongRowSkeleton } from "@/components/ui/Skeletons";
+import { StaggerList, StaggerItem } from "@/components/ui/MotionWrapper";
 import DraftKanbanBoard from "@/components/drafts/DraftKanbanBoard";
 import CommentsPanel from "@/components/comments/CommentsPanel";
 import { useAudioPlayerContext } from "@/components/audio/AudioPlayer";
@@ -148,7 +153,10 @@ export default function MaquetasPage() {
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
   const [versionsOpenId, setVersionsOpenId] = useState<string | null>(null);
   const [commentsOpenId, setCommentsOpenId] = useState<string | null>(null);
+  const [waveformOpenId, setWaveformOpenId] = useState<string | null>(null);
   const [lyricsDraft, setLyricsDraft] = useState<Draft | null>(null);
+  const [aiCoverDraft, setAiCoverDraft] = useState<Draft | null>(null);
+  const [bulkCoversOpen, setBulkCoversOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "board">(() =>
     typeof window !== "undefined"
       ? (localStorage.getItem("maquetas-view-mode") as "list" | "board") || "list"
@@ -163,6 +171,7 @@ export default function MaquetasPage() {
   );
   const [missingAudioFilter, setMissingAudioFilter] = useState(false);
   const [missingBpmFilter, setMissingBpmFilter] = useState(false);
+  const [missingCoverArtFilter, setMissingCoverArtFilter] = useState(false);
   const [staleFilter, setStaleFilter] = useState(false);
   const [producerFilter, setProducerFilter] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
@@ -416,6 +425,9 @@ export default function MaquetasPage() {
         (Date.now() - new Date(d.month_created + "-01").getTime()) > 180 * 86_400_000
       );
     }
+    if (missingCoverArtFilter) {
+      result = result.filter(d => !d.cover_art_url);
+    }
     if (producerFilter) {
       result = result.filter(d => d.producer === producerFilter);
     }
@@ -432,7 +444,7 @@ export default function MaquetasPage() {
   })();
 
   // Group by month_created for the "Recientes" view
-  const showMonthGroups = sortBy === "default" && !isSearching && statusFilter === "todos" && !missingAudioFilter && !missingBpmFilter && !staleFilter && activeTab === "todas";
+  const showMonthGroups = sortBy === "default" && !isSearching && statusFilter === "todos" && !missingAudioFilter && !missingBpmFilter && !staleFilter && !missingCoverArtFilter && activeTab === "todas";
   const draftsByMonth: { month: string; label: string; drafts: Draft[] }[] = [];
   if (showMonthGroups) {
     const seen = new Map<string, Draft[]>();
@@ -538,13 +550,13 @@ export default function MaquetasPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="card-premium relative overflow-hidden rounded-2xl">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-transparent to-transparent" />
-        <div className="absolute -top-16 -right-16 w-56 h-56 bg-blue-500/8 rounded-full blur-3xl" />
+      <div className="card-premium relative overflow-hidden rounded-2xl page-header-hero">
+        <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, hsl(var(--section-hsl, 262 80% 62%) / 0.08) 0%, transparent 60%)" }} />
+        <div className="absolute -top-16 -right-16 w-56 h-56 rounded-full blur-3xl pointer-events-none" style={{ background: "hsl(var(--section-hsl, 262 80% 62%) / 0.06)" }} />
         <div className="relative px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500/30 to-blue-600/8 border border-blue-500/25 flex items-center justify-center flex-shrink-0 shadow-[0_0_20px_hsl(220_80%_60%/0.18)]">
-              <FileAudio className="h-6 w-6 text-blue-400 drop-shadow-[0_0_6px_hsl(220_80%_60%/0.5)]" />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg, hsl(var(--section-hsl, 262 80% 62%) / 0.30), hsl(var(--section-hsl, 262 80% 62%) / 0.08))", border: "1px solid hsl(var(--section-hsl, 262 80% 62%) / 0.22)" }}>
+              <FileAudio className="h-6 w-6 drop-shadow-[0_0_6px_currentColor]" style={{ color: "hsl(var(--section-hsl, 262 80% 62%))" }} />
             </div>
             <div>
               <h1 className="text-xl font-black tracking-tight gradient-text">Maquetas</h1>
@@ -565,6 +577,17 @@ export default function MaquetasPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {/* Generar portadas en masa */}
+            {!loading && drafts.filter(d => !d.cover_art_url).length > 0 && (
+              <button
+                onClick={() => setBulkCoversOpen(true)}
+                title={`Generar portadas con IA para ${drafts.filter(d => !d.cover_art_url).length} maquetas`}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-violet-500/40 text-sm text-violet-400 hover:bg-violet-500/10 transition-all active:scale-95"
+              >
+                <Sparkles className="h-4 w-4" />
+                <span className="hidden sm:inline">Portadas IA</span>
+              </button>
+            )}
             {/* Export CSV */}
             {!loading && drafts.length > 0 && (
               <button
@@ -764,12 +787,13 @@ export default function MaquetasPage() {
           d.status === "borrador" && d.month_created != null &&
           (Date.now() - new Date(d.month_created + "-01").getTime()) > 180 * 86_400_000
         ).length;
-        if (withoutAudio === 0 && withoutBpm === 0 && staleCount === 0) return null;
+        const withoutCovers = drafts.filter(d => !d.cover_art_url).length;
+        if (withoutAudio === 0 && withoutBpm === 0 && staleCount === 0 && withoutCovers === 0) return null;
         return (
           <div className="flex items-center gap-2 flex-wrap">
             {withoutAudio > 0 && (
               <button
-                onClick={() => { setMissingAudioFilter(!missingAudioFilter); setMissingBpmFilter(false); setStaleFilter(false); }}
+                onClick={() => { setMissingAudioFilter(!missingAudioFilter); setMissingBpmFilter(false); setStaleFilter(false); setMissingCoverArtFilter(false); }}
                 className={cn(
                   "flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full transition-all active:scale-95",
                   missingAudioFilter
@@ -784,7 +808,7 @@ export default function MaquetasPage() {
             )}
             {withoutBpm > 0 && (
               <button
-                onClick={() => { setMissingBpmFilter(!missingBpmFilter); setMissingAudioFilter(false); setStaleFilter(false); }}
+                onClick={() => { setMissingBpmFilter(!missingBpmFilter); setMissingAudioFilter(false); setStaleFilter(false); setMissingCoverArtFilter(false); }}
                 className={cn(
                   "flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full transition-all active:scale-95",
                   missingBpmFilter
@@ -799,7 +823,7 @@ export default function MaquetasPage() {
             )}
             {staleCount > 0 && (
               <button
-                onClick={() => { setStaleFilter(!staleFilter); setMissingAudioFilter(false); setMissingBpmFilter(false); }}
+                onClick={() => { setStaleFilter(!staleFilter); setMissingAudioFilter(false); setMissingBpmFilter(false); setMissingCoverArtFilter(false); }}
                 className={cn(
                   "flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full transition-all active:scale-95",
                   staleFilter
@@ -810,6 +834,21 @@ export default function MaquetasPage() {
                 <Clock className="h-3 w-3 flex-shrink-0" />
                 {staleCount} estancadas
                 {staleFilter && <X className="h-2.5 w-2.5 ml-0.5 opacity-70" />}
+              </button>
+            )}
+            {withoutCovers > 0 && (
+              <button
+                onClick={() => { setMissingCoverArtFilter(!missingCoverArtFilter); setMissingAudioFilter(false); setMissingBpmFilter(false); setStaleFilter(false); }}
+                className={cn(
+                  "flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full transition-all active:scale-95",
+                  missingCoverArtFilter
+                    ? "bg-violet-500/18 text-violet-400 border border-violet-500/40 font-black shadow-[0_0_10px_hsl(263_70%_60%/0.15)]"
+                    : "bg-secondary text-muted-foreground hover:text-foreground font-medium"
+                )}
+              >
+                <Sparkles className="h-3 w-3 flex-shrink-0" />
+                {withoutCovers} sin portada
+                {missingCoverArtFilter && <X className="h-2.5 w-2.5 ml-0.5 opacity-70" />}
               </button>
             )}
           </div>
@@ -928,6 +967,7 @@ export default function MaquetasPage() {
                           isUpdatingStatus={updatingStatusId === draft.id}
                           versionsOpen={versionsOpenId === draft.id}
                           commentsOpen={commentsOpenId === draft.id}
+                          waveformOpen={waveformOpenId === draft.id}
                           selected={selectedIds.has(draft.id)}
                           anySelected={selectedIds.size > 0}
                           onSelect={() => toggleSelect(draft.id)}
@@ -938,10 +978,12 @@ export default function MaquetasPage() {
                           onPublish={() => setPublishingDraft(draft)}
                           onToggleVersions={() => setVersionsOpenId((prev) => prev === draft.id ? null : draft.id)}
                           onToggleComments={() => setCommentsOpenId((prev) => prev === draft.id ? null : draft.id)}
+                          onToggleWaveform={() => setWaveformOpenId((prev) => prev === draft.id ? null : draft.id)}
                           onOpenLyrics={() => setLyricsDraft(draft)}
                           onAddToQueue={() => { player.addToQueue(draftToTrack(draft)); toast.success(`"${draft.title}" añadida a la cola`); }}
                           isFavorited={favoritedIds.has(draft.id)}
                           onToggleFavorite={() => toggleFavorite(draft.id)}
+                          onGenerateCover={() => setAiCoverDraft(draft)}
                         />
                         {versionsOpenId === draft.id && (
                           <DraftVersionsPanel draftId={draft.id} draftTitle={draft.title} />
@@ -949,6 +991,16 @@ export default function MaquetasPage() {
                         {commentsOpenId === draft.id && (
                           <div className="border-t border-border/60 max-h-96 overflow-hidden flex flex-col">
                             <CommentsPanel draft_id={draft.id} currentUserId={user?.id} />
+                          </div>
+                        )}
+                        {waveformOpenId === draft.id && (draft.drive_file_url || draft.drive_file_id) && (
+                          <div className="border-t border-border/40 px-4 py-3 bg-secondary/20">
+                            <WaveformPlayer
+                              url={draft.drive_file_id ? `/api/drive/stream/${draft.drive_file_id}` : draft.drive_file_url!}
+                              waveColor="hsl(var(--section-hsl, 220 80% 62%) / 0.35)"
+                              progressColor="hsl(var(--section-hsl, 220 80% 62%))"
+                              height={52}
+                            />
                           </div>
                         )}
                       </div>
@@ -968,6 +1020,7 @@ export default function MaquetasPage() {
                       isUpdatingStatus={updatingStatusId === draft.id}
                       versionsOpen={versionsOpenId === draft.id}
                       commentsOpen={commentsOpenId === draft.id}
+                      waveformOpen={waveformOpenId === draft.id}
                       selected={selectedIds.has(draft.id)}
                       anySelected={selectedIds.size > 0}
                       onSelect={() => toggleSelect(draft.id)}
@@ -978,9 +1031,11 @@ export default function MaquetasPage() {
                       onPublish={() => setPublishingDraft(draft)}
                       onToggleVersions={() => setVersionsOpenId((prev) => prev === draft.id ? null : draft.id)}
                       onToggleComments={() => setCommentsOpenId((prev) => prev === draft.id ? null : draft.id)}
+                      onToggleWaveform={() => setWaveformOpenId((prev) => prev === draft.id ? null : draft.id)}
                       onOpenLyrics={() => setLyricsDraft(draft)}
                       isFavorited={favoritedIds.has(draft.id)}
                       onToggleFavorite={() => toggleFavorite(draft.id)}
+                      onGenerateCover={() => setAiCoverDraft(draft)}
                     />
                     {versionsOpenId === draft.id && (
                       <DraftVersionsPanel draftId={draft.id} draftTitle={draft.title} />
@@ -988,6 +1043,16 @@ export default function MaquetasPage() {
                     {commentsOpenId === draft.id && (
                       <div className="border-t border-border/60 max-h-96 overflow-hidden flex flex-col">
                         <CommentsPanel draft_id={draft.id} currentUserId={user?.id} />
+                      </div>
+                    )}
+                    {waveformOpenId === draft.id && (draft.drive_file_url || draft.drive_file_id) && (
+                      <div className="border-t border-border/40 px-4 py-3 bg-secondary/20">
+                        <WaveformPlayer
+                          url={draft.drive_file_id ? `/api/drive/stream/${draft.drive_file_id}` : draft.drive_file_url!}
+                          waveColor="hsl(var(--section-hsl, 220 80% 62%) / 0.35)"
+                          progressColor="hsl(var(--section-hsl, 220 80% 62%))"
+                          height={52}
+                        />
                       </div>
                     )}
                   </div>
@@ -1067,6 +1132,34 @@ export default function MaquetasPage() {
         />
       )}
 
+      {/* Modal de portadas en masa con IA */}
+      {bulkCoversOpen && (
+        <BulkCoversModal
+          onClose={() => setBulkCoversOpen(false)}
+          onDone={(updatedIds) => {
+            setBulkCoversOpen(false);
+            if (updatedIds.length > 0) {
+              // Reload drafts to pick up the new cover_art_url values
+              loadDrafts();
+            }
+          }}
+        />
+      )}
+
+      {/* Modal de portada con IA */}
+      {aiCoverDraft && (
+        <AICoverModal
+          draft={aiCoverDraft}
+          onClose={() => setAiCoverDraft(null)}
+          onSaved={(updatedDraft) => {
+            setDrafts((prev) =>
+              prev.map((d) => (d.id === updatedDraft.id ? updatedDraft : d))
+            );
+            setAiCoverDraft(null);
+          }}
+        />
+      )}
+
       {/* Panel de letras */}
       {lyricsDraft && (
         <LyricsPanel
@@ -1097,6 +1190,7 @@ interface DraftRowProps {
   isUpdatingStatus: boolean;
   versionsOpen: boolean;
   commentsOpen: boolean;
+  waveformOpen: boolean;
   selected: boolean;
   anySelected: boolean;
   onSelect: () => void;
@@ -1111,6 +1205,7 @@ interface DraftRowProps {
   onAddToQueue?: () => void;
   isFavorited: boolean;
   onToggleFavorite: () => void;
+  onGenerateCover: () => void;
 }
 
 function DraftRow({
@@ -1134,7 +1229,10 @@ function DraftRow({
   onAddToQueue,
   isFavorited,
   onToggleFavorite,
-}: DraftRowProps) {
+  onGenerateCover,
+  waveformOpen,
+  onToggleWaveform,
+}: DraftRowProps & { onToggleWaveform?: () => void }) {
   const hasAudio = !!draft.drive_file_id || !!draft.drive_file_url;
   const canAdvance = STATUS_NEXT[draft.status] !== null;
   const isReady = draft.status === "lista_para_publicar";
@@ -1387,6 +1485,24 @@ function DraftRow({
         </a>
       )}
 
+      {/* Waveform toggle — muestra la onda real del audio */}
+      {hasAudio && onToggleWaveform && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleWaveform(); }}
+          title={waveformOpen ? "Ocultar waveform" : "Ver waveform real"}
+          className={cn(
+            "flex-shrink-0 p-1.5 rounded-xl transition-all active:scale-95",
+            waveformOpen
+              ? "text-primary bg-primary/15 border border-primary/25"
+              : "text-muted-foreground hover:text-primary hover:bg-primary/10 hidden group-hover:flex"
+          )}
+        >
+          <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+            <path d="M1 8h1M3 5v6M5 3v10M7 6v4M9 4v8M11 5v6M13 6v4M15 8h-1" />
+          </svg>
+        </button>
+      )}
+
       {/* Analizar BPM hint — solo si hay audio y faltan datos musicales */}
       {hasAudio && !draft.bpm && !draft.key_signature && (
         <a
@@ -1398,6 +1514,18 @@ function DraftRow({
           <Zap className="h-3 w-3" />
           BPM
         </a>
+      )}
+
+      {/* Generar portada con IA — visible en hover cuando no hay cover art */}
+      {!draft.cover_art_url && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onGenerateCover(); }}
+          title="Generar portada con IA"
+          className="hidden group-hover:flex items-center gap-1 px-2 py-1 rounded-xl bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 transition-all active:scale-95 flex-shrink-0 text-[10px] font-medium"
+        >
+          <Sparkles className="h-3 w-3" />
+          Portada
+        </button>
       )}
 
       {/* Favorito */}

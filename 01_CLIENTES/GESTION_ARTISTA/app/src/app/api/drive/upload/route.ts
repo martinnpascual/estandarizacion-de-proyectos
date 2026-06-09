@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { Readable } from "stream";
+import { rateLimit } from "@/lib/rate-limit";
 
 // ─── Shared: get authenticated Drive client ───────────────────────────────────
 async function getAuthenticatedDrive(userId: string) {
@@ -81,6 +82,18 @@ export async function POST(request: NextRequest) {
 
   if (!user) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  }
+
+  // Rate limit: 60 uploads per user per hour
+  const { allowed, resetAt } = rateLimit(`upload:${user.id}`, 60, 60 * 60_000);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Demasiadas subidas. Intentá de nuevo en un rato." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil((resetAt - Date.now()) / 1000)) },
+      }
+    );
   }
 
   const drive = await getAuthenticatedDrive(user.id);

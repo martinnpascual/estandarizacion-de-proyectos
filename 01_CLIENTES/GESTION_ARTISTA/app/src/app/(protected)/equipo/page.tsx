@@ -32,6 +32,7 @@ import { useUser } from "@/hooks/useUser";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { StaggerList, StaggerItem } from "@/components/ui/MotionWrapper";
 import type { Profile, TeamInvitation, UserRole } from "@/types/database";
 
 // ─── Avatar color helper ──────────────────────────────────────────────────────
@@ -241,14 +242,14 @@ export default function EquipoPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="card-premium relative overflow-hidden rounded-2xl">
-        <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/8 via-transparent to-transparent pointer-events-none" />
-        <div className="absolute -top-10 -right-10 w-40 h-40 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-blue-400/6 rounded-full blur-2xl pointer-events-none" />
+      <div className="card-premium relative overflow-hidden rounded-2xl page-header-hero">
+        <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, hsl(var(--section-hsl, 262 80% 62%) / 0.08) 0%, transparent 60%)" }} />
+        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full blur-3xl pointer-events-none" style={{ background: "hsl(var(--section-hsl, 262 80% 62%) / 0.06)" }} />
+        <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full blur-2xl pointer-events-none" style={{ background: "hsl(var(--section-hsl, 262 80% 62%) / 0.04)" }} />
         <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-5">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/30 to-cyan-600/10 border border-cyan-500/20 flex items-center justify-center flex-shrink-0">
-              <UserCog className="h-5 w-5 text-cyan-400" />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg, hsl(var(--section-hsl, 262 80% 62%) / 0.30), hsl(var(--section-hsl, 262 80% 62%) / 0.08))", border: "1px solid hsl(var(--section-hsl, 262 80% 62%) / 0.22)" }}>
+              <UserCog className="h-5 w-5 drop-shadow-[0_0_6px_currentColor]" style={{ color: "hsl(var(--section-hsl, 262 80% 62%))" }} />
             </div>
             <div>
               <h1 className="text-xl font-black tracking-tight gradient-text">Equipo</h1>
@@ -486,7 +487,16 @@ export default function EquipoPage() {
             if (filtered.length === 0) {
               return (
                 <div className="flex flex-col items-center justify-center py-10 text-center px-4 gap-2">
-                  <Users className="h-8 w-8 text-muted-foreground/30" />
+                  <div
+                    className="relative w-14 h-14 rounded-2xl flex items-center justify-center empty-state-icon mb-1"
+                    style={{
+                      background: "linear-gradient(135deg, hsl(var(--section-hsl, 312 70% 58%) / 0.20), hsl(var(--section-hsl, 312 70% 58%) / 0.07))",
+                      border: "1px solid hsl(var(--section-hsl, 312 70% 58%) / 0.22)",
+                      boxShadow: "0 8px 32px hsl(0 0% 0% / 0.15)"
+                    }}
+                  >
+                    <Users className="h-7 w-7" style={{ color: "hsl(var(--section-hsl, 312 70% 58%))" }} />
+                  </div>
                   <p className="text-sm text-muted-foreground">
                     {searchQuery.trim()
                       ? `Sin resultados para "${searchQuery}"`
@@ -505,15 +515,15 @@ export default function EquipoPage() {
             }
 
             return (
-              <div className="divide-y divide-border/50">
+              <StaggerList className="divide-y divide-border/50">
                 {filtered.map((member) => {
                   const meta = ROLE_META[member.role];
                   const isCurrentUser = member.id === user?.id;
                   const isArtist = member.role === "artista";
 
                   return (
+                    <StaggerItem key={member.id}>
                     <div
-                      key={member.id}
                       className="row-interactive flex items-center gap-3 px-4 py-3.5 hover:bg-secondary/30 transition-all group"
                     >
                       {/* Avatar */}
@@ -619,9 +629,10 @@ export default function EquipoPage() {
                         );
                       })()}
                     </div>
+                    </StaggerItem>
                   );
                 })}
-              </div>
+              </StaggerList>
             );
           })()
         )}
