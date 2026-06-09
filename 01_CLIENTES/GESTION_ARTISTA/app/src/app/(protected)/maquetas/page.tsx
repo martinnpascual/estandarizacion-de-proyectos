@@ -36,6 +36,7 @@ import {
 import DraftVersionsPanel from "@/components/drafts/DraftVersionsPanel";
 import WaveformPlayer from "@/components/audio/WaveformPlayer";
 import AICoverModal from "@/components/drafts/AICoverModal";
+import AISuggestPanel from "@/components/drafts/AISuggestPanel";
 import BulkCoversModal from "@/components/drafts/BulkCoversModal";
 import LyricsPanel from "@/components/lyrics/LyricsPanel";
 import { SongRowSkeleton } from "@/components/ui/Skeletons";
@@ -154,6 +155,7 @@ export default function MaquetasPage() {
   const [versionsOpenId, setVersionsOpenId] = useState<string | null>(null);
   const [commentsOpenId, setCommentsOpenId] = useState<string | null>(null);
   const [waveformOpenId, setWaveformOpenId] = useState<string | null>(null);
+  const [aiSuggestOpenId, setAiSuggestOpenId] = useState<string | null>(null);
   const [lyricsDraft, setLyricsDraft] = useState<Draft | null>(null);
   const [aiCoverDraft, setAiCoverDraft] = useState<Draft | null>(null);
   const [bulkCoversOpen, setBulkCoversOpen] = useState(false);
@@ -968,6 +970,7 @@ export default function MaquetasPage() {
                           versionsOpen={versionsOpenId === draft.id}
                           commentsOpen={commentsOpenId === draft.id}
                           waveformOpen={waveformOpenId === draft.id}
+                          aiSuggestOpen={aiSuggestOpenId === draft.id}
                           selected={selectedIds.has(draft.id)}
                           anySelected={selectedIds.size > 0}
                           onSelect={() => toggleSelect(draft.id)}
@@ -979,6 +982,7 @@ export default function MaquetasPage() {
                           onToggleVersions={() => setVersionsOpenId((prev) => prev === draft.id ? null : draft.id)}
                           onToggleComments={() => setCommentsOpenId((prev) => prev === draft.id ? null : draft.id)}
                           onToggleWaveform={() => setWaveformOpenId((prev) => prev === draft.id ? null : draft.id)}
+                          onToggleAiSuggest={() => setAiSuggestOpenId((prev) => prev === draft.id ? null : draft.id)}
                           onOpenLyrics={() => setLyricsDraft(draft)}
                           onAddToQueue={() => { player.addToQueue(draftToTrack(draft)); toast.success(`"${draft.title}" añadida a la cola`); }}
                           isFavorited={favoritedIds.has(draft.id)}
@@ -1003,6 +1007,9 @@ export default function MaquetasPage() {
                             />
                           </div>
                         )}
+                        {aiSuggestOpenId === draft.id && (
+                          <AISuggestPanel key={draft.id} draft={draft} />
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1021,6 +1028,7 @@ export default function MaquetasPage() {
                       versionsOpen={versionsOpenId === draft.id}
                       commentsOpen={commentsOpenId === draft.id}
                       waveformOpen={waveformOpenId === draft.id}
+                      aiSuggestOpen={aiSuggestOpenId === draft.id}
                       selected={selectedIds.has(draft.id)}
                       anySelected={selectedIds.size > 0}
                       onSelect={() => toggleSelect(draft.id)}
@@ -1032,6 +1040,7 @@ export default function MaquetasPage() {
                       onToggleVersions={() => setVersionsOpenId((prev) => prev === draft.id ? null : draft.id)}
                       onToggleComments={() => setCommentsOpenId((prev) => prev === draft.id ? null : draft.id)}
                       onToggleWaveform={() => setWaveformOpenId((prev) => prev === draft.id ? null : draft.id)}
+                      onToggleAiSuggest={() => setAiSuggestOpenId((prev) => prev === draft.id ? null : draft.id)}
                       onOpenLyrics={() => setLyricsDraft(draft)}
                       isFavorited={favoritedIds.has(draft.id)}
                       onToggleFavorite={() => toggleFavorite(draft.id)}
@@ -1054,6 +1063,9 @@ export default function MaquetasPage() {
                           height={52}
                         />
                       </div>
+                    )}
+                    {aiSuggestOpenId === draft.id && (
+                      <AISuggestPanel key={draft.id} draft={draft} />
                     )}
                   </div>
                 ))}
@@ -1191,6 +1203,7 @@ interface DraftRowProps {
   versionsOpen: boolean;
   commentsOpen: boolean;
   waveformOpen: boolean;
+  aiSuggestOpen: boolean;
   selected: boolean;
   anySelected: boolean;
   onSelect: () => void;
@@ -1232,7 +1245,9 @@ function DraftRow({
   onGenerateCover,
   waveformOpen,
   onToggleWaveform,
-}: DraftRowProps & { onToggleWaveform?: () => void }) {
+  aiSuggestOpen,
+  onToggleAiSuggest,
+}: DraftRowProps & { onToggleWaveform?: () => void; onToggleAiSuggest?: () => void }) {
   const hasAudio = !!draft.drive_file_id || !!draft.drive_file_url;
   const canAdvance = STATUS_NEXT[draft.status] !== null;
   const isReady = draft.status === "lista_para_publicar";
@@ -1525,6 +1540,23 @@ function DraftRow({
         >
           <Sparkles className="h-3 w-3" />
           Portada
+        </button>
+      )}
+
+      {/* Sugerencias IA — siempre disponible, activo cuando el panel está abierto */}
+      {onToggleAiSuggest && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleAiSuggest(); }}
+          title={aiSuggestOpen ? "Cerrar sugerencias IA" : "Ver sugerencias IA"}
+          className={cn(
+            "flex items-center gap-1 px-2 py-1 rounded-xl transition-all active:scale-95 flex-shrink-0 text-[10px] font-medium",
+            aiSuggestOpen
+              ? "bg-primary/15 text-primary border border-primary/25"
+              : "hidden group-hover:flex bg-primary/8 text-primary/60 hover:bg-primary/15 hover:text-primary"
+          )}
+        >
+          <Sparkles className="h-3 w-3" />
+          IA
         </button>
       )}
 
