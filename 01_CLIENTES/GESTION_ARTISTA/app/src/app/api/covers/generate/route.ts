@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
   // Pollinations.ai — free, no API key, FLUX model, CORS-enabled
   const imageUrl =
     `https://image.pollinations.ai/prompt/${encodedPrompt}` +
-    `?width=512&height=512&nologo=true&model=flux-schnell&seed=${seed}&nofeed=true`;
+    `?width=512&height=512&nologo=true&model=flux-schnell&seed=${seed}`;
 
   return NextResponse.json({ imageUrl });
 }
