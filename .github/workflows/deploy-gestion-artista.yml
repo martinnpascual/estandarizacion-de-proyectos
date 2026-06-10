@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - '01_CLIENTES/GESTION_ARTISTA/app/**'
+      - '.github/workflows/deploy-gestion-artista.yml'
 
 jobs:
   deploy:
