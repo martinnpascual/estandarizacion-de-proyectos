@@ -107,22 +107,27 @@ export async function savePreferences(
 }
 
 export async function disconnectGoogle(): Promise<{ error: string | null }> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "No autenticado" };
+  try {
+    // Use the user's own session — RLS policy allows users to update their own row
+    const supabase = await createServerSupabaseClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { error: "No autenticado" };
 
-  const { error } = await supabase
-    .from("profiles")
-    .update({
-      google_access_token: null,
-      google_refresh_token: null,
-      google_token_expiry: null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", user.id);
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        google_access_token: null,
+        google_refresh_token: null,
+        google_token_expiry: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", user.id);
 
-  if (error) return { error: error.message };
-  return { error: null };
+    if (error) return { error: error.message };
+    return { error: null };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
 }

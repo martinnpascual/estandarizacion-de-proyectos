@@ -15,7 +15,6 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { createServiceRoleClient } from "@/lib/supabase/admin";
 
 // ── Token management ──────────────────────────────────────────────────────────
 
@@ -26,9 +25,9 @@ interface TokenInfo {
 }
 
 async function getValidAccessToken(userId: string): Promise<string | null> {
-  const adminClient = createServiceRoleClient();
+  const supabase = await createServerSupabaseClient();
 
-  const { data: profile } = await adminClient
+  const { data: profile } = await supabase
     .from("profiles")
     .select("google_access_token, google_refresh_token, google_token_expiry")
     .eq("id", userId)
@@ -76,15 +75,16 @@ async function getValidAccessToken(userId: string): Promise<string | null> {
     ? new Date(Date.now() + refreshed.expires_in * 1000).toISOString()
     : null;
 
-  // Persist refreshed token
-  await adminClient
+  // Persist refreshed token (fire-and-forget; don't block streaming on it)
+  supabase
     .from("profiles")
     .update({
       google_access_token: newToken,
       google_token_expiry: newExpiry,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", userId);
+    .eq("id", userId)
+    .then(() => {});
 
   return newToken;
 }

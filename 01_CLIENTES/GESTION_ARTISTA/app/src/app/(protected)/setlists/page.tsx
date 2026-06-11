@@ -137,6 +137,8 @@ export default function SetlistsPage() {
   // Drag-and-drop reorder
   const dragItem = useRef<number | null>(null);
   const dragOverItem = useRef<number | null>(null);
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   // Presentation Mode
   const [presentationMode, setPresentationMode] = useState(false);
@@ -427,13 +429,17 @@ export default function SetlistsPage() {
 
   function handleDragStart(index: number) {
     dragItem.current = index;
+    setDraggingIndex(index);
   }
 
   function handleDragEnter(index: number) {
     dragOverItem.current = index;
+    setDragOverIndex(index);
   }
 
   async function handleDragEnd() {
+    setDraggingIndex(null);
+    setDragOverIndex(null);
     if (
       dragItem.current === null ||
       dragOverItem.current === null ||
@@ -889,11 +895,24 @@ export default function SetlistsPage() {
                           onDragEnter={() => handleDragEnter(index)}
                           onDragEnd={handleDragEnd}
                           onDragOver={(e) => e.preventDefault()}
-                          className="row-interactive flex items-center gap-3 px-4 py-3 hover:bg-secondary/30 transition-all group cursor-grab active:cursor-grabbing select-none"
+                          className={cn(
+                            "row-interactive relative flex items-center gap-3 px-4 py-3 transition-all group cursor-grab active:cursor-grabbing select-none",
+                            draggingIndex === index
+                              ? "opacity-40 scale-[0.98] bg-secondary/60 ring-1 ring-inset ring-border/60"
+                              : "hover:bg-secondary/30",
+                            dragOverIndex === index && draggingIndex !== index
+                              ? "border-t-2 border-[hsl(var(--section-hsl,286_72%_62%))] bg-[hsl(var(--section-hsl,286_72%_62%)/0.05)]"
+                              : "border-t border-border/40"
+                          )}
                         >
                           {/* Track number + drag handle */}
                           <div className="flex items-center gap-1.5 w-7 flex-shrink-0">
-                            <GripVertical className="h-4 w-4 text-muted-foreground/20 group-hover:text-muted-foreground/50 transition-colors" />
+                            <GripVertical className={cn(
+                              "h-4 w-4 transition-colors",
+                              draggingIndex === index
+                                ? "text-[hsl(var(--section-hsl,286_72%_62%))] drop-shadow-[0_0_6px_hsl(var(--section-hsl,286_72%_62%)/0.8)]"
+                                : "text-muted-foreground/20 group-hover:text-muted-foreground/60"
+                            )} />
                             <span className="text-xs text-muted-foreground/40 tabular-nums group-hover:hidden">
                               {index + 1}
                             </span>

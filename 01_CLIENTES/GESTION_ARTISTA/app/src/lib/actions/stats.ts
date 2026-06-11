@@ -64,6 +64,50 @@ export async function getPlayStats(): Promise<{
   }
 }
 
+// ── Song play history ────────────────────────────────────────────────
+
+export interface PlayHistoryEntry {
+  id: string;
+  song_id: string | null;
+  draft_id: string | null;
+  created_at: string;
+  song_title?: string;
+  draft_title?: string;
+}
+
+export async function getRecentPlayHistory(limit = 20): Promise<{
+  data: PlayHistoryEntry[] | null;
+  error: string | null;
+}> {
+  try {
+    const supabase = await createServerSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { data: [], error: null };
+
+    const { data, error } = await supabase
+      .from("play_events")
+      .select("id, song_id, draft_id, created_at, songs(title), drafts(title)")
+      .eq("created_by", user.id)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (error) return { data: null, error: error.message };
+
+    const entries: PlayHistoryEntry[] = (data ?? []).map((row) => ({
+      id: row.id,
+      song_id: row.song_id ?? null,
+      draft_id: row.draft_id ?? null,
+      created_at: row.created_at,
+      song_title: row.song_id ? (row.songs as unknown as { title: string } | null)?.title : undefined,
+      draft_title: row.draft_id ? (row.drafts as unknown as { title: string } | null)?.title : undefined,
+    }));
+
+    return { data: entries, error: null };
+  } catch {
+    return { data: [], error: null };
+  }
+}
+
 // ── Maquetas stats ──────────────────────────────────────────────────
 
 export interface MaquetasStats {

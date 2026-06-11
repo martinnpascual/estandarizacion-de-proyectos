@@ -31,6 +31,17 @@ const GENRES = [
   "Otro",
 ];
 
+const VERSION_TYPES = [
+  { value: "original",      label: "Original" },
+  { value: "remix",         label: "Remix" },
+  { value: "radio_edit",    label: "Radio Edit" },
+  { value: "acustico",      label: "Acústico" },
+  { value: "extended",      label: "Extended" },
+  { value: "explicit",      label: "Explicit" },
+  { value: "clean",         label: "Clean" },
+  { value: "instrumental",  label: "Instrumental" },
+];
+
 const KEY_SIGNATURES = [
   "C mayor", "G mayor", "D mayor", "A mayor", "E mayor", "B mayor",
   "F# mayor", "C# mayor", "F mayor", "Bb mayor", "Eb mayor", "Ab mayor",
@@ -58,6 +69,7 @@ const EMPTY_FORM: SongFormData = {
   lyrics: null,
   isrc: null,
   pro_registration: null,
+  version_type: null,
 };
 
 function songToForm(song: Song): SongFormData {
@@ -81,6 +93,7 @@ function songToForm(song: Song): SongFormData {
     lyrics: song.lyrics ?? null,
     isrc: song.isrc ?? null,
     pro_registration: song.pro_registration ?? null,
+    version_type: song.version_type ?? null,
   };
 }
 
@@ -163,11 +176,12 @@ export default function SongForm({ song, artistName, onClose, onSaved }: SongFor
     );
   }
 
-  async function handleDetect() {
-    if (!form.drive_file_url) return;
+  async function handleDetect(urlOverride?: string) {
+    const audioUrl = urlOverride ?? form.drive_file_url;
+    if (!audioUrl) return;
     setJustDetected(false);
     resetAnalysis();
-    const result = await analyze(form.drive_file_url);
+    const result = await analyze(audioUrl);
     if (result) {
       set("bpm", result.bpm);
       set("key_signature", result.key);
@@ -303,6 +317,37 @@ export default function SongForm({ song, artistName, onClose, onSaved }: SongFor
             </Field>
           </div>
 
+          {/* Versión */}
+          <Field label="Tipo de versión">
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => set("version_type", null)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                  form.version_type === null
+                    ? "bg-primary/15 text-primary border-primary/30"
+                    : "bg-transparent text-muted-foreground border-border/60 hover:border-border"
+                }`}
+              >
+                Ninguna
+              </button>
+              {VERSION_TYPES.map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => set("version_type", form.version_type === value ? null : value)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                    form.version_type === value
+                      ? "bg-primary/15 text-primary border-primary/30"
+                      : "bg-transparent text-muted-foreground border-border/60 hover:border-border"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </Field>
+
           {/* Duración + Cover Art */}
           <div className="grid grid-cols-2 gap-4">
             <Field label="Duración (mm:ss)" error={errors.duration_seconds}>
@@ -343,11 +388,11 @@ export default function SongForm({ song, artistName, onClose, onSaved }: SongFor
               {form.drive_file_url ? (
                 <button
                   type="button"
-                  onClick={handleDetect}
+                  onClick={() => handleDetect()}
                   disabled={analyzing}
                   className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-medium transition-all border
                     disabled:opacity-60 disabled:cursor-not-allowed
-                    bg-violet-500/10 border-violet-500/25 text-violet-400 hover:bg-violet-500/20"
+                    bg-primary/10 border-primary/25 text-primary hover:bg-primary/20"
                 >
                   {analyzing ? (
                     <>
@@ -646,8 +691,13 @@ export default function SongForm({ song, artistName, onClose, onSaved }: SongFor
           fileType="audio"
           onSelect={(file: DriveFile) => {
             set("drive_file_id", file.id);
-            set("drive_file_url", `/api/drive/stream/${file.id}`);
+            const url = `/api/drive/stream/${file.id}`;
+            set("drive_file_url", url);
             setShowDrivePicker(false);
+            // Auto-detect BPM + key when no data yet
+            if (!form.bpm && !form.key_signature) {
+              handleDetect(url);
+            }
           }}
           onClose={() => setShowDrivePicker(false)}
         />

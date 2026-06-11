@@ -186,3 +186,57 @@ export async function deleteSong(
   if (error) return { error: error.message };
   return { error: null };
 }
+
+// ── Share token ──────────────────────────────────────────────────────────────
+
+export async function generateSongShareToken(
+  songId: string
+): Promise<{ token: string | null; error: string | null }> {
+  const supabase = await createServerSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { token: null, error: "No autenticado" };
+
+  const token = crypto.randomUUID();
+  const { error } = await supabase
+    .from("songs")
+    .update({ share_token: token })
+    .eq("id", songId)
+    .eq("is_deleted", false);
+
+  if (error) return { token: null, error: error.message };
+  return { token, error: null };
+}
+
+export async function revokeSongShareToken(
+  songId: string
+): Promise<{ error: string | null }> {
+  const supabase = await createServerSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "No autenticado" };
+
+  const { error } = await supabase
+    .from("songs")
+    .update({ share_token: null })
+    .eq("id", songId)
+    .eq("is_deleted", false);
+
+  if (error) return { error: error.message };
+  return { error: null };
+}
+
+export async function getSongByShareToken(
+  token: string
+): Promise<SongResult> {
+  // Use admin client so the public share page works without user session
+  const admin = createAdminSupabaseClient();
+  const { data, error } = await admin
+    .from("songs")
+    .select("*")
+    .eq("share_token", token)
+    .eq("is_deleted", false)
+    .maybeSingle();
+
+  if (error) return { data: null, error: error.message };
+  if (!data) return { data: null, error: "Link no encontrado" };
+  return { data: data as Song, error: null };
+}

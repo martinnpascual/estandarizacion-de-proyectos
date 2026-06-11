@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, usePathname } from "next/navigation";
 
 // Mapa de sección → color HSL (h s% l%) para el degradado ambiente del body
@@ -43,7 +44,7 @@ import ContextualFAB from "@/components/layout/ContextualFAB";
 import DeadlineAlerts from "@/components/layout/DeadlineAlerts";
 
 /** Componente interno que puede leer el contexto del player para ajustar el padding y el FAB */
-function LayoutContent({ children }: { children: React.ReactNode }) {
+function LayoutContent({ children, pathname }: { children: React.ReactNode; pathname: string }) {
   const { currentTrack } = useAudioPlayerContext();
   return (
     <main
@@ -104,7 +105,18 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
           background: "radial-gradient(circle, hsl(var(--section-hsl, 262 80% 62%) / 0.07) 0%, transparent 70%)",
         }} />
       </div>
-      <div className="relative z-10 p-4 md:p-6 lg:p-8 page-enter">{children}</div>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={pathname}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+          className="relative z-10 p-4 md:p-6 lg:p-8"
+        >
+          {children}
+        </motion.div>
+      </AnimatePresence>
       {/* ── FAB contextual ────────────────────────────────────────────── */}
       <ContextualFAB playerActive={!!currentTrack} />
     </main>
@@ -196,7 +208,7 @@ export default function ProtectedLayout({
             </div>
             <NavProgressBar />
             <Sidebar />
-            <LayoutContent>{children}</LayoutContent>
+            <LayoutContent pathname={pathname}>{children}</LayoutContent>
             <AudioPlayer />
             {/* ── Alertas de deadline próximas ──────────────────────── */}
             <DeadlineAlerts />

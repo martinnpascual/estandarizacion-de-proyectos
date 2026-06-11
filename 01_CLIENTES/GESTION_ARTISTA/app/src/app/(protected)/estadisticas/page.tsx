@@ -12,7 +12,7 @@ import {
   FileAudio, Users, FolderOpen, CheckCircle2, AlertTriangle, CalendarClock, ChevronRight,
   LayoutDashboard, Award, TrendingUp, TrendingDown, Share2, Play, Zap, Target,
 } from "lucide-react";
-import { getAllStats, type AllStats, type GoalsStats } from "@/lib/actions/stats";
+import { getAllStats, type AllStats, type GoalsStats, getRecentPlayHistory, type PlayHistoryEntry } from "@/lib/actions/stats";
 import { getSocialLinks, type SocialLinkWithLatestStat } from "@/lib/actions/social";
 import { cn } from "@/lib/utils";
 import { AnimatedCounter } from "@/components/ui/MotionWrapper";
@@ -238,6 +238,7 @@ function EstadisticasContent() {
   const [error, setError] = useState<string | null>(null);
   const [socialLinks, setSocialLinks] = useState<SocialLinkWithLatestStat[]>([]);
   const [loadingLinks, setLoadingLinks] = useState(true);
+  const [playHistory, setPlayHistory] = useState<PlayHistoryEntry[]>([]);
 
   const rawTab = searchParams.get("tab") as Tab | null;
   const tab: Tab = rawTab && TABS.some(t => t.id === rawTab) ? rawTab : "resumen";
@@ -257,6 +258,9 @@ function EstadisticasContent() {
     getSocialLinks().then(({ data }) => {
       setSocialLinks(data ?? []);
       setLoadingLinks(false);
+    });
+    getRecentPlayHistory(15).then(({ data }) => {
+      setPlayHistory(data ?? []);
     });
   }, []);
 
@@ -340,7 +344,39 @@ function EstadisticasContent() {
           </div>
 
           {/* ── RESUMEN TAB ──────────────────────────────────────── */}
-          {tab === "resumen" && <ResumenTab stats={stats!} />}
+          {tab === "resumen" && (
+            <>
+              <ResumenTab stats={stats!} />
+              {playHistory.length > 0 && (
+                <div className="card-premium rounded-2xl p-5 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Play className="h-4 w-4 text-primary" />
+                    <h3 className="text-sm font-black text-foreground/90">Últimas reproducciones</h3>
+                  </div>
+                  <div className="space-y-1">
+                    {playHistory.map((entry) => (
+                      <div key={entry.id} className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl hover:bg-secondary/60 transition-colors">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={cn(
+                            "flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black",
+                            entry.song_id ? "bg-primary/15 text-primary" : "bg-blue-500/15 text-blue-400"
+                          )}>
+                            {entry.song_id ? "S" : "M"}
+                          </span>
+                          <span className="text-sm font-medium truncate">
+                            {entry.song_title ?? entry.draft_title ?? "Pista desconocida"}
+                          </span>
+                        </div>
+                        <span className="flex-shrink-0 text-[11px] text-muted-foreground/50 tabular-nums">
+                          {new Date(entry.created_at).toLocaleDateString("es-AR", { day: "2-digit", month: "short" })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
 
           {/* ── DISCOGRAFÍA TAB ───────────────────────────────────── */}
           {tab === "discografia" && <DiscografiaTab stats={stats?.discografia ?? null} />}

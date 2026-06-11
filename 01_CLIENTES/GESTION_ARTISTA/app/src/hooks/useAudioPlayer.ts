@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import { logPlayEvent } from "@/lib/actions/stats";
 
 export interface Track {
   id: string;
@@ -11,6 +12,7 @@ export interface Track {
   coverArt?: string;
   bpm?: number;
   keySignature?: string;
+  sourceType?: "song" | "draft";
 }
 
 export type LoopMode = "none" | "one" | "all";
@@ -142,6 +144,9 @@ export function useAudioPlayer() {
       await playPromiseRef.current;
       resumeAudioContext();
       setIsPlaying(true);
+      // Record play event (fire-and-forget, never throws)
+      if (track.sourceType === "song") logPlayEvent({ song_id: track.id }).catch(() => {});
+      else if (track.sourceType === "draft") logPlayEvent({ draft_id: track.id }).catch(() => {});
     } catch (e: unknown) {
       if (e instanceof Error && e.name !== "AbortError") {
         console.error("Error playing audio:", e.message);
@@ -410,5 +415,7 @@ export function useAudioPlayer() {
     // Web Audio API
     analyserRef,
     resumeAudioContext,
+    // Raw audio element (for WaveSurfer media sync)
+    audioRef,
   };
 }

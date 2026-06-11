@@ -35,3 +35,14 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# Vercel deploy logs
+vercel*.log
+deploy_batch*.log
+
+# Claude worktrees
+.claude/
+
+# Test files
+public/logo-mockup.html
+public/test_cover.png

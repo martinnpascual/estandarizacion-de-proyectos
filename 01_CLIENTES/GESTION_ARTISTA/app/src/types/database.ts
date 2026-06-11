@@ -82,7 +82,9 @@ export interface Song {
   soundcloud_url: string | null;
   tags: string[];
   lyrics: string | null;
+  version_type: string | null;
   is_public: boolean;
+  share_token: string | null;
   isrc: string | null;
   pro_registration: string | null;
   distribution_status: Record<string, string> | null;

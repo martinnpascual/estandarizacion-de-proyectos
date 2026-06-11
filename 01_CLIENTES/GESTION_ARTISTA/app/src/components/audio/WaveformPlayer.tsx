@@ -54,10 +54,12 @@ export default function WaveformPlayer({
       try {
         const WaveSurfer = (await import("wavesurfer.js")).default;
 
+        const primaryHsl = getComputedStyle(containerRef.current!).getPropertyValue("--primary").trim() || "262 80% 62%";
+
         ws = WaveSurfer.create({
           container: containerRef.current!,
-          waveColor: "rgba(99, 102, 241, 0.35)",
-          progressColor: "rgba(99, 102, 241, 1)",
+          waveColor: `hsl(${primaryHsl} / 0.30)`,
+          progressColor: `hsl(${primaryHsl})`,
           height,
           barWidth: 2,
           barGap: 1,

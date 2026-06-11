@@ -30,7 +30,6 @@ import {
   X,
   Building2,
 } from "lucide-react";
-import { disconnectGoogle } from "@/lib/actions/profile";
 import { createClient } from "@/lib/supabase/client";
 import { useUser } from "@/hooks/useUser";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
@@ -255,11 +254,20 @@ export default function PerfilPage() {
   async function handleDisconnectGoogle() {
     if (!await confirm({ title: "¿Desconectar Google?", message: "Se eliminarán los tokens de acceso a Drive y Calendar. Podrás volver a conectarlo en cualquier momento.", confirmLabel: "Desconectar", variant: "default" })) return;
     setDisconnecting(true);
-    const { error } = await disconnectGoogle();
-    setDisconnecting(false);
-    if (error) {
-      toast.error(error);
-    } else {
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("No autenticado");
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          google_access_token: null,
+          google_refresh_token: null,
+          google_token_expiry: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", user.id);
+      if (error) throw new Error(error.message);
       setProfile((p) =>
         p
           ? {
@@ -271,6 +279,10 @@ export default function PerfilPage() {
           : p
       );
       toast.success("Google desconectado correctamente");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al desconectar Google");
+    } finally {
+      setDisconnecting(false);
     }
   }
 

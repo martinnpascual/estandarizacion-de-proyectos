@@ -34,6 +34,7 @@ import {
   Zap,
   ListPlus,
   Heart,
+  Share2,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -41,6 +42,7 @@ import SongDetailPanel from "@/components/songs/SongDetailPanel";
 import LyricsPanel from "@/components/lyrics/LyricsPanel";
 import { SongRowSkeleton, SongCardSkeleton } from "@/components/ui/Skeletons";
 import { StaggerList, StaggerItem } from "@/components/ui/MotionWrapper";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { useAudioPlayerContext } from "@/components/audio/AudioPlayer";
 import SongForm from "@/components/songs/SongForm";
 import CommentsPanel from "@/components/comments/CommentsPanel";
@@ -52,6 +54,7 @@ import {
   searchSongs,
   deleteSong,
   getAvailableYears,
+  generateSongShareToken,
 } from "@/lib/actions/songs";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useOptimisticList } from "@/hooks/useOptimisticList";
@@ -151,6 +154,30 @@ export default function DiscografiaPage() {
   const isSearchPending = searchQuery !== debouncedSearch;
   const [isPending, startTransition] = useTransition();
 
+  // Bulk selection
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
+  const toggleBulkSelect = useCallback((id: string) => {
+    setBulkSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }, []);
+  function selectAllVisible() {
+    setBulkSelected(new Set(displayedSongs.map(s => s.id)));
+  }
+  function clearBulkSelection() { setBulkSelected(new Set()); }
+
+  // Version accordion — tracks which title groups are expanded within each year
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  function toggleVersionGroup(key: string) {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  }
+
   // Keyboard navigation state
   const [keyboardSongId, setKeyboardSongId] = useState<string | null>(null);
   const keyboardSongIdRef = useRef<string | null>(null);
@@ -236,6 +263,7 @@ export default function DiscografiaPage() {
       coverArt: s.cover_art_url ?? undefined,
       bpm: s.bpm ?? undefined,
       keySignature: s.key_signature ?? undefined,
+      sourceType: "song" as const,
     };
   }
 
@@ -432,6 +460,54 @@ export default function DiscografiaPage() {
     player.play(songToTrack(shuffled[0]), shuffled.map(songToTrack));
   }
 
+  function handleExportPDF() {
+    const songList = displayedSongsRef.current;
+    const groupsByYear: Record<number, Song[]> = {};
+    for (const s of songList) {
+      if (!groupsByYear[s.year]) groupsByYear[s.year] = [];
+      groupsByYear[s.year].push(s);
+    }
+    const years = Object.keys(groupsByYear).map(Number).sort((a, b) => b - a);
+
+    const rows = years.map((year) => {
+      const header = `<tr style="background:#1a0a3a"><td colspan="5" style="padding:8px 12px;font-size:13px;font-weight:900;color:#a78bfa;letter-spacing:.05em">${year}</td></tr>`;
+      const songRows = groupsByYear[year].map((s, i) => `
+        <tr style="border-bottom:1px solid #1e1e2e">
+          <td style="padding:7px 12px;color:#888;font-size:11px;width:30px">${i + 1}</td>
+          <td style="padding:7px 12px;font-weight:700;font-size:13px">${s.title}${s.version_type ? ` <span style="font-size:10px;color:#a78bfa;background:#1a0a3a;padding:1px 6px;border-radius:9px;margin-left:4px">${s.version_type.replace("_"," ")}</span>` : ""}</td>
+          <td style="padding:7px 12px;color:#888;font-size:12px">${s.artist_name}${s.featuring.length ? ` ft. ${s.featuring.join(", ")}` : ""}</td>
+          <td style="padding:7px 12px;color:#888;font-size:12px">${s.genre ?? "—"}</td>
+          <td style="padding:7px 12px;color:#888;font-size:12px;text-align:right">${s.duration_seconds ? `${Math.floor(s.duration_seconds / 60)}:${String(s.duration_seconds % 60).padStart(2, "0")}` : "—"}</td>
+        </tr>`).join("");
+      return header + songRows;
+    }).join("");
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Discografía — BERTIAKA Studio</title>
+      <style>body{margin:0;background:#0a0a0f;color:#e0e0f0;font-family:system-ui,sans-serif}
+      h1{margin:0 0 4px;font-size:22px;font-weight:900;color:#fff}
+      .sub{color:#666;font-size:12px;margin-bottom:20px}
+      table{width:100%;border-collapse:collapse}
+      th{padding:6px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#555;border-bottom:1px solid #1e1e2e}
+      tr:hover td{background:rgba(167,139,250,.04)}
+      @media print{body{background:#fff;color:#000}.sub{color:#444}th{color:#444}td{color:#222}}</style>
+    </head><body>
+      <div style="padding:24px 32px">
+        <h1>Discografía</h1>
+        <div class="sub">${songList.length} canciones · Exportado el ${new Date().toLocaleDateString("es-AR")}</div>
+        <table><thead><tr>
+          <th>#</th><th>Título</th><th>Artista</th><th>Género</th><th style="text-align:right">Duración</th>
+        </tr></thead><tbody>${rows}</tbody></table>
+      </div>
+    </body></html>`;
+
+    const w = window.open("", "_blank");
+    if (!w) return;
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 400);
+  }
+
   const isSearching = debouncedSearch.trim().length > 0;
 
   // useMemo: evita recalcular filtros/sort en cada keystroke de búsqueda
@@ -549,6 +625,16 @@ export default function DiscografiaPage() {
                   </button>
                 </>
               )}
+              {/* Export PDF */}
+              <button
+                onClick={handleExportPDF}
+                title="Exportar discografía como PDF"
+                className="flex items-center gap-1.5 px-3 py-2 border border-border/60 rounded-xl hover:bg-secondary/60 transition-all active:scale-95 text-sm text-muted-foreground hover:text-foreground"
+              >
+                <Download className="h-4 w-4" />
+                <span className="hidden lg:inline">PDF</span>
+              </button>
+
               {/* View toggle */}
               <div className="flex items-center border border-border/60 rounded-xl overflow-hidden">
                 <button
@@ -962,10 +1048,14 @@ export default function DiscografiaPage() {
 
                   {/* Equalizer si está reproduciendo */}
                   {isPlaying && (
-                    <div className="absolute bottom-2 left-2 flex gap-[2px] items-end h-4 z-10">
-                      {[1,2,3,4].map(i => (
-                        <div key={i} className="eq-bar w-[2.5px] bg-primary rounded-full"
-                          style={{ height: `${[60,100,45,80][i-1]}%` }} />
+                    <div className="absolute bottom-2.5 left-2.5 flex gap-[3px] items-end z-10 bg-black/30 backdrop-blur-sm rounded-lg px-1.5 py-1.5">
+                      {[10, 16, 8, 14, 11].map((h, i) => (
+                        <div key={i} className="eq-bar w-[3px] rounded-full"
+                          style={{
+                            height: h,
+                            background: "hsl(var(--section-hsl, 262 80% 72%))",
+                            boxShadow: "0 0 4px hsl(var(--section-hsl, 262 80% 62%) / 0.8)",
+                          }} />
                       ))}
                     </div>
                   )}
@@ -1105,33 +1195,14 @@ export default function DiscografiaPage() {
             </button>
           </div>
         ) : songs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center px-4">
-            <div
-              className="relative w-16 h-16 rounded-2xl flex items-center justify-center empty-state-icon mb-5"
-              style={{
-                background: "linear-gradient(135deg, hsl(var(--section-hsl, 262 80% 62%) / 0.20), hsl(var(--section-hsl, 262 80% 62%) / 0.07))",
-                border: "1px solid hsl(var(--section-hsl, 262 80% 62%) / 0.22)",
-                boxShadow: "0 8px 32px hsl(0 0% 0% / 0.15)"
-              }}
-            >
-              <Music className="h-8 w-8" style={{ color: "hsl(var(--section-hsl, 262 80% 62%))" }} />
-            </div>
-            <p className="text-sm font-medium text-foreground/70">
-              {isSearching ? `Sin resultados para "${searchQuery}"` : `No hay canciones en ${selectedYear}`}
-            </p>
-            <p className="text-xs text-muted-foreground/50 mt-1">
-              {isSearching ? "Probá con otro término" : "Registrá tu primera canción de este año"}
-            </p>
-            {!isSearching && (
-              <button
-                onClick={handleAdd}
-                className="mt-4 flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/25 text-primary rounded-xl text-sm font-medium hover:bg-primary/20 transition-all active:scale-95"
-              >
-                <Plus className="h-4 w-4" />
-                Agregar canción
-              </button>
-            )}
-          </div>
+          <EmptyState
+            icon={Music}
+            title={isSearching ? `Sin resultados para "${searchQuery}"` : `No hay canciones en ${selectedYear}`}
+            description={isSearching ? "Probá con otro término o revisá la ortografía." : "Registrá tu primera canción de este año."}
+            action={!isSearching ? { label: "Agregar canción", onClick: handleAdd } : undefined}
+            iconColor="text-[hsl(var(--section-hsl,262_80%_62%))]"
+            iconBg="bg-[hsl(var(--section-hsl,262_80%_62%)/0.12)] border border-[hsl(var(--section-hsl,262_80%_62%)/0.22)]"
+          />
         ) : displayedSongs.length === 0 && (genreFilter || sortBy !== "default" || missingPlatformFilter || missingGenreFilter || missingAudioFilter) ? (
           <div className="flex flex-col items-center justify-center py-20 text-center px-4">
             {missingPlatformFilter && !genreFilter && !missingGenreFilter && !missingAudioFilter ? (
@@ -1204,34 +1275,85 @@ export default function DiscografiaPage() {
             let globalIdx = 0;
             return (
               <div>
-                {years.map((year) => (
-                  <div key={year}>
-                    <div className="section-group-header">
-                      <span className="section-group-header-label tabular-nums">{year}</span>
-                      <div className="flex-1 h-px bg-gradient-to-r from-border/50 to-transparent" />
-                      <span className="text-[10px] text-muted-foreground/70 bg-secondary/80 border border-border/40 px-2 py-0.5 rounded-full tabular-nums font-bold">{yearGroups[year].length}</span>
+                {years.map((year) => {
+                  // Group by base title within each year for accordion
+                  const titleGroups: Record<string, Song[]> = {};
+                  for (const s of yearGroups[year]) {
+                    const key = s.title.toLowerCase().trim();
+                    if (!titleGroups[key]) titleGroups[key] = [];
+                    titleGroups[key].push(s);
+                  }
+                  return (
+                    <div key={year}>
+                      <div className="section-group-header">
+                        <span className="section-group-header-label tabular-nums">{year}</span>
+                        <div className="flex-1 h-px bg-gradient-to-r from-border/50 to-transparent" />
+                        <span className="text-[10px] text-muted-foreground/70 bg-secondary/80 border border-border/40 px-2 py-0.5 rounded-full tabular-nums font-bold">{yearGroups[year].length}</span>
+                      </div>
+                      <div className="divide-y divide-border/50 list-enter">
+                        {Object.entries(titleGroups).map(([titleKey, group]) => {
+                          const primary = group[0];
+                          const variants = group.slice(1);
+                          const groupKey = `${year}-${titleKey}`;
+                          const isExpanded = expandedGroups.has(groupKey);
+                          const primaryIdx = globalIdx++;
+                          return (
+                            <div key={titleKey}>
+                              <div id={`song-row-${primary.id}`} className="row-interactive" onDoubleClick={() => handleEdit(primary)}>
+                                <SongRow
+                                  song={primary}
+                                  index={primaryIdx + 1}
+                                  isPlaying={player.currentTrack?.id === primary.id && player.isPlaying}
+                                  isCurrentTrack={player.currentTrack?.id === primary.id}
+                                  isSelected={selectedSong?.id === primary.id}
+                                  isKeyboardSelected={keyboardSongId === primary.id}
+                                  isFavorited={favoritedIds.has(primary.id)}
+                                  isBulkSelected={bulkSelected.has(primary.id)}
+                                  onToggleBulk={toggleBulkSelect}
+                                  onToggleFavorite={toggleFavorite}
+                                  onAction={onAction}
+                                />
+                              </div>
+                              {variants.length > 0 && (
+                                <>
+                                  <button
+                                    onClick={() => toggleVersionGroup(groupKey)}
+                                    className="w-full flex items-center gap-2 px-4 py-1.5 text-[11px] text-muted-foreground/60 hover:text-primary hover:bg-primary/5 transition-all"
+                                  >
+                                    <span className="w-px h-3 bg-border/60 ml-3 mr-1" />
+                                    {isExpanded
+                                      ? `Ocultar ${variants.length} versión${variants.length > 1 ? "es" : ""}`
+                                      : `+${variants.length} versión${variants.length > 1 ? "es" : ""}`}
+                                  </button>
+                                  {isExpanded && variants.map((v) => {
+                                    const vIdx = globalIdx++;
+                                    return (
+                                      <div key={v.id} id={`song-row-${v.id}`} className="row-interactive pl-4 border-l-2 border-primary/20 ml-4" onDoubleClick={() => handleEdit(v)}>
+                                        <SongRow
+                                          song={v}
+                                          index={vIdx + 1}
+                                          isPlaying={player.currentTrack?.id === v.id && player.isPlaying}
+                                          isCurrentTrack={player.currentTrack?.id === v.id}
+                                          isSelected={selectedSong?.id === v.id}
+                                          isKeyboardSelected={keyboardSongId === v.id}
+                                          isFavorited={favoritedIds.has(v.id)}
+                                          isBulkSelected={bulkSelected.has(v.id)}
+                                          onToggleBulk={toggleBulkSelect}
+                                          onToggleFavorite={toggleFavorite}
+                                          onAction={onAction}
+                                        />
+                                      </div>
+                                    );
+                                  })}
+                                </>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="divide-y divide-border/50 list-enter">
-                      {yearGroups[year].map((song) => {
-                        const idx = globalIdx++;
-                        return (
-                          <div key={song.id} id={`song-row-${song.id}`} className="row-interactive" onDoubleClick={() => handleEdit(song)}>
-                            <SongRow
-                              song={song}
-                              index={idx + 1}
-                              isPlaying={player.currentTrack?.id === song.id && player.isPlaying}
-                              isSelected={selectedSong?.id === song.id}
-                              isKeyboardSelected={keyboardSongId === song.id}
-                              isFavorited={favoritedIds.has(song.id)}
-                              onToggleFavorite={toggleFavorite}
-                              onAction={onAction}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             );
           })()
@@ -1243,9 +1365,12 @@ export default function DiscografiaPage() {
                   song={song}
                   index={idx + 1}
                   isPlaying={player.currentTrack?.id === song.id && player.isPlaying}
+                  isCurrentTrack={player.currentTrack?.id === song.id}
                   isSelected={selectedSong?.id === song.id}
                   isKeyboardSelected={keyboardSongId === song.id}
                   isFavorited={favoritedIds.has(song.id)}
+                  isBulkSelected={bulkSelected.has(song.id)}
+                  onToggleBulk={toggleBulkSelect}
                   onToggleFavorite={toggleFavorite}
                   onAction={onAction}
                 />
@@ -1361,6 +1486,75 @@ export default function DiscografiaPage() {
         onSaved={handleSaved}
       />
     )}
+
+    {/* Floating bulk action bar */}
+    {bulkSelected.size > 0 && (
+      <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2.5 rounded-2xl border border-white/12 shadow-2xl"
+        style={{ background: "rgba(16,16,28,0.97)", backdropFilter: "blur(20px)" }}
+      >
+        <span className="text-xs font-black text-white/70 mr-1 tabular-nums">
+          {bulkSelected.size} seleccionada{bulkSelected.size !== 1 ? "s" : ""}
+        </span>
+        <div className="w-px h-5 bg-white/12" />
+        <button
+          onClick={() => {
+            const selected = songs.filter(s => bulkSelected.has(s.id));
+            const playable = selected.filter(s => s.drive_file_id || s.drive_file_url);
+            if (playable.length === 0) { toast.error("Ninguna canción seleccionada tiene audio"); return; }
+            player.play(songToTrack(playable[0]), playable.map(songToTrack));
+          }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/15 text-primary hover:bg-primary/25 transition-all active:scale-95 text-xs font-semibold border border-primary/25"
+        >
+          <Play className="h-3 w-3" />
+          Reproducir
+        </button>
+        <button
+          onClick={() => {
+            const selected = songs.filter(s => bulkSelected.has(s.id));
+            const playable = selected.filter(s => s.drive_file_id || s.drive_file_url);
+            playable.forEach(s => player.addToQueue(songToTrack(s)));
+            toast.success(`${playable.length} canción${playable.length !== 1 ? "es" : ""} añadidas a la cola`);
+          }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 text-white/70 hover:bg-white/10 transition-all active:scale-95 text-xs font-semibold border border-white/10"
+        >
+          <ListPlus className="h-3 w-3" />
+          Cola
+        </button>
+        <button
+          onClick={async () => {
+            const ok = await confirm({
+              title: `Eliminar ${bulkSelected.size} canción${bulkSelected.size !== 1 ? "es" : ""}`,
+              message: "Esta acción no se puede deshacer.",
+              confirmLabel: "Eliminar",
+              variant: "danger",
+            });
+            if (!ok) return;
+            const ids = Array.from(bulkSelected);
+            await Promise.all(ids.map(id => deleteSong(id)));
+            ids.forEach(id => removeOptimistic(id));
+            clearBulkSelection();
+            toast.success(`${ids.length} canción${ids.length !== 1 ? "es" : ""} eliminadas`);
+          }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all active:scale-95 text-xs font-semibold border border-red-500/20"
+        >
+          <Trash2 className="h-3 w-3" />
+          Eliminar
+        </button>
+        <div className="w-px h-5 bg-white/12" />
+        <button
+          onClick={() => { selectAllVisible(); }}
+          className="px-2 py-1.5 rounded-xl text-white/40 hover:text-white/80 hover:bg-white/8 transition-all text-[11px]"
+        >
+          Todos
+        </button>
+        <button
+          onClick={clearBulkSelection}
+          className="p-1.5 rounded-xl text-white/30 hover:text-white/70 hover:bg-white/8 transition-all"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    )}
   </>
   );
 }
@@ -1370,9 +1564,12 @@ interface SongRowProps {
   song: Song;
   index: number;
   isPlaying: boolean;
+  isCurrentTrack: boolean;
   isSelected: boolean;
   isKeyboardSelected: boolean;
   isFavorited: boolean;
+  isBulkSelected: boolean;
+  onToggleBulk: (id: string) => void;
   onToggleFavorite: (id: string) => void;
   onAction: (type: SongActionType, song: Song) => void;
 }
@@ -1381,14 +1578,19 @@ const SongRow = memo(function SongRow({
   song,
   index,
   isPlaying,
+  isCurrentTrack,
   isSelected,
   isKeyboardSelected,
   isFavorited,
+  isBulkSelected,
+  onToggleBulk,
   onToggleFavorite,
   onAction,
 }: SongRowProps) {
   const hasAudio = !!(song.drive_file_url || song.drive_file_id);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
 
   function getDownloadUrl() {
     if (song.drive_file_id) {
@@ -1407,6 +1609,25 @@ const SongRow = memo(function SongRow({
       setTimeout(() => setLinkCopied(false), 2000);
     });
   }
+
+  async function handleShare(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (shareLoading) return;
+    setShareLoading(true);
+    try {
+      const existingToken = song.share_token;
+      const token = existingToken ?? (await generateSongShareToken(song.id)).token;
+      if (!token) return;
+      // Patch the local object so re-clicks skip the server call
+      (song as { share_token: string | null }).share_token = token;
+      const url = `${window.location.origin}/share/song/${token}`;
+      await navigator.clipboard.writeText(url);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2500);
+    } finally {
+      setShareLoading(false);
+    }
+  }
   const platformLinks = [
     { label: "Spotify",    abbr: "SP", color: "text-[#1db954]", bg: "bg-[#1db954]/12 border-[#1db954]/25 hover:bg-[#1db954]/20", url: song.spotify_url },
     { label: "YouTube",   abbr: "YT", color: "text-[#ff0000]", bg: "bg-[#ff0000]/12 border-[#ff0000]/25 hover:bg-[#ff0000]/20", url: song.youtube_url },
@@ -1421,32 +1642,62 @@ const SongRow = memo(function SongRow({
       className={cn(
         "stagger-item relative flex items-center gap-3 px-4 py-3.5 row-hover transition-all duration-150 active:scale-[0.99] group rounded-xl mx-1.5",
         isPlaying && "row-is-playing",
+        isCurrentTrack && !isPlaying && "bg-white/[0.03]",
         isSelected && "bg-secondary/60",
         isKeyboardSelected && "ring-1 ring-inset ring-primary/50 bg-primary/5"
       )}
     >
-      {/* Accent bar izquierda — visible cuando suena, con glow */}
-      {isPlaying && (
-        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-8 rounded-full bg-primary shadow-[0_0_8px_hsl(var(--primary)/0.8)]" />
+      {/* Accent bar izquierda — visible cuando es la pista actual */}
+      {isCurrentTrack && (
+        <span className={cn(
+          "absolute left-0 top-1/2 -translate-y-1/2 w-0.5 rounded-full transition-all duration-300",
+          isPlaying ? "h-8 opacity-100" : "h-5 opacity-50"
+        )} style={{
+          background: "hsl(var(--section-hsl, 262 80% 62%))",
+          boxShadow: isPlaying ? "0 0 8px hsl(var(--section-hsl, 262 80% 62%) / 0.8)" : "none",
+        }} />
       )}
+
+      {/* Checkbox bulk — visible on hover or when selected */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onToggleBulk(song.id); }}
+        title="Selección múltiple"
+        className={cn(
+          "flex-shrink-0 w-4 h-4 rounded border transition-all hidden sm:flex items-center justify-center",
+          isBulkSelected
+            ? "bg-primary border-primary opacity-100"
+            : "border-white/20 opacity-0 group-hover:opacity-100"
+        )}
+      >
+        {isBulkSelected && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
+      </button>
 
       {/* Número / Play / Pause — crossfade suave */}
       <div className="w-7 flex-shrink-0 text-center relative h-7">
-        {isPlaying ? (
-          /* Playing: EQ animado (fade-out en hover) → Pause (fade-in en hover) */
+        {isCurrentTrack ? (
+          /* Current track: EQ animado (playing) o barras estáticas (paused) */
           <>
             <button
               onClick={() => onAction("play", song)}
-              title="Pausar"
+              title={isPlaying ? "Pausar" : "Reanudar"}
               className="absolute inset-0 flex items-center justify-center w-7 h-7 rounded-full bg-primary text-primary-foreground hover:bg-primary/80 transition-all active:scale-95 opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100"
             >
-              <Pause className="h-3 w-3" />
+              {isPlaying ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3 ml-0.5" />}
             </button>
             <span className="absolute inset-0 flex items-center justify-center w-7 h-7 transition-all group-hover:opacity-0 group-hover:scale-90">
-              <span className="flex gap-0.5 items-end h-3.5">
-                <span className="w-[3px] bg-primary rounded-full eq-bar" style={{ height: "8px" }} />
-                <span className="w-[3px] bg-primary rounded-full eq-bar" style={{ height: "12px" }} />
-                <span className="w-[3px] bg-primary rounded-full eq-bar" style={{ height: "6px" }} />
+              <span className="flex gap-[2px] items-end h-3.5">
+                {[10, 14, 7, 12, 9].map((h, i) => (
+                  <span key={i}
+                    className={cn("w-[2.5px] rounded-full", isPlaying ? "eq-bar" : "opacity-40")}
+                    style={{
+                      height: isPlaying ? h : Math.max(3, h * 0.35),
+                      background: isPlaying
+                        ? `hsl(var(--section-hsl, 262 80% 62%))`
+                        : "hsl(var(--section-hsl, 262 80% 62%) / 0.5)",
+                      transition: "height 0.3s ease",
+                    }}
+                  />
+                ))}
               </span>
             </span>
           </>
@@ -1472,7 +1723,7 @@ const SongRow = memo(function SongRow({
       <div className={cn(
         "w-11 h-11 flex-shrink-0 rounded-xl flex items-center justify-center overflow-hidden relative transition-all duration-300",
         !song.cover_art_url && genreColors ? genreColors.bg : "bg-secondary",
-        isPlaying && "shadow-[0_0_14px_hsl(var(--primary)/0.5)] ring-1 ring-primary/40"
+        isCurrentTrack && "shadow-[0_0_14px_hsl(var(--section-hsl,262_80%_62%)/0.55)] ring-1 ring-[hsl(var(--section-hsl,262_80%_62%)/0.4)]"
       )}>
         {song.cover_art_url ? (
           <Image
@@ -1486,6 +1737,27 @@ const SongRow = memo(function SongRow({
         ) : (
           <Music className={cn("h-4 w-4 group-hover:scale-110 transition-transform", genreColors ? genreColors.text : "text-muted-foreground/50")} />
         )}
+        {/* EQ overlay on cover art when current track */}
+        {isCurrentTrack && (
+          <div className={cn(
+            "absolute inset-0 flex items-end justify-center pb-1.5 transition-opacity duration-300",
+            isPlaying ? "opacity-100" : "opacity-60"
+          )}>
+            <div className="flex gap-[2px] items-end h-4 bg-black/30 backdrop-blur-sm rounded-md px-1.5 py-1">
+              {[10, 16, 8, 14, 11].map((h, i) => (
+                <span key={i}
+                  className={cn("w-[2px] rounded-full", isPlaying ? "eq-bar" : "")}
+                  style={{
+                    height: isPlaying ? h : 3,
+                    background: "hsl(var(--section-hsl, 262 80% 72%))",
+                    boxShadow: isPlaying ? "0 0 4px hsl(var(--section-hsl, 262 80% 62%) / 0.8)" : "none",
+                    transition: "height 0.3s ease",
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Info — click opens detail panel */}
@@ -1494,7 +1766,7 @@ const SongRow = memo(function SongRow({
         className="flex-1 min-w-0 text-left"
       >
         <div className="flex items-center gap-1.5 min-w-0">
-          <p className={cn("text-[13px] font-black truncate leading-tight min-w-0", isPlaying ? "text-primary" : "text-foreground/90")}>
+          <p className={cn("text-[13px] font-black truncate leading-tight min-w-0", isCurrentTrack ? "text-[hsl(var(--section-hsl,262_80%_62%))]" : "text-foreground/90")}>
             {song.title}
           </p>
           {isRecentSong(song) && (
@@ -1516,6 +1788,11 @@ const SongRow = memo(function SongRow({
           )}
           {song.genre && !genreColors && (
             <span className="text-xs text-muted-foreground"> · {song.genre}</span>
+          )}
+          {song.version_type && (
+            <span className="flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-black bg-violet-500/12 text-violet-400 border border-violet-500/20 uppercase tracking-wide">
+              {song.version_type.replace("_", " ")}
+            </span>
           )}
           {song.bpm && (
             <span className="meta-chip meta-chip-bpm flex-shrink-0" title="BPM">
@@ -1645,9 +1922,24 @@ const SongRow = memo(function SongRow({
             "p-1.5 rounded-xl transition-all active:scale-95",
             linkCopied ? "text-green-400" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
           )}
-          title="Copiar enlace"
+          title="Copiar enlace interno"
         >
           {linkCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+        </button>
+        <button
+          onClick={handleShare}
+          className={cn(
+            "p-1.5 rounded-xl transition-all active:scale-95",
+            shareCopied
+              ? "text-purple-400 bg-purple-500/10"
+              : shareLoading
+                ? "text-muted-foreground/40"
+                : "text-muted-foreground hover:text-purple-400 hover:bg-purple-500/10"
+          )}
+          title="Compartir enlace público"
+          disabled={shareLoading}
+        >
+          {shareCopied ? <Check className="h-3.5 w-3.5" /> : <Share2 className="h-3.5 w-3.5" />}
         </button>
         <button
           onClick={() => onAction("select", song)}

@@ -4,13 +4,17 @@ import { useRef, useEffect, useCallback, useState } from "react";
 import {
   Play, Pause, Volume2, VolumeX,
   SkipBack, SkipForward, Music, List, X, Shuffle, Repeat, Repeat1, ChevronDown, ChevronUp,
-  Heart, Timer, Share2, Check,
+  Heart, Timer, Share2, Check, Maximize2, Minimize2, Activity,
 } from "lucide-react";
+import Image from "next/image";
 import { formatTime } from "@/lib/utils";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import type { LoopMode } from "@/hooks/useAudioPlayer";
 import { createContext, useContext } from "react";
 import { cn } from "@/lib/utils";
+import dynamic from "next/dynamic";
+
+const WaveformBar = dynamic(() => import("./WaveformBar"), { ssr: false });
 
 // ── Context ────────────────────────────────────────────────────────────────
 const AudioPlayerContext = createContext<ReturnType<typeof useAudioPlayer> | null>(null);
@@ -531,11 +535,13 @@ export default function AudioPlayer() {
   const {
     currentTrack, isPlaying, currentTime, duration, volume, commentMarkers,
     queue, queueIndex, shuffle, loop, hasNext, hasPrev, playbackRate, setPlaybackRate,
-    analyserRef, resumeAudioContext,
+    analyserRef, resumeAudioContext, audioRef,
   } = player;
 
   const [showQueue, setShowQueue] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [showNowPlaying, setShowNowPlaying] = useState(false);
+  const [showWaveform, setShowWaveform] = useState(false);
 
   // ── Like / heart ──────────────────────────────────────────────────────
   const [likedIds, setLikedIds] = useState<Set<string>>(() => {
@@ -646,13 +652,129 @@ export default function AudioPlayer() {
   const coverUrl = currentTrack.coverArt ?? null;
   const pct      = duration > 0 ? (currentTime / duration) * 100 : 0;
 
+  // Deterministic hue from track ID — changes per song without requiring image CORS
+  function idToHue(id: string): number {
+    let h = 0;
+    for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0;
+    return Math.abs(h % 360);
+  }
+  const trackHsl = `${idToHue(currentTrack.id)} 75% 62%`;
+
   return (
     <>
       <QueueDrawer open={showQueue} onClose={() => setShowQueue(false)} />
 
+      {/* ── Now Playing fullscreen overlay ──────────────────────────── */}
+      {showNowPlaying && (
+        <div className="fixed inset-0 z-[55] flex flex-col items-center justify-center overflow-hidden"
+          style={{ background: "rgba(4,4,8,0.97)", backdropFilter: "blur(0px)" }}
+        >
+          {/* Blurred cover background */}
+          {coverUrl && (
+            <div className="absolute inset-0 pointer-events-none"
+              style={{
+                backgroundImage: `url(${coverUrl})`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                filter: "blur(80px) saturate(1.4)",
+                opacity: 0.35,
+                transform: "scale(1.1)",
+              }}
+            />
+          )}
+          <div className="absolute inset-0 pointer-events-none" style={{
+            background: "linear-gradient(to bottom, rgba(4,4,8,0.6) 0%, rgba(4,4,8,0.2) 40%, rgba(4,4,8,0.7) 100%)",
+          }} />
+
+          {/* Close button */}
+          <button
+            onClick={() => setShowNowPlaying(false)}
+            className="absolute top-4 right-4 z-10 p-2.5 rounded-full bg-white/10 hover:bg-white/20 transition-all text-white/60 hover:text-white"
+          >
+            <Minimize2 className="h-5 w-5" />
+          </button>
+
+          {/* Content */}
+          <div className="relative z-10 flex flex-col items-center gap-6 px-8 w-full max-w-sm">
+            {/* Cover art */}
+            <div className="relative w-64 h-64 rounded-3xl overflow-hidden shadow-2xl"
+              style={{ boxShadow: `0 32px 80px hsl(${idToHue(currentTrack.id)} 75% 30% / 0.6)` }}
+            >
+              {coverUrl ? (
+                <Image src={coverUrl} alt={currentTrack.title} fill className="object-cover" unoptimized />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-white/5">
+                  <Music className="h-16 w-16 text-white/20" />
+                </div>
+              )}
+            </div>
+
+            {/* Title + artist */}
+            <div className="text-center w-full">
+              <p className="text-xl font-black text-white leading-tight truncate">{currentTrack.title}</p>
+              <p className="text-sm text-white/50 mt-1 truncate">{currentTrack.artist}</p>
+            </div>
+
+            {/* Progress */}
+            <div className="w-full space-y-1">
+              <div
+                className="w-full h-1.5 rounded-full bg-white/15 cursor-pointer relative overflow-hidden"
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  player.seek(((e.clientX - rect.left) / rect.width) * duration);
+                }}
+              >
+                <div className="absolute inset-y-0 left-0 rounded-full transition-none"
+                  style={{ width: `${pct}%`, background: `hsl(${idToHue(currentTrack.id)} 75% 62%)` }}
+                />
+              </div>
+              <div className="flex justify-between text-[11px] text-white/35 tabular-nums">
+                <span>{formatTime(currentTime)}</span>
+                <span>{duration > 0 ? formatTime(duration) : "—"}</span>
+              </div>
+            </div>
+
+            {/* Controls */}
+            <div className="flex items-center gap-6">
+              <button onClick={player.playPrev} disabled={!hasPrev}
+                className="p-2 text-white/60 hover:text-white disabled:opacity-30 transition-all active:scale-90">
+                <SkipBack className="h-7 w-7" />
+              </button>
+              <button
+                onClick={() => isPlaying ? player.pause() : player.play()}
+                className="w-16 h-16 rounded-full flex items-center justify-center text-white shadow-xl transition-all active:scale-95"
+                style={{ background: `hsl(${idToHue(currentTrack.id)} 75% 50%)`, boxShadow: `0 0 24px hsl(${idToHue(currentTrack.id)} 75% 50% / 0.5)` }}
+              >
+                {isPlaying ? <Pause className="h-7 w-7" /> : <Play className="h-7 w-7 ml-1" />}
+              </button>
+              <button onClick={player.playNext} disabled={!hasNext}
+                className="p-2 text-white/60 hover:text-white disabled:opacity-30 transition-all active:scale-90">
+                <SkipForward className="h-7 w-7" />
+              </button>
+            </div>
+
+            {/* BPM / Key */}
+            {(currentTrack.bpm || currentTrack.keySignature) && (
+              <div className="flex items-center gap-2">
+                {currentTrack.bpm && (
+                  <span className="text-[11px] text-white/40 bg-white/8 border border-white/10 px-2 py-0.5 rounded-lg">
+                    {currentTrack.bpm} BPM
+                  </span>
+                )}
+                {currentTrack.keySignature && (
+                  <span className="text-[11px] text-white/40 bg-white/8 border border-white/10 px-2 py-0.5 rounded-lg">
+                    {currentTrack.keySignature}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div
         className="fixed bottom-0 left-0 right-0 z-30 animate-in slide-in-from-bottom-4 duration-300"
-        style={{ filter: "drop-shadow(0 -24px 64px rgba(0,0,0,0.92))" }}
+        style={{ filter: "drop-shadow(0 -24px 64px rgba(0,0,0,0.92))", "--section-hsl": trackHsl } as React.CSSProperties}
       >
         {/* ── Background ──────────────────────────────────────────────── */}
         <div className="absolute inset-0 overflow-hidden">
@@ -678,15 +800,28 @@ export default function AudioPlayer() {
             width: "65%", height: "130%",
             background: `radial-gradient(ellipse at 50% 100%, hsl(var(--section-hsl, 262 80% 62%) / ${isPlaying ? "0.20" : "0.09"}) 0%, transparent 70%)`,
           }} />
-          {/* Cover art color bleed */}
+          {/* Cover art color bleed — two-layer depth effect */}
           {coverUrl && (
-            <div className="absolute inset-0 pointer-events-none blur-3xl scale-110" style={{
-              backgroundImage: `url(${coverUrl})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              opacity: isPlaying ? 0.22 : 0.10,
-              transition: "opacity 0.7s ease",
-            }} />
+            <>
+              {/* Deep outer glow — very blurred, wide */}
+              <div className="absolute inset-0 pointer-events-none scale-[1.3]" style={{
+                backgroundImage: `url(${coverUrl})`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                filter: "blur(60px) saturate(2.2)",
+                opacity: isPlaying ? 0.32 : 0.14,
+                transition: "opacity 0.9s ease",
+              }} />
+              {/* Inner sharper glow — center focused */}
+              <div className="absolute inset-0 pointer-events-none" style={{
+                backgroundImage: `url(${coverUrl})`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                filter: "blur(28px) saturate(1.8) brightness(0.7)",
+                opacity: isPlaying ? 0.14 : 0.06,
+                transition: "opacity 0.7s ease",
+              }} />
+            </>
           )}
           {/* Grain texture */}
           <div className="absolute inset-0 pointer-events-none opacity-[0.022]" style={{
@@ -716,16 +851,29 @@ export default function AudioPlayer() {
           )}
         </div>
 
-        {/* ── Spectrum + time labels ────────────────────────────────────── */}
+        {/* ── Spectrum / Waveform + time labels ────────────────────────── */}
         <div className="relative z-10 px-3 pt-1">
-          <SpectrumAnalyzer
-            analyserRef={analyserRef}
-            isPlaying={isPlaying}
-            currentTime={currentTime}
-            duration={duration}
-            commentMarkers={commentMarkers}
-            onSeek={player.seek}
-          />
+          {showWaveform ? (
+            <WaveformBar
+              url={currentTrack.url}
+              audioElement={audioRef.current}
+              currentTime={currentTime}
+              duration={duration}
+              isPlaying={isPlaying}
+              commentMarkers={commentMarkers}
+              onSeek={player.seek}
+              height={44}
+            />
+          ) : (
+            <SpectrumAnalyzer
+              analyserRef={analyserRef}
+              isPlaying={isPlaying}
+              currentTime={currentTime}
+              duration={duration}
+              commentMarkers={commentMarkers}
+              onSeek={player.seek}
+            />
+          )}
           <div className="flex justify-between mt-0.5 px-0.5 items-center">
             <span
               className="player-lcd select-none transition-colors"
@@ -736,6 +884,18 @@ export default function AudioPlayer() {
             >
               {formatTime(currentTime)}
             </span>
+            {/* Waveform / Spectrum toggle */}
+            <button
+              onClick={() => setShowWaveform(v => !v)}
+              title={showWaveform ? "Modo espectro" : "Modo waveform"}
+              className={cn(
+                "player-lcd transition-all active:scale-90 mx-auto",
+                showWaveform ? "opacity-70 hover:opacity-100" : "opacity-25 hover:opacity-55"
+              )}
+              style={{ fontSize: "9px" }}
+            >
+              <Activity className="h-2.5 w-2.5" />
+            </button>
             <button
               onClick={() => setShowRemaining(v => !v)}
               title={showRemaining ? "Mostrar duración total" : "Mostrar tiempo restante"}
@@ -989,6 +1149,14 @@ export default function AudioPlayer() {
                       </div>
                     )}
                   </div>
+                  {/* Expand to fullscreen Now Playing */}
+                  <button
+                    onClick={() => setShowNowPlaying(true)}
+                    data-tooltip="Modo inmersivo"
+                    className="p-1 rounded-lg transition-all active:scale-90 text-white/25 hover:text-white/60"
+                  >
+                    <Maximize2 className="h-3.5 w-3.5" />
+                  </button>
                 </div>
               </div>
             </div>

@@ -84,12 +84,13 @@ export default function DraftForm({ draft, onClose, onSaved }: DraftFormProps) {
     setErrors((prev) => ({ ...prev, [key]: undefined }));
   }
 
-  async function handleDetect() {
-    if (!form.drive_file_id) return;
+  async function handleDetect(idOverride?: string) {
+    const fileId = idOverride ?? form.drive_file_id;
+    if (!fileId) return;
     setJustDetected(false);
     resetAnalysis();
 
-    const streamUrl = `/api/drive/stream/${form.drive_file_id}`;
+    const streamUrl = `/api/drive/stream/${fileId}`;
     const result = await analyze(streamUrl);
     if (result) {
       set("bpm", result.bpm);
@@ -219,11 +220,11 @@ export default function DraftForm({ draft, onClose, onSaved }: DraftFormProps) {
               {form.drive_file_id && (
                 <button
                   type="button"
-                  onClick={handleDetect}
+                  onClick={() => handleDetect()}
                   disabled={analyzing}
                   className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-medium transition-all border
                     disabled:opacity-60 disabled:cursor-not-allowed
-                    bg-violet-500/10 border-violet-500/25 text-violet-400 hover:bg-violet-500/20"
+                    bg-primary/10 border-primary/25 text-primary hover:bg-primary/20"
                 >
                   {analyzing ? (
                     <>
@@ -367,6 +368,10 @@ export default function DraftForm({ draft, onClose, onSaved }: DraftFormProps) {
             set("drive_file_url", file.webViewLink ?? file.webContentLink ?? null);
             setShowDrivePicker(false);
             resetAnalysis();
+            // Auto-detect BPM + key when no data yet
+            if (!form.bpm && !form.key_signature) {
+              handleDetect(file.id);
+            }
           }}
           onClose={() => setShowDrivePicker(false)}
         />

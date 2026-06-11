@@ -26,6 +26,7 @@ export const SongSchema = z.object({
   lyrics: z.string().nullable().default(null),
   isrc: z.string().nullable().default(null),
   pro_registration: z.string().nullable().default(null),
+  version_type: z.string().nullable().default(null),
 });
 export type SongFormData = z.infer<typeof SongSchema>;
 

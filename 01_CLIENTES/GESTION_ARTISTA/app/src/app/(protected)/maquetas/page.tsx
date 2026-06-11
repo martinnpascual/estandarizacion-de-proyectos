@@ -44,6 +44,7 @@ import BulkCoversModal from "@/components/drafts/BulkCoversModal";
 import LyricsPanel from "@/components/lyrics/LyricsPanel";
 import { SongRowSkeleton } from "@/components/ui/Skeletons";
 import { StaggerList, StaggerItem } from "@/components/ui/MotionWrapper";
+import { EmptyState } from "@/components/ui/EmptyState";
 import DraftKanbanBoard from "@/components/drafts/DraftKanbanBoard";
 import CommentsPanel from "@/components/comments/CommentsPanel";
 import { useAudioPlayerContext } from "@/components/audio/AudioPlayer";
@@ -324,6 +325,7 @@ export default function MaquetasPage() {
       coverArt: d.cover_art_url ?? undefined,
       bpm: d.bpm ?? undefined,
       keySignature: d.key_signature ?? undefined,
+      sourceType: "draft" as const,
     };
   }
 
@@ -944,63 +946,38 @@ export default function MaquetasPage() {
             </button>
           </div>
         ) : activeTab === "favoritas" && favoritedIds.size === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center px-4">
-            <div className="relative mb-5 empty-state-icon">
-              <div className="absolute inset-0 bg-pink-500/20 rounded-2xl blur-xl scale-125" />
-              <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-pink-500/20 to-pink-700/10 border border-pink-500/20 flex items-center justify-center">
-                <Heart className="h-8 w-8 text-pink-400/60" />
-              </div>
-            </div>
-            <p className="text-sm font-medium text-foreground/70">Sin favoritas todavía</p>
-            <p className="text-xs text-muted-foreground/50 mt-1">
-              Tocá el ❤ en cualquier maqueta para guardarla aquí
-            </p>
-            <button
-              onClick={() => setActiveTab("todas")}
-              className="mt-4 flex items-center gap-2 px-4 py-2 bg-pink-500/10 border border-pink-500/25 text-pink-400 rounded-2xl text-sm font-medium hover:bg-pink-500/20 transition-all active:scale-95"
-            >
-              <FileAudio className="h-4 w-4" />
-              Ver todas las maquetas
-            </button>
-          </div>
+          <EmptyState
+            icon={Heart}
+            title="Sin favoritas todavía"
+            description="Tocá el ❤ en cualquier maqueta para guardarla aquí."
+            action={{ label: "Ver todas las maquetas", onClick: () => setActiveTab("todas") }}
+            iconColor="text-pink-400"
+            iconBg="bg-pink-500/12 border border-pink-500/20"
+          />
         ) : drafts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center px-4">
-            <div className="relative mb-5 empty-state-icon">
-              <div className="absolute inset-0 bg-blue-500/20 rounded-2xl blur-xl scale-125" />
-              <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500/20 to-blue-700/10 border border-blue-500/20 flex items-center justify-center">
-                <FileAudio className="h-8 w-8 text-blue-400/60" />
-              </div>
-            </div>
-            <p className="text-sm font-medium text-foreground/70">
-              {missingAudioFilter
-                ? "¡Todas las maquetas tienen audio!"
-                : producerFilter
-                ? `Sin maquetas de ${producerFilter}`
-                : searchQuery
-                ? `Sin resultados para "${searchQuery}"`
-                : "No hay maquetas todavía"}
-            </p>
-            <p className="text-xs text-muted-foreground/50 mt-1">
-              {missingAudioFilter ? "Buen trabajo 🎵" : searchQuery ? "Probá con otro término" : "Empezá a registrar tus canciones en progreso"}
-            </p>
-            {missingAudioFilter ? (
-              <button onClick={() => setMissingAudioFilter(false)} className="mt-4 text-xs text-primary hover:text-primary/80 transition-all active:scale-95">
-                Ver todas las maquetas
-              </button>
-            ) : producerFilter ? (
-              <button onClick={() => setProducerFilter(null)} className="mt-4 text-xs text-primary hover:text-primary/80 transition-all active:scale-95">
-                Ver todas las maquetas
-              </button>
-            ) : !searchQuery && (
-              <button
-                onClick={() => { setEditingDraft(undefined); setShowForm(true); }}
-                className="mt-4 flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/25 text-primary rounded-2xl text-sm font-medium hover:bg-primary/20 transition-all active:scale-95"
-              >
-                <Plus className="h-4 w-4" />
-                Nueva maqueta
-              </button>
-            )}
-          </div>
+          <EmptyState
+            icon={FileAudio}
+            title={
+              missingAudioFilter ? "¡Todas las maquetas tienen audio!" :
+              producerFilter ? `Sin maquetas de ${producerFilter}` :
+              searchQuery ? `Sin resultados para "${searchQuery}"` :
+              "No hay maquetas todavía"
+            }
+            description={
+              missingAudioFilter ? "Buen trabajo — todas tienen archivo de audio." :
+              searchQuery ? "Probá con otro término o revisá la ortografía." :
+              producerFilter ? undefined :
+              "Empezá a registrar tus canciones en progreso."
+            }
+            action={
+              missingAudioFilter ? { label: "Ver todas", onClick: () => setMissingAudioFilter(false) } :
+              producerFilter ? { label: "Ver todas", onClick: () => setProducerFilter(null) } :
+              !searchQuery ? { label: "Nueva maqueta", onClick: () => { setEditingDraft(undefined); setShowForm(true); } } :
+              undefined
+            }
+            iconColor="text-[hsl(var(--section-hsl,220_80%_62%))]"
+            iconBg="bg-[hsl(var(--section-hsl,220_80%_62%)/0.12)] border border-[hsl(var(--section-hsl,220_80%_62%)/0.22)]"
+          />
         ) : (
           <div>
             {showMonthGroups ? (
