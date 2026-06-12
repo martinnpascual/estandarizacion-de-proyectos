@@ -12,7 +12,6 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { updateDraftCoverArt } from "@/lib/actions/drafts";
 import type { Draft } from "@/types/database";
 
 interface AICoverModalProps {
@@ -21,34 +20,33 @@ interface AICoverModalProps {
   onSaved: (updatedDraft: Draft) => void;
 }
 
-function defaultPrompt(title: string): string {
-  return `Album cover art for an urban music track titled "${title}". Dark aesthetic, abstract artistic, cinematic lighting, dramatic atmosphere, professional music artwork. No text, no letters, no words, no numbers. Square format.`;
+function defaultPrompt(_title: string): string {
+  return `Album cover art for an urban music track. Dark aesthetic, abstract artistic, cinematic lighting, dramatic atmosphere, professional music artwork. No text, no letters, no words, no numbers in the image. Square format.`;
 }
 
 export default function AICoverModal({ draft, onClose, onSaved }: AICoverModalProps) {
   const [prompt, setPrompt] = useState(defaultPrompt(draft.title));
   const [showPrompt, setShowPrompt] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [imgLoaded, setImgLoaded] = useState(false);
-  const [imgError, setImgError] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
+  const [loadingMsg, setLoadingMsg] = useState("Generando portada…");
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Auto-generate on open
   useEffect(() => {
     handleGenerate();
+    return () => { if (retryTimer.current) clearTimeout(retryTimer.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleGenerate() {
     if (generating) return;
+    if (retryTimer.current) { clearTimeout(retryTimer.current); retryTimer.current = null; }
     setGenerating(true);
     setError(null);
     setImageUrl(null);
-    setImgLoaded(false);
-    setImgError(false);
+    setLoadingMsg("Generando portada…");
 
     try {
       const res = await fetch("/api/covers/generate", {
@@ -58,6 +56,15 @@ export default function AICoverModal({ draft, onClose, onSaved }: AICoverModalPr
       });
 
       const data = await res.json();
+
+      // Cold start: model is loading, auto-retry after estimated time
+      if (res.status === 503 && data.loading) {
+        const wait = Math.min(Math.ceil(data.estimatedTime ?? 20), 30);
+        setLoadingMsg(`Modelo calentando… reintentando en ${wait}s`);
+        setGenerating(false);
+        retryTimer.current = setTimeout(() => handleGenerate(), wait * 1000);
+        return;
+      }
 
       if (!res.ok || !data.imageUrl) {
         setError(data.error ?? "No se pudo generar la imagen");
@@ -73,47 +80,22 @@ export default function AICoverModal({ draft, onClose, onSaved }: AICoverModalPr
   }
 
   async function handleSave() {
-    if (!imageUrl || !imgLoaded) return;
+    if (!imageUrl) return;
     setSaving(true);
     setError(null);
 
     try {
-      // Fetch image binary from Pollinations (CORS-enabled, safe client-side)
-      const imgRes = await fetch(imageUrl);
-      if (!imgRes.ok) throw new Error("No se pudo descargar la imagen generada");
-      const blob = await imgRes.blob();
-      const fileName = `cover-${draft.id}-${Date.now()}.jpg`;
-      const file = new File([blob], fileName, { type: "image/jpeg" });
-
-      // Upload to Drive
-      const formData = new FormData();
-      formData.append("file", file);
-      const uploadRes = await fetch("/api/drive/upload", {
+      const res = await fetch("/api/covers/save", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl, draftId: draft.id }),
       });
-      const uploadData = await uploadRes.json();
-
-      if (!uploadRes.ok) {
-        setError(
-          uploadData.needs_auth
-            ? "Google Drive no está conectado. Conectalo desde tu perfil."
-            : uploadData.error ?? "Error al subir la imagen a Drive"
-        );
+      const data = await res.json();
+      if (!res.ok || !data.draft) {
+        setError(data.error ?? "Error al guardar la portada");
         return;
       }
-
-      // Save URL to DB
-      const { data: updatedDraft, error: dbError } = await updateDraftCoverArt(
-        draft.id,
-        uploadData.url
-      );
-      if (dbError || !updatedDraft) {
-        setError(dbError ?? "Error al guardar la portada");
-        return;
-      }
-
-      onSaved(updatedDraft);
+      onSaved(data.draft);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al guardar");
@@ -152,8 +134,8 @@ export default function AICoverModal({ draft, onClose, onSaved }: AICoverModalPr
         <div className="mx-5 mb-4">
           <div className="relative w-full aspect-square rounded-2xl overflow-hidden border border-border/50 bg-gradient-to-br from-violet-950/30 to-zinc-900/60 flex items-center justify-center">
 
-            {/* Loading spinner — shown while generating URL or while img is loading */}
-            {(generating || (imageUrl && !imgLoaded && !imgError)) && (
+            {/* Loading / warm-up spinner */}
+            {(generating || (!imageUrl && !error)) && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10 bg-gradient-to-br from-violet-950/30 to-zinc-900/60">
                 <div className="relative">
                   <div className="w-12 h-12 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
@@ -161,15 +143,15 @@ export default function AICoverModal({ draft, onClose, onSaved }: AICoverModalPr
                   </div>
                   <div className="absolute -inset-1 rounded-2xl border border-violet-500/20 animate-ping" />
                 </div>
-                <p className="text-xs text-muted-foreground">Generando portada…</p>
+                <p className="text-xs text-muted-foreground text-center px-4">{loadingMsg}</p>
               </div>
             )}
 
             {/* Error state */}
-            {(error || imgError) && !generating && (
+            {error && !generating && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center">
                 <AlertCircle className="h-8 w-8 text-red-400/70" />
-                <p className="text-xs text-red-400">{error ?? "Error al cargar la imagen"}</p>
+                <p className="text-xs text-red-400">{error}</p>
                 <button
                   onClick={handleGenerate}
                   className="mt-1 text-xs text-violet-400 hover:text-violet-300 underline"
@@ -179,20 +161,13 @@ export default function AICoverModal({ draft, onClose, onSaved }: AICoverModalPr
               </div>
             )}
 
-            {/* The image — hidden until loaded */}
+            {/* Generated image — already hosted in Supabase, loads instantly */}
             {imageUrl && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                ref={imgRef}
                 src={imageUrl}
                 alt={`Portada para "${draft.title}"`}
-                className={cn(
-                  "w-full h-full object-cover transition-opacity duration-300",
-                  imgLoaded ? "opacity-100" : "opacity-0"
-                )}
-                crossOrigin="anonymous"
-                onLoad={() => setImgLoaded(true)}
-                onError={() => { setImgLoaded(false); setImgError(true); }}
+                className="w-full h-full object-cover"
               />
             )}
           </div>
@@ -237,7 +212,7 @@ export default function AICoverModal({ draft, onClose, onSaved }: AICoverModalPr
 
           <button
             onClick={handleSave}
-            disabled={!imageUrl || !imgLoaded || saving || generating}
+            disabled={!imageUrl || saving || generating}
             className={cn(
               "flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-black transition-all active:scale-95 flex-1",
               "bg-violet-600 text-white hover:bg-violet-500",

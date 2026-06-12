@@ -161,6 +161,9 @@ export default function SetlistsPage() {
       if (savedId) {
         const found = data.find((s) => s.id === savedId);
         if (found) setSelectedSetlist(found);
+        else if (data.length === 1) setSelectedSetlist(data[0]);
+      } else if (data.length === 1) {
+        setSelectedSetlist(data[0]);
       }
     }
     setLoading(false);
@@ -1183,6 +1186,7 @@ function SetlistCard({
                 "text-sm font-black truncate",
                 isSelected ? "text-foreground" : "text-foreground/80"
               )}
+              title={setlist.name}
             >
               {setlist.name}
             </p>

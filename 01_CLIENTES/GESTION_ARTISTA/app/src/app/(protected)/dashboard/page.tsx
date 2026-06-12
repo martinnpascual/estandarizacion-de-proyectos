@@ -556,6 +556,28 @@ export default function DashboardPage() {
         );
       })()}
 
+      {/* Overdue goals alert */}
+      {!loading && (() => {
+        const today = new Date(); today.setHours(0,0,0,0);
+        const overdueGoals = activeGoals.filter(g => {
+          if (!g.target_date || g.is_completed) return false;
+          const d = new Date(g.target_date + "T00:00:00");
+          return d < today;
+        });
+        if (overdueGoals.length === 0) return null;
+        return (
+          <a href="/metas" className="flex items-center justify-between px-4 py-3 bg-orange-500/10 border border-orange-500/30 rounded-2xl hover:bg-orange-500/15 hover:-translate-y-0.5 hover:shadow-sm transition-all active:scale-[0.99] group">
+            <div className="flex items-center gap-2">
+              <Target className="h-4 w-4 text-orange-400 flex-shrink-0" />
+              <p className="text-sm font-black text-orange-400">
+                {overdueGoals.length} meta{overdueGoals.length !== 1 ? "s" : ""} vencida{overdueGoals.length !== 1 ? "s" : ""} — renovar fecha
+              </p>
+            </div>
+            <ChevronRight className="h-4 w-4 text-orange-400 flex-shrink-0 group-hover:translate-x-0.5 transition-transform" />
+          </a>
+        );
+      })()}
+
       {/* Maquetas listas alert */}
       {!loading && (stats?.readyToPublish ?? 0) > 0 && (
         <a href="/maquetas?status=lista_para_publicar" className="flex items-center justify-between px-4 py-3 bg-green-500/10 border border-green-500/30 rounded-2xl hover:bg-green-500/15 hover:-translate-y-0.5 hover:shadow-sm transition-all active:scale-[0.99] group">

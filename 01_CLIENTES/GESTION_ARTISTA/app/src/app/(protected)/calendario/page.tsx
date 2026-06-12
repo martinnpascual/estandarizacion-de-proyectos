@@ -34,11 +34,12 @@ import {
 import { CalendarEventSchema, type CalendarEventFormData } from "@/lib/schemas";
 import { getSongsByYear } from "@/lib/actions/songs";
 import { getProjects } from "@/lib/actions/projects";
+import { getGoals } from "@/lib/actions/goals";
 import { useAudioPlayerContext } from "@/components/audio/AudioPlayer";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/ToastProvider";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-import type { CalendarEvent, CalendarEventType, Song, Project } from "@/types/database";
+import type { CalendarEvent, CalendarEventType, Song, Project, Goal } from "@/types/database";
 
 const EVENT_TYPE_META: Record<
   CalendarEventType,
@@ -133,16 +134,18 @@ export default function CalendarioPage() {
   // For song/project linking dropdowns in the event form + linked-entity display
   const [formSongs, setFormSongs] = useState<Song[]>([]);
   const [formProjects, setFormProjects] = useState<Project[]>([]);
+  const [allGoals, setAllGoals] = useState<Goal[]>([]);
 
-  // Load songs + projects once on mount (for form dropdowns and linked-entity display)
+  // Load songs + projects + goals once on mount
   useEffect(() => {
-    Promise.all([getSongsByYear(), getProjects()]).then(([songsRes, projectsRes]) => {
+    Promise.all([getSongsByYear(), getProjects(), getGoals()]).then(([songsRes, projectsRes, goalsRes]) => {
       setFormSongs(
         [...(songsRes.data ?? [])].sort((a, b) => a.title.localeCompare(b.title))
       );
       setFormProjects(
         [...(projectsRes.data ?? [])].sort((a, b) => a.name.localeCompare(b.name))
       );
+      setAllGoals((goalsRes.data ?? []).filter((g: Goal) => !!g.target_date && !g.is_completed));
     }).catch(() => { /* silently ignore load errors for dropdowns */ });
   }, []);
 
@@ -474,6 +477,22 @@ export default function CalendarioPage() {
     const key = ev.start_date.split("T")[0];
     if (!eventsByDate[key]) eventsByDate[key] = [];
     eventsByDate[key].push(ev);
+  });
+
+  // Goal deadlines and project target dates indexed by date string
+  const goalsByDate: Record<string, Goal[]> = {};
+  allGoals.forEach((g) => {
+    if (g.target_date) {
+      const key = g.target_date.split("T")[0];
+      if (!goalsByDate[key]) goalsByDate[key] = [];
+      goalsByDate[key].push(g);
+    }
+  });
+  const projectsByDate: Record<string, Project[]> = {};
+  formProjects.filter(p => !!p.target_date).forEach((p) => {
+    const key = (p.target_date as string).split("T")[0];
+    if (!projectsByDate[key]) projectsByDate[key] = [];
+    projectsByDate[key].push(p);
   });
 
   // Filtered events for agenda / selected-date panel
@@ -1156,6 +1175,28 @@ export default function CalendarioPage() {
                           +{dayEvents.length - 3} más
                         </div>
                       )}
+                      {(goalsByDate[dateStr] ?? []).map((g) => (
+                        <a
+                          key={`goal-${g.id}`}
+                          href="/metas"
+                          onClick={(e) => e.stopPropagation()}
+                          title={`Meta: ${g.title}`}
+                          className="text-[10px] px-1.5 py-0.5 rounded-xl truncate border cursor-pointer hover:opacity-80 transition-opacity block bg-orange-500/15 text-orange-400 border-orange-500/25"
+                        >
+                          🎯 {g.title}
+                        </a>
+                      ))}
+                      {(projectsByDate[dateStr] ?? []).map((p) => (
+                        <a
+                          key={`proj-${p.id}`}
+                          href="/proyectos"
+                          onClick={(e) => e.stopPropagation()}
+                          title={`Proyecto: ${p.name}`}
+                          className="text-[10px] px-1.5 py-0.5 rounded-xl truncate border cursor-pointer hover:opacity-80 transition-opacity block bg-violet-500/15 text-violet-400 border-violet-500/25"
+                        >
+                          📁 {p.name}
+                        </a>
+                      ))}
                     </div>
                   </div>
                 );

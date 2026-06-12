@@ -295,9 +295,10 @@ interface GoalCardProps {
   onUpdateProgress: (id: string, current_value: number) => void;
   onEdit: (goal: Goal) => void;
   onSyncNow: (id: string) => Promise<void>;
+  onRenew: (id: string) => void;
 }
 
-function GoalCard({ goal, onToggle, onDelete, onUpdateProgress, onEdit, onSyncNow }: GoalCardProps) {
+function GoalCard({ goal, onToggle, onDelete, onUpdateProgress, onEdit, onSyncNow, onRenew }: GoalCardProps) {
   const percent = Math.min(100, Math.round((goal.current_value / goal.target_value) * 100));
   const [editing, setEditing] = useState(false);
   const [tempValue, setTempValue] = useState(String(goal.current_value));
@@ -422,24 +423,35 @@ function GoalCard({ goal, onToggle, onDelete, onUpdateProgress, onEdit, onSyncNo
               </button>
             )}
             {daysLeft !== null && (
-              <span className={`flex-shrink-0 px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
-                daysLeft < 0
-                  ? "bg-red-500/15 text-red-400"
-                  : daysLeft === 0
-                  ? "bg-orange-500/15 text-orange-400 animate-pulse"
-                  : daysLeft === 1
-                  ? "bg-orange-500/15 text-orange-400"
-                  : daysLeft < 7
-                  ? "bg-amber-500/15 text-amber-400"
-                  : daysLeft < 30
-                  ? "bg-yellow-500/10 text-yellow-500"
-                  : "bg-secondary text-muted-foreground"
-              }`}>
-                {daysLeft < 0 ? `Vencida hace ${Math.abs(daysLeft)}d`
-                  : daysLeft === 0 ? "Hoy"
-                  : daysLeft === 1 ? "Mañana"
-                  : `${daysLeft}d restantes`}
-              </span>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                  daysLeft < 0
+                    ? "bg-red-500/15 text-red-400"
+                    : daysLeft === 0
+                    ? "bg-orange-500/15 text-orange-400 animate-pulse"
+                    : daysLeft === 1
+                    ? "bg-orange-500/15 text-orange-400"
+                    : daysLeft < 7
+                    ? "bg-amber-500/15 text-amber-400"
+                    : daysLeft < 30
+                    ? "bg-yellow-500/10 text-yellow-500"
+                    : "bg-secondary text-muted-foreground"
+                }`}>
+                  {daysLeft < 0 ? `Vencida hace ${Math.abs(daysLeft)}d`
+                    : daysLeft === 0 ? "Hoy"
+                    : daysLeft === 1 ? "Mañana"
+                    : `${daysLeft}d restantes`}
+                </span>
+                {daysLeft < 0 && !goal.is_completed && (
+                  <button
+                    onClick={() => onRenew(goal.id)}
+                    className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-violet-500/15 text-violet-400 border border-violet-500/20 hover:bg-violet-500/25 transition-all active:scale-95"
+                    title="Extender fecha límite 30 días"
+                  >
+                    +30d
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -566,6 +578,16 @@ export default function MetasPage() {
     setGoals((prev) => prev.map((g) => (g.id === id ? { ...g, current_value } : g)));
     const { error } = await updateGoal(id, { current_value });
     if (error) toastError(error);
+  };
+
+  const handleRenew = async (id: string) => {
+    const newDate = new Date();
+    newDate.setDate(newDate.getDate() + 30);
+    const target_date = newDate.toISOString().split("T")[0];
+    setGoals((prev) => prev.map((g) => g.id === id ? { ...g, target_date } : g));
+    const { error } = await updateGoal(id, { target_date });
+    if (error) { toastError(error); load(); return; }
+    toastSuccess("Fecha renovada 30 días");
   };
 
   const handleSyncNow = async (id: string) => {
@@ -803,6 +825,7 @@ export default function MetasPage() {
                   onUpdateProgress={handleUpdateProgress}
                   onEdit={setEditingGoal}
                   onSyncNow={handleSyncNow}
+                  onRenew={handleRenew}
                 />
               </StaggerItem>
             ))}

@@ -701,6 +701,59 @@ export default function MaquetasPage() {
       </div>
 
 
+      {/* Pipeline bar */}
+      {!loading && drafts.length > 0 && (() => {
+        const counts: Record<DraftStatus, number> = { borrador: 0, en_mezcla: 0, masterizada: 0, lista_para_publicar: 0 };
+        drafts.forEach(d => { counts[d.status] = (counts[d.status] ?? 0) + 1; });
+        const stages: { status: DraftStatus; label: string; color: string }[] = [
+          { status: "borrador",            label: "Borrador",     color: "#71717a" },
+          { status: "en_mezcla",           label: "En mezcla",    color: "#60a5fa" },
+          { status: "masterizada",         label: "Masterizada",  color: "#c084fc" },
+          { status: "lista_para_publicar", label: "Lista pub.",   color: "#4ade80" },
+        ];
+        return (
+          <div className="card-premium rounded-2xl px-5 py-4">
+            <p className="text-[11px] font-black uppercase tracking-wider text-muted-foreground mb-3">Pipeline de producción</p>
+            <div className="flex rounded-xl overflow-hidden h-6 gap-0.5">
+              {stages.map(({ status, label, color }) => {
+                const count = counts[status] ?? 0;
+                const pct = drafts.length > 0 ? (count / drafts.length) * 100 : 0;
+                if (pct === 0) return null;
+                return (
+                  <button
+                    key={status}
+                    onClick={() => setStatusFilter(status)}
+                    title={`${label}: ${count}`}
+                    className="group relative flex items-center justify-center transition-all hover:opacity-90 active:scale-95"
+                    style={{ width: `${pct}%`, background: color, minWidth: "2rem" }}
+                  >
+                    <span className="text-[10px] font-black text-black/70 group-hover:text-black/90 transition-colors tabular-nums select-none">
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex gap-4 mt-2.5 flex-wrap">
+              {stages.map(({ status, label, color }) => {
+                const count = counts[status] ?? 0;
+                return (
+                  <button
+                    key={status}
+                    onClick={() => setStatusFilter(status)}
+                    className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors active:scale-95"
+                  >
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
+                    {label}
+                    <span className="font-black tabular-nums" style={{ color }}>{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Tabs: Todas / Favoritas / Archivadas */}
       <div className="flex items-center gap-1 bg-secondary/40 rounded-2xl p-1 w-fit">
         <button
@@ -1575,17 +1628,15 @@ function DraftRow({
         </a>
       )}
 
-      {/* Generar portada con IA — visible en hover cuando no hay cover art */}
-      {!draft.cover_art_url && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onGenerateCover(); }}
-          title="Generar portada con IA"
-          className="hidden group-hover:flex items-center gap-1 px-2 py-1 rounded-xl bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 transition-all active:scale-95 flex-shrink-0 text-[10px] font-medium"
-        >
-          <Sparkles className="h-3 w-3" />
-          Portada
-        </button>
-      )}
+      {/* Generar/regenerar portada con IA — visible en hover siempre */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onGenerateCover(); }}
+        title={draft.cover_art_url ? "Regenerar portada con IA" : "Generar portada con IA"}
+        className="hidden group-hover:flex items-center gap-1 px-2 py-1 rounded-xl bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 transition-all active:scale-95 flex-shrink-0 text-[10px] font-medium"
+      >
+        <Sparkles className="h-3 w-3" />
+        Portada
+      </button>
 
       {/* Sugerencias IA — siempre disponible, activo cuando el panel está abierto */}
       {onToggleAiSuggest && (

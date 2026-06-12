@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   getRoyaltyPayments,
   getRoyaltySummary,
@@ -27,6 +27,7 @@ import {
   Loader2,
   Download,
   Pencil,
+  Upload,
 } from "lucide-react";
 import {
   AreaChart,
@@ -284,6 +285,8 @@ export default function IngresosPage() {
   );
   const { error: toastError, success: toastSuccess } = useToast();
   const { confirm, ConfirmDialog } = useConfirm();
+  const csvImportRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -328,6 +331,78 @@ export default function IngresosPage() {
     a.download = `ingresos_${selectedYear}${selectedSource !== "todos" ? `_${selectedSource}` : ""}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  // ── CSV import (DistroKid format) ────────────────────────────────────────────
+  async function handleImportCSV(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter(Boolean);
+      if (lines.length < 2) { toastError("CSV vacío o sin datos"); return; }
+
+      // Parse header
+      const sep = lines[0].includes("\t") ? "\t" : ",";
+      const parseRow = (line: string) =>
+        line.split(sep).map((c) => c.trim().replace(/^"|"$/g, "").replace(/""/g, '"'));
+      const headers = parseRow(lines[0]).map((h) => h.toLowerCase());
+
+      // Column index helpers
+      const col = (...names: string[]) => names.reduce((found, n) => found !== -1 ? found : headers.findIndex(h => h.includes(n)), -1);
+      const iStore    = col("store", "platform", "fuente", "plataform");
+      const iAmount   = col("net revenue", "earnings", "monto", "amount", "royalt");
+      const iCurrency = col("currency", "moneda");
+      const iPeriod   = col("sale month", "reporting date", "período", "period", "date", "mes");
+
+      if (iAmount === -1 || iPeriod === -1) {
+        toastError("No se encontraron columnas de monto o período en el CSV");
+        return;
+      }
+
+      const STORE_MAP: Record<string, string> = {
+        spotify: "spotify", youtube: "youtube", "apple music": "apple_music",
+        "itunes": "apple_music", tidal: "tidal", amazon: "amazon_music",
+        "soundcloud": "soundcloud", "directo": "directo", "sync": "sync",
+      };
+
+      let imported = 0;
+      let skipped = 0;
+      for (let i = 1; i < lines.length; i++) {
+        const row = parseRow(lines[i]);
+        const rawAmount = parseFloat(row[iAmount]?.replace(/[^0-9.-]/g, "") ?? "");
+        const rawPeriod = row[iPeriod] ?? "";
+        if (isNaN(rawAmount) || rawAmount === 0) { skipped++; continue; }
+
+        // Normalize period to YYYY-MM
+        let period_month = rawPeriod.slice(0, 7);
+        if (!/^\d{4}-\d{2}$/.test(period_month)) {
+          const d = new Date(rawPeriod);
+          if (isNaN(d.getTime())) { skipped++; continue; }
+          period_month = d.toISOString().slice(0, 7);
+        }
+
+        const rawStore = (row[iStore] ?? "").toLowerCase();
+        const source = (Object.entries(STORE_MAP).find(([k]) => rawStore.includes(k))?.[1] ?? "otro") as RoyaltyPaymentFormData["source"];
+        const currency = row[iCurrency]?.toUpperCase() || "USD";
+
+        const { error } = await createRoyaltyPayment({ source, amount: Math.abs(rawAmount), currency, period_month, song_id: null, notes: null });
+        if (error) { skipped++; } else { imported++; }
+      }
+
+      if (imported > 0) {
+        toastSuccess(`${imported} ingreso${imported !== 1 ? "s" : ""} importado${imported !== 1 ? "s" : ""}${skipped > 0 ? ` (${skipped} omitidos)` : ""}`);
+        load();
+      } else {
+        toastError(`No se importaron registros${skipped > 0 ? ` (${skipped} omitidos)` : ""}`);
+      }
+    } catch {
+      toastError("Error al leer el CSV");
+    } finally {
+      setImporting(false);
+    }
   }
 
   // ── Keyboard shortcuts: N → new income, E → export CSV, Escape → close ──────
@@ -412,6 +487,22 @@ export default function IngresosPage() {
                   <span className="hidden sm:inline">Exportar</span>
                 </button>
               )}
+              <input
+                ref={csvImportRef}
+                type="file"
+                accept=".csv,.tsv,.txt"
+                className="hidden"
+                onChange={handleImportCSV}
+              />
+              <button
+                onClick={() => csvImportRef.current?.click()}
+                disabled={importing}
+                title="Importar ingresos desde CSV (DistroKid, TuneCore, etc.)"
+                className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border/60 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all active:scale-95 disabled:opacity-50"
+              >
+                {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                <span className="hidden sm:inline">Importar</span>
+              </button>
               <button
                 onClick={() => setShowForm(true)}
                 title="Nuevo ingreso (N)"
